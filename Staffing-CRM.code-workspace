@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "Staffing CRM"
+    }
+  ],
+  "settings": {
+    "deno.enable": true,
+    "deno.enablePaths": [
+      "supabase/functions"
+    ],
+    "deno.lint": true,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    }
+  }
+}
