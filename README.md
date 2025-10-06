@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Staffing CRM - Multi-Tenant SaaS Application
 
 A complete multi-tenant SaaS platform built with React, Supabase, and Stripe. This application provides a scalable foundation for a CRM system with subscription-based pricing and multi-module support.
@@ -496,3 +497,6 @@ supabase functions list
 1. Verify email templates are enabled in Supabase
 2. Check redirect URLs are configured correctly
 3. Ensure email delivery is working (check spam folder)
+=======
+# staffingcrm
+>>>>>>> origin/main
