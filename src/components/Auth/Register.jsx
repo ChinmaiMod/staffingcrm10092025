@@ -97,6 +97,16 @@ export default function Register() {
 
         if (functionData?.error) {
           console.error('Function returned error:', functionData.error)
+          
+          // Check if it's a duplicate user error
+          if (functionData.error.includes('already exists') || 
+              functionData.error.includes('already registered')) {
+            setError(functionData.error)
+            // Don't throw, just show the error and stay on the page
+            setLoading(false)
+            return
+          }
+          
           throw new Error(`Server Error: ${functionData.error}`)
         }
 
@@ -139,7 +149,18 @@ export default function Register() {
         <h1>Create Your Account</h1>
         <p className="auth-subtitle">Start your free trial today</p>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            {error}
+            {error.includes('already exists') || error.includes('already registered') ? (
+              <div style={{ marginTop: '10px' }}>
+                <Link to="/login" style={{ color: '#fff', textDecoration: 'underline' }}>
+                  Go to Login Page
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        )}
         {success && <div className="alert alert-success">{success}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">

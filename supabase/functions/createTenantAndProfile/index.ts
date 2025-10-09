@@ -41,6 +41,31 @@ serve(async (req) => {
       throw new Error('Missing required fields: userId, email, companyName')
     }
 
+    // Check if profile already exists
+    console.log('Checking for existing profile...')
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('id', userId)
+      .single()
+
+    if (existingProfile) {
+      console.log('User already exists:', existingProfile.email)
+      throw new Error('An account with this email already exists. Please try logging in instead.')
+    }
+
+    // Check if email is already used
+    const { data: existingEmail } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('email', email.toLowerCase())
+      .single()
+
+    if (existingEmail) {
+      console.log('Email already in use:', email)
+      throw new Error('This email address is already registered. Please try logging in instead.')
+    }
+
     // Create tenant
     console.log('Creating tenant...')
     const { data: tenant, error: tenantError } = await supabase
@@ -75,6 +100,12 @@ serve(async (req) => {
 
     if (profileError) {
       console.error('Profile creation error:', profileError)
+      
+      // Check for duplicate key error (PostgreSQL error code 23505)
+      if (profileError.code === '23505') {
+        throw new Error('This account already exists. Please try logging in instead.')
+      }
+      
       throw new Error(`Failed to create profile: ${profileError.message}`)
     }
     console.log('Profile created successfully')
