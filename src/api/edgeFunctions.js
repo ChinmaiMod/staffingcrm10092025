@@ -15,8 +15,17 @@ export async function callEdgeFunction(functionName, data, token = null) {
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }))
-    throw new Error(error.message || 'Edge function call failed')
+    // Try to parse the error response body
+    const errorBody = await response.json().catch(() => null)
+    
+    // Extract the actual error message from the response
+    if (errorBody && errorBody.error) {
+      throw new Error(errorBody.error)
+    }
+    
+    // Fallback to generic message
+    const errorMessage = errorBody?.message || `Request failed with status ${response.status}`
+    throw new Error(errorMessage)
   }
 
   return response.json()
@@ -90,35 +99,55 @@ export async function listContacts(token) {
     'apikey': SUPABASE_ANON_KEY,
   }
   const res = await fetch(`${FUNCTIONS_URL}/crm_contacts`, { headers })
-  if (!res.ok) throw new Error('Failed to list contacts')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to list contacts'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 
 export async function getContact(id, token) {
   const headers = { 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }
   const res = await fetch(`${FUNCTIONS_URL}/crm_contacts/${id}`, { headers })
-  if (!res.ok) throw new Error('Failed to get contact')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to get contact'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 
 export async function createContact(data, token) {
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }
   const res = await fetch(`${FUNCTIONS_URL}/crm_contacts`, { method: 'POST', headers, body: JSON.stringify(data) })
-  if (!res.ok) throw new Error('Failed to create contact')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to create contact'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 
 export async function updateContact(id, data, token) {
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }
   const res = await fetch(`${FUNCTIONS_URL}/crm_contacts/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) })
-  if (!res.ok) throw new Error('Failed to update contact')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to update contact'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 
 export async function deleteContact(id, token) {
   const headers = { 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }
   const res = await fetch(`${FUNCTIONS_URL}/crm_contacts/${id}`, { method: 'DELETE', headers })
-  if (!res.ok) throw new Error('Failed to delete contact')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to delete contact'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 
@@ -126,7 +155,11 @@ export async function deleteContact(id, token) {
 export async function listEmailTemplates(token) {
   const headers = { 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }
   const res = await fetch(`${FUNCTIONS_URL}/email_templates`, { headers })
-  if (!res.ok) throw new Error('Failed to list email templates')
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null)
+    const errorMessage = errorBody?.error || errorBody?.message || 'Failed to list email templates'
+    throw new Error(errorMessage)
+  }
   return res.json()
 }
 

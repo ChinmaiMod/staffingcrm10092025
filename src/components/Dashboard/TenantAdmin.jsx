@@ -3,6 +3,7 @@ import { supabase } from '../../api/supabaseClient'
 import { useAuth } from '../../contexts/AuthProvider'
 import { createInvite } from '../../api/edgeFunctions'
 import { useTenant } from '../../contexts/TenantProvider'
+import { handleSupabaseError } from '../../utils/validators'
 
 export default function TenantAdmin() {
   const { profile } = useAuth()
@@ -53,23 +54,29 @@ export default function TenantAdmin() {
   const changeRole = async (userId, newRole) => {
     try {
       const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
-      if (error) throw error
+      if (error) {
+        const errorMessage = handleSupabaseError(error)
+        throw new Error(errorMessage)
+      }
       fetchUsers()
     } catch (err) {
-      console.error(err)
-      alert('Failed to update role: ' + err.message)
+      console.error('Role update error:', err)
+      alert(err.message || 'Failed to update role')
     }
   }
 
   const removeUser = async (userId) => {
-    if (!confirm('Remove user from tenant?')) return
+    if (!confirm('Remove user from tenant? This will revoke their access to this company.')) return
     try {
       const { error } = await supabase.from('profiles').update({ tenant_id: null, role: 'USER' }).eq('id', userId)
-      if (error) throw error
+      if (error) {
+        const errorMessage = handleSupabaseError(error)
+        throw new Error(errorMessage)
+      }
       fetchUsers()
     } catch (err) {
-      console.error(err)
-      alert('Failed to remove user: ' + err.message)
+      console.error('Remove user error:', err)
+      alert(err.message || 'Failed to remove user')
     }
   }
 

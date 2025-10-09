@@ -46,7 +46,9 @@ export default function VerifyEmail() {
       }, 2000)
     } catch (err) {
       console.error('Verification error:', err)
-      setError(err.message || 'Verification failed. The link may be expired.')
+      // Display the actual error message from the Edge Function
+      const errorMessage = err.message || 'Verification failed. The link may be expired.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -64,7 +66,9 @@ export default function VerifyEmail() {
       setEmail('')
     } catch (err) {
       console.error('Resend error:', err)
-      setError(err.message || 'Failed to resend verification email')
+      // Display the actual error message from the Edge Function
+      const errorMessage = err.message || 'Failed to resend verification email'
+      setError(errorMessage)
     } finally {
       setResending(false)
     }

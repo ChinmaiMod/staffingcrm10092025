@@ -107,14 +107,18 @@ const Feedback = () => {
           feedback_id: feedbackData.feedback_id,
           user_email: user.email,
           tenant_name: tenant.company_name,
-          subject: formData.subject,
-          message: formData.message,
+          subject: formData.subject.trim(),
+          message: formData.message.trim(),
           category: formData.category
         }
       });
 
       if (emailError) {
         console.error('Email send error:', emailError);
+        // Check if there's an error message in the response body
+        if (emailData && emailData.error) {
+          console.error('Email error details:', emailData.error);
+        }
         // Don't throw - feedback is saved, email is nice-to-have
       }
 
