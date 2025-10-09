@@ -68,6 +68,13 @@ export default function Register() {
 
       // Create tenant and profile using Edge Function
       try {
+        console.log('Calling createTenantAndProfile with:', {
+          userId: data.user.id,
+          email: formData.email,
+          username: formData.username || formData.email.split('@')[0],
+          companyName: formData.company,
+        })
+
         const { data: functionData, error: functionError } = await supabase.functions.invoke(
           'createTenantAndProfile',
           {
@@ -80,14 +87,22 @@ export default function Register() {
           }
         )
 
+        console.log('Function response:', { functionData, functionError })
+
         if (functionError) {
-          console.error('Function error:', functionError)
-          throw new Error(functionError.message || 'Failed to create company profile')
+          console.error('Function error details:', functionError)
+          const errorMessage = functionError.message || functionError.msg || 'Failed to create company profile'
+          throw new Error(`Edge Function Error: ${errorMessage}`)
         }
 
         if (functionData?.error) {
           console.error('Function returned error:', functionData.error)
-          throw new Error(functionData.error)
+          throw new Error(`Server Error: ${functionData.error}`)
+        }
+
+        if (!functionData?.success) {
+          console.error('Function response invalid:', functionData)
+          throw new Error('Invalid response from registration service')
         }
 
         setSuccess(

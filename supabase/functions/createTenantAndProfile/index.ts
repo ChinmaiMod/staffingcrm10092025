@@ -16,18 +16,33 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')!
+    // Log the start
+    console.log('createTenantAndProfile function called')
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing environment variables:', { supabaseUrl: !!supabaseUrl, supabaseServiceKey: !!supabaseServiceKey })
+      throw new Error('Server configuration error: Missing environment variables')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
 
     const { userId, email, username, companyName } = await req.json()
+    console.log('Request data:', { userId: !!userId, email: !!email, username, companyName })
 
     if (!userId || !email || !companyName) {
       throw new Error('Missing required fields: userId, email, companyName')
     }
 
     // Create tenant
+    console.log('Creating tenant...')
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .insert({
@@ -37,9 +52,14 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (tenantError) throw tenantError
+    if (tenantError) {
+      console.error('Tenant creation error:', tenantError)
+      throw new Error(`Failed to create tenant: ${tenantError.message}`)
+    }
+    console.log('Tenant created:', tenant.tenant_id)
 
     // Create profile
+    console.log('Creating profile...')
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -53,9 +73,14 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (profileError) throw profileError
+    if (profileError) {
+      console.error('Profile creation error:', profileError)
+      throw new Error(`Failed to create profile: ${profileError.message}`)
+    }
+    console.log('Profile created successfully')
 
     // Create audit log
+    console.log('Creating audit log...')
     await supabase
       .from('audit_logs')
       .insert({
@@ -67,6 +92,7 @@ serve(async (req) => {
         details: { company_name: companyName }
       })
 
+    console.log('Registration completed successfully')
     return new Response(
       JSON.stringify({
         success: true,
@@ -79,8 +105,12 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Edge function error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
