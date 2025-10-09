@@ -66,40 +66,28 @@ export default function Register() {
         throw new Error('No user returned from signup')
       }
 
-      // Create tenant and profile directly without Edge Function
+      // Create tenant and profile using Edge Function
       try {
-        // Create tenant
-        const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .insert([{
-            name: formData.company,
-            owner_id: data.user.id,
-            subscription_status: 'trialing',
-            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days trial
-          }])
-          .select()
-          .single()
+        const { data: functionData, error: functionError } = await supabase.functions.invoke(
+          'createTenantAndProfile',
+          {
+            body: {
+              userId: data.user.id,
+              email: formData.email,
+              username: formData.username || formData.email.split('@')[0],
+              companyName: formData.company,
+            },
+          }
+        )
 
-        if (tenantError) {
-          console.error('Tenant creation error:', tenantError)
-          throw new Error('Failed to create company profile')
+        if (functionError) {
+          console.error('Function error:', functionError)
+          throw new Error(functionError.message || 'Failed to create company profile')
         }
 
-        // Create user profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: data.user.id,
-            email: formData.email,
-            username: formData.username || formData.email.split('@')[0],
-            tenant_id: tenantData.id,
-            role: 'tenant_admin',
-            status: 'active',
-          }])
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError)
-          throw new Error('Failed to create user profile')
+        if (functionData?.error) {
+          console.error('Function returned error:', functionData.error)
+          throw new Error(functionData.error)
         }
 
         setSuccess(
