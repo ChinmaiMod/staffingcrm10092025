@@ -117,9 +117,27 @@ export default function Register() {
 
         console.log('Function response:', { functionData, functionError })
 
+        // Handle Edge Function errors
         if (functionError) {
           console.error('Function error details:', functionError)
-          const errorMessage = functionError.message || functionError.msg || 'Failed to create company profile'
+          
+          // Edge Function returned non-2xx status - check the response body for the actual error
+          if (functionData && functionData.error) {
+            console.log('Error message from function body:', functionData.error)
+            
+            // Check if it's a duplicate user error
+            if (functionData.error.includes('already exists') || 
+                functionData.error.includes('already registered')) {
+              setError(functionData.error)
+              setLoading(false)
+              return
+            }
+            
+            throw new Error(functionData.error)
+          }
+          
+          // Fallback if no error in body
+          const errorMessage = functionError.message || functionError.msg || 'Edge Function returned a non-2xx status code'
           throw new Error(`Registration Error: ${errorMessage}`)
         }
 
@@ -130,12 +148,11 @@ export default function Register() {
           if (functionData.error.includes('already exists') || 
               functionData.error.includes('already registered')) {
             setError(functionData.error)
-            // Don't throw, just show the error and stay on the page
             setLoading(false)
             return
           }
           
-          throw new Error(`Server Error: ${functionData.error}`)
+          throw new Error(functionData.error)
         }
 
         if (!functionData?.success) {
