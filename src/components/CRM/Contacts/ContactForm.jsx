@@ -4,7 +4,7 @@ import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
 import { 
   validateEmail, 
-  validatePhoneNumber, 
+  validatePhone, 
   validateTextField, 
   validateSelect,
   handleError 
@@ -244,7 +244,7 @@ export default function ContactForm({ contact, onSave, onCancel }) {
 
     // Validate phone (optional but must be valid if provided)
     if (formData.phone && formData.phone.trim()) {
-      const phoneValidation = validatePhoneNumber(formData.phone);
+      const phoneValidation = validatePhone(formData.phone);
       if (!phoneValidation.valid) {
         errors.phone = phoneValidation.error;
       }
