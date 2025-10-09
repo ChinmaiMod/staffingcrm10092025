@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
+import { validatePassword, validatePasswordConfirmation, handleError } from '../../utils/validators'
 import './Auth.css'
 
 export default function ResetPassword() {
@@ -14,27 +15,40 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const validateForm = () => {
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long')
-      return false
+    const errors = {}
+    
+    // Validate password
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.valid) {
+      errors.password = passwordValidation.error
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return false
+    // Validate password confirmation
+    const confirmValidation = validatePasswordConfirmation(
+      formData.password,
+      formData.confirmPassword
+    )
+    if (!confirmValidation.valid) {
+      errors.confirmPassword = confirmValidation.error
     }
 
-    return true
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+    setFieldErrors({})
 
-    if (!validateForm()) return
+    if (!validateForm()) {
+      setError('Please fix the errors below')
+      return
+    }
 
     setLoading(true)
 
@@ -50,17 +64,26 @@ export default function ResetPassword() {
       }, 2000)
     } catch (err) {
       console.error('Password update error:', err)
-      setError(err.message || 'Failed to update password')
+      setError(handleError(err, 'password update'))
     } finally {
       setLoading(false)
     }
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
+    
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors({
+        ...fieldErrors,
+        [name]: ''
+      })
+    }
   }
 
   return (
@@ -74,30 +97,39 @@ export default function ResetPassword() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="password">New Password</label>
+            <label htmlFor="password">New Password *</label>
             <input
               type="password"
               id="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              required
+              className={fieldErrors.password ? 'error' : ''}
               placeholder="Minimum 8 characters"
+              autoComplete="new-password"
             />
-            <small>Must be at least 8 characters long</small>
+            {fieldErrors.password ? (
+              <small className="error-text">{fieldErrors.password}</small>
+            ) : (
+              <small>Must be at least 8 characters long</small>
+            )}
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm New Password</label>
+            <label htmlFor="confirmPassword">Confirm New Password *</label>
             <input
               type="password"
               id="confirmPassword"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              required
+              className={fieldErrors.confirmPassword ? 'error' : ''}
               placeholder="Re-enter your password"
+              autoComplete="new-password"
             />
+            {fieldErrors.confirmPassword && (
+              <small className="error-text">{fieldErrors.confirmPassword}</small>
+            )}
           </div>
 
           <button

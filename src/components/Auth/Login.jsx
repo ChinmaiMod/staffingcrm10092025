@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
+import { validateEmail, handleError } from '../../utils/validators'
 import './Auth.css'
 
 export default function Login() {
@@ -13,34 +14,67 @@ export default function Login() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const validateForm = () => {
+    const errors = {}
+    
+    // Validate email
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.valid) {
+      errors.email = emailValidation.error
+    }
+    
+    // Validate password
+    if (!formData.password) {
+      errors.password = 'Password is required'
+    }
+    
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
+    
+    // Validate form before submitting
+    if (!validateForm()) {
+      setError('Please fix the errors below')
+      return
+    }
+    
     setLoading(true)
 
     try {
       const { data, error: signInError } = await signIn(
-        formData.email,
+        formData.email.trim(),
         formData.password
       )
 
       if (signInError) throw signInError
 
       if (!data.user) {
-        throw new Error('Login failed')
+        throw new Error('Login failed. Please check your credentials.')
       }
 
       // Redirect will be handled by AuthProvider and route protection
       navigate('/dashboard')
     } catch (err) {
       console.error('Login error:', err)
+      
+      // Handle specific error cases
       if (err.message.includes('Email not confirmed')) {
-        setError('Please verify your email address before logging in.')
+        setError('Please verify your email address before logging in. Check your inbox for the verification link.')
       } else if (err.message.includes('Invalid login credentials')) {
-        setError('Invalid email or password')
+        setError('Invalid email or password. Please try again.')
+      } else if (err.message.includes('Email link is invalid')) {
+        setError('Your email verification link has expired. Please request a new one.')
+      } else if (err.message.includes('User not found')) {
+        setError('No account found with this email address. Please check your email or sign up.')
       } else {
-        setError(err.message || 'An error occurred during login')
+        setError(handleError(err, 'login'))
       }
     } finally {
       setLoading(false)
@@ -48,10 +82,19 @@ export default function Login() {
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
+    
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors({
+        ...fieldErrors,
+        [name]: ''
+      })
+    }
   }
 
   return (
@@ -64,29 +107,37 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="email">Email Address *</label>
             <input
               type="email"
               id="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              required
+              className={fieldErrors.email ? 'error' : ''}
               placeholder="you@company.com"
+              autoComplete="email"
             />
+            {fieldErrors.email && (
+              <small className="error-text">{fieldErrors.email}</small>
+            )}
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Password *</label>
             <input
               type="password"
               id="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              required
+              className={fieldErrors.password ? 'error' : ''}
               placeholder="Enter your password"
+              autoComplete="current-password"
             />
+            {fieldErrors.password && (
+              <small className="error-text">{fieldErrors.password}</small>
+            )}
           </div>
 
           <div className="form-group">

@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import { supabase } from '../../api/supabaseClient';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useTenant } from '../../contexts/TenantProvider';
+import { 
+  validateTextField, 
+  validateSelect, 
+  validateURL,
+  validateFile,
+  handleSupabaseError
+} from '../../utils/validators';
 import './IssueReport.css';
 
 const IssueReport = () => {
@@ -24,6 +31,7 @@ const IssueReport = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const severityOptions = [
     { value: 'LOW', label: 'Low', description: 'Minor issue', color: 'low' },
@@ -38,6 +46,14 @@ const IssueReport = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors({
+        ...fieldErrors,
+        [name]: ''
+      });
+    }
   };
 
   const handleSeveritySelect = (severity) => {
@@ -50,12 +66,22 @@ const IssueReport = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setError('File size must be less than 5MB');
+      const fileValidation = validateFile(file, {
+        required: false,
+        maxSize: 5 * 1024 * 1024, // 5MB
+        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+      });
+      
+      if (!fileValidation.valid) {
+        setError(fileValidation.error);
+        setFieldErrors({ ...fieldErrors, screenshot: fileValidation.error });
         return;
       }
+      
       setScreenshot(file);
       setError('');
+      setFieldErrors({ ...fieldErrors, screenshot: '' });
     }
   };
 
@@ -63,12 +89,24 @@ const IssueReport = () => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
+      const fileValidation = validateFile(file, {
+        required: false,
+        maxSize: 5 * 1024 * 1024,
+        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      });
+      
+      if (!fileValidation.valid) {
+        setError(fileValidation.error);
+        setFieldErrors({ ...fieldErrors, screenshot: fileValidation.error });
         return;
       }
+      
       setScreenshot(file);
       setError('');
+      setFieldErrors({ ...fieldErrors, screenshot: '' });
+    } else if (file) {
+      setError('Please upload an image file (JPG, PNG, GIF, or WebP)');
+      setFieldErrors({ ...fieldErrors, screenshot: 'Invalid file type' });
     }
   };
 
@@ -101,22 +139,55 @@ const IssueReport = () => {
     setLoading(true);
     setError('');
     setSuccess(false);
+    setFieldErrors({});
 
     try {
+      // Validate form fields
+      const errors = {};
+      
+      const titleValidation = validateTextField(formData.title, 'Issue title', {
+        required: true,
+        minLength: 10,
+        maxLength: 200
+      });
+      if (!titleValidation.valid) errors.title = titleValidation.error;
+      
+      const descValidation = validateTextField(formData.description, 'Description', {
+        required: true,
+        minLength: 20,
+        maxLength: 2000
+      });
+      if (!descValidation.valid) errors.description = descValidation.error;
+      
+      const typeValidation = validateSelect(formData.issue_type, 'Issue type', true);
+      if (!typeValidation.valid) errors.issue_type = typeValidation.error;
+      
+      if (formData.page_url) {
+        const urlValidation = validateURL(formData.page_url, false);
+        if (!urlValidation.valid) errors.page_url = urlValidation.error;
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setError('Please fix the errors below before submitting');
+        setLoading(false);
+        return;
+      }
+
       // Insert issue report into database
       const { data: issueData, error: dbError } = await supabase
         .from('issue_reports')
         .insert([{
           tenant_id: tenant.tenant_id,
           user_id: user.id,
-          title: formData.title,
-          description: formData.description,
+          title: formData.title.trim(),
+          description: formData.description.trim(),
           severity: formData.severity,
           issue_type: formData.issue_type,
-          steps_to_reproduce: formData.steps_to_reproduce,
-          expected_behavior: formData.expected_behavior,
-          actual_behavior: formData.actual_behavior,
-          page_url: formData.page_url,
+          steps_to_reproduce: formData.steps_to_reproduce.trim(),
+          expected_behavior: formData.expected_behavior.trim(),
+          actual_behavior: formData.actual_behavior.trim(),
+          page_url: formData.page_url.trim(),
           browser_info: formData.browser_info,
           status: 'OPEN'
         }])
@@ -158,7 +229,7 @@ const IssueReport = () => {
 
     } catch (err) {
       console.error('Error submitting issue report:', err);
-      setError(err.message || 'Failed to submit issue report. Please try again.');
+      setError(handleSupabaseError(err));
     } finally {
       setLoading(false);
     }
@@ -179,6 +250,7 @@ const IssueReport = () => {
     setScreenshot(null);
     setError('');
     setSuccess(false);
+    setFieldErrors({});
   };
 
   return (
@@ -222,10 +294,13 @@ const IssueReport = () => {
             name="title"
             value={formData.title}
             onChange={handleChange}
+            className={fieldErrors.title ? 'error' : ''}
             placeholder="Brief description of the issue..."
             maxLength={200}
-            required
           />
+          {fieldErrors.title && (
+            <small className="error-text">{fieldErrors.title}</small>
+          )}
         </div>
 
         <div className="form-row">
@@ -238,7 +313,7 @@ const IssueReport = () => {
               name="issue_type"
               value={formData.issue_type}
               onChange={handleChange}
-              required
+              className={fieldErrors.issue_type ? 'error' : ''}
             >
               <option value="BUG">Bug / Error</option>
               <option value="UI_ISSUE">UI / Display Issue</option>
@@ -247,6 +322,9 @@ const IssueReport = () => {
               <option value="FEATURE_NOT_WORKING">Feature Not Working</option>
               <option value="OTHER">Other</option>
             </select>
+            {fieldErrors.issue_type && (
+              <small className="error-text">{fieldErrors.issue_type}</small>
+            )}
           </div>
 
           <div className="form-group">
@@ -257,8 +335,12 @@ const IssueReport = () => {
               name="page_url"
               value={formData.page_url}
               onChange={handleChange}
+              className={fieldErrors.page_url ? 'error' : ''}
               placeholder="https://..."
             />
+            {fieldErrors.page_url && (
+              <small className="error-text">{fieldErrors.page_url}</small>
+            )}
           </div>
         </div>
 
@@ -289,10 +371,13 @@ const IssueReport = () => {
             name="description"
             value={formData.description}
             onChange={handleChange}
+            className={fieldErrors.description ? 'error' : ''}
             placeholder="Provide a detailed description of the issue..."
             maxLength={2000}
-            required
           />
+          {fieldErrors.description && (
+            <small className="error-text">{fieldErrors.description}</small>
+          )}
           <div className={`character-count ${formData.description.length > 1800 ? 'warning' : ''}`}>
             {formData.description.length} / 2000 characters
           </div>

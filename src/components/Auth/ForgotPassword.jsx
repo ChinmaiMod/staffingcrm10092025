@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
+import { validateEmail, handleError } from '../../utils/validators'
 import './Auth.css'
 
 export default function ForgotPassword() {
@@ -9,23 +10,34 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [fieldError, setFieldError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+    setFieldError('')
+    
+    // Validate email
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.valid) {
+      setFieldError(emailValidation.error)
+      setError('Please enter a valid email address')
+      return
+    }
+    
     setLoading(true)
 
     try {
-      const { error: resetError } = await resetPassword(email)
+      const { error: resetError } = await resetPassword(email.trim())
 
       if (resetError) throw resetError
 
-      setSuccess('Password reset email sent! Please check your inbox.')
+      setSuccess('Password reset email sent! Please check your inbox and spam folder.')
       setEmail('')
     } catch (err) {
       console.error('Password reset error:', err)
-      setError(err.message || 'Failed to send password reset email')
+      setError(handleError(err, 'password reset'))
     } finally {
       setLoading(false)
     }
@@ -44,16 +56,23 @@ export default function ForgotPassword() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="email">Email Address *</label>
             <input
               type="email"
               id="email"
               name="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setFieldError('')
+              }}
+              className={fieldError ? 'error' : ''}
               placeholder="you@company.com"
+              autoComplete="email"
             />
+            {fieldError && (
+              <small className="error-text">{fieldError}</small>
+            )}
           </div>
 
           <button

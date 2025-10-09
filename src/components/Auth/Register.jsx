@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
 import { supabase } from '../../api/supabaseClient'
+import { 
+  validateEmail, 
+  validatePassword, 
+  validatePasswordConfirmation,
+  validateUsername,
+  validateCompanyName,
+  handleError
+} from '../../utils/validators'
 import './Auth.css'
 
 export default function Register() {
@@ -18,61 +26,81 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const validateForm = () => {
-    if (!formData.email || !formData.password || !formData.company) {
-      setError('Please fill in all required fields')
-      return false
+    const errors = {}
+    
+    // Validate company name
+    const companyValidation = validateCompanyName(formData.company)
+    if (!companyValidation.valid) {
+      errors.company = companyValidation.error
     }
 
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address')
-      return false
+    // Validate email
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.valid) {
+      errors.email = emailValidation.error
+    }
+    
+    // Validate username (optional but validate if provided)
+    const usernameValidation = validateUsername(formData.username, false)
+    if (!usernameValidation.valid) {
+      errors.username = usernameValidation.error
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long')
-      return false
+    // Validate password
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.valid) {
+      errors.password = passwordValidation.error
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return false
+    // Validate password confirmation
+    const confirmValidation = validatePasswordConfirmation(
+      formData.password,
+      formData.confirmPassword
+    )
+    if (!confirmValidation.valid) {
+      errors.confirmPassword = confirmValidation.error
     }
 
-    return true
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+    setFieldErrors({})
 
-    if (!validateForm()) return
+    if (!validateForm()) {
+      setError('Please fix the errors below before continuing')
+      return
+    }
 
     setLoading(true)
 
     try {
       // Sign up user with Supabase Auth
       const { data, error: signUpError } = await signUp(
-        formData.email,
+        formData.email.trim(),
         formData.password
       )
 
       if (signUpError) throw signUpError
 
       if (!data.user) {
-        throw new Error('No user returned from signup')
+        throw new Error('Registration failed. Please try again.')
       }
 
       // Create tenant and profile using Edge Function
       try {
         console.log('Calling createTenantAndProfile with:', {
           userId: data.user.id,
-          email: formData.email,
-          username: formData.username || formData.email.split('@')[0],
-          companyName: formData.company,
+          email: formData.email.trim(),
+          username: formData.username.trim() || formData.email.split('@')[0],
+          companyName: formData.company.trim(),
         })
 
         const { data: functionData, error: functionError } = await supabase.functions.invoke(
@@ -80,9 +108,9 @@ export default function Register() {
           {
             body: {
               userId: data.user.id,
-              email: formData.email,
-              username: formData.username || formData.email.split('@')[0],
-              companyName: formData.company,
+              email: formData.email.trim(),
+              username: formData.username.trim() || formData.email.split('@')[0],
+              companyName: formData.company.trim(),
             },
           }
         )
@@ -92,7 +120,7 @@ export default function Register() {
         if (functionError) {
           console.error('Function error details:', functionError)
           const errorMessage = functionError.message || functionError.msg || 'Failed to create company profile'
-          throw new Error(`Edge Function Error: ${errorMessage}`)
+          throw new Error(`Registration Error: ${errorMessage}`)
         }
 
         if (functionData?.error) {
@@ -112,7 +140,7 @@ export default function Register() {
 
         if (!functionData?.success) {
           console.error('Function response invalid:', functionData)
-          throw new Error('Invalid response from registration service')
+          throw new Error('Invalid response from registration service. Please try again.')
         }
 
         setSuccess(
@@ -124,23 +152,30 @@ export default function Register() {
         }, 3000)
       } catch (dbError) {
         console.error('Database error:', dbError)
-        // If database operations fail, we should clean up the auth user
-        // but for now, we'll just show the error
         throw dbError
       }
     } catch (err) {
       console.error('Registration error:', err)
-      setError(err.message || 'An error occurred during registration')
+      setError(handleError(err, 'registration'))
     } finally {
       setLoading(false)
     }
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
+    
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors({
+        ...fieldErrors,
+        [name]: ''
+      })
+    }
   }
 
   return (
@@ -172,9 +207,13 @@ export default function Register() {
               name="company"
               value={formData.company}
               onChange={handleChange}
-              required
+              className={fieldErrors.company ? 'error' : ''}
               placeholder="Your Company Inc."
+              autoComplete="organization"
             />
+            {fieldErrors.company && (
+              <small className="error-text">{fieldErrors.company}</small>
+            )}
           </div>
 
           <div className="form-group">
@@ -185,9 +224,13 @@ export default function Register() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              required
+              className={fieldErrors.email ? 'error' : ''}
               placeholder="you@company.com"
+              autoComplete="email"
             />
+            {fieldErrors.email && (
+              <small className="error-text">{fieldErrors.email}</small>
+            )}
           </div>
 
           <div className="form-group">
@@ -198,8 +241,13 @@ export default function Register() {
               name="username"
               value={formData.username}
               onChange={handleChange}
+              className={fieldErrors.username ? 'error' : ''}
               placeholder="johndoe"
+              autoComplete="username"
             />
+            {fieldErrors.username && (
+              <small className="error-text">{fieldErrors.username}</small>
+            )}
           </div>
 
           <div className="form-group">
@@ -210,12 +258,15 @@ export default function Register() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              required
+              className={fieldErrors.password ? 'error' : ''}
               placeholder="Minimum 8 characters"
+              autoComplete="new-password"
             />
-            <small>
-              Must be at least 8 characters long
-            </small>
+            {fieldErrors.password ? (
+              <small className="error-text">{fieldErrors.password}</small>
+            ) : (
+              <small>Must be at least 8 characters long</small>
+            )}
           </div>
 
           <div className="form-group">
@@ -226,9 +277,13 @@ export default function Register() {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              required
+              className={fieldErrors.confirmPassword ? 'error' : ''}
               placeholder="Re-enter your password"
+              autoComplete="new-password"
             />
+            {fieldErrors.confirmPassword && (
+              <small className="error-text">{fieldErrors.confirmPassword}</small>
+            )}
           </div>
 
           <button
