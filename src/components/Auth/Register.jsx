@@ -118,41 +118,26 @@ export default function Register() {
         console.log('Function response:', { functionData, functionError })
 
         // Handle Edge Function errors
-        if (functionError) {
-          console.error('Function error details:', functionError)
+        // When Edge Function returns non-2xx status, the error details are in functionData.error
+        if (functionError || functionData?.error) {
+          console.error('Function error details:', { functionError, functionData })
           
-          // Edge Function returned non-2xx status - check the response body for the actual error
-          if (functionData && functionData.error) {
-            console.log('Error message from function body:', functionData.error)
-            
-            // Check if it's a duplicate user error
-            if (functionData.error.includes('already exists') || 
-                functionData.error.includes('already registered')) {
-              setError(functionData.error)
-              setLoading(false)
-              return
-            }
-            
-            throw new Error(functionData.error)
-          }
+          // Extract the error message from the response body
+          let errorMessage = functionData?.error || functionError?.message || 'Registration failed. Please try again.'
           
-          // Fallback if no error in body
-          const errorMessage = functionError.message || functionError.msg || 'Edge Function returned a non-2xx status code'
-          throw new Error(`Registration Error: ${errorMessage}`)
-        }
-
-        if (functionData?.error) {
-          console.error('Function returned error:', functionData.error)
+          console.log('Extracted error message:', errorMessage)
           
-          // Check if it's a duplicate user error
-          if (functionData.error.includes('already exists') || 
-              functionData.error.includes('already registered')) {
-            setError(functionData.error)
+          // Check if it's a duplicate user/email error
+          if (errorMessage.includes('already exists') || 
+              errorMessage.includes('already registered') ||
+              errorMessage.includes('already in use')) {
+            setError(errorMessage)
             setLoading(false)
             return
           }
           
-          throw new Error(functionData.error)
+          // For other errors, throw to be caught by outer catch
+          throw new Error(errorMessage)
         }
 
         if (!functionData?.success) {
