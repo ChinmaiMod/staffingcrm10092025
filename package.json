@@ -5,9 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --mode local",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:restart": "supabase stop && supabase start",
+    "supabase:reset": "supabase db reset",
+    "db:migrate": "supabase db push",
+    "db:reset": "supabase db reset",
+    "studio": "start http://localhost:54323",
+    "setup": "powershell -ExecutionPolicy Bypass -File .\\setup-local-supabase.ps1"
   },
   "dependencies": {
     "@stripe/stripe-js": "^2.1.11",

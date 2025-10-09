@@ -31,7 +31,7 @@ export default function TenantDashboard() {
 
       <div className="dashboard-content">
         <div className="dashboard-header">
-          <h1>Welcome to Your Dashboard</h1>
+          <h1>Welcome to Your Account</h1>
           <p>Manage your business with ease</p>
         </div>
 
@@ -109,7 +109,7 @@ export default function TenantDashboard() {
             <div className="module-card">
               <h3>CRM</h3>
               <p>Customer Relationship Management</p>
-              <button className="btn btn-primary">
+              <button className="btn btn-primary" onClick={() => navigate('/crm')}>
                 Access CRM
               </button>
             </div>
@@ -119,7 +119,7 @@ export default function TenantDashboard() {
                 <div className="module-card">
                   <h3>HRMS</h3>
                   <p>Human Resource Management System</p>
-                  <button className="btn btn-primary">
+                  <button className="btn btn-primary" onClick={() => navigate('/hrms')}>
                     Access HRMS
                   </button>
                 </div>
@@ -127,7 +127,7 @@ export default function TenantDashboard() {
                 <div className="module-card">
                   <h3>Finance</h3>
                   <p>Financial Management System</p>
-                  <button className="btn btn-primary">
+                  <button className="btn btn-primary" onClick={() => navigate('/finance')}>
                     Access Finance
                   </button>
                 </div>
@@ -146,6 +146,14 @@ export default function TenantDashboard() {
                 </button>
               </div>
             )}
+
+            <div className="module-card">
+              <h3>💡 Suggestions/Ideas ?</h3>
+              <p>Share your feedback and ideas</p>
+              <button className="btn btn-primary" onClick={() => navigate('/feedback')}>
+                Submit Feedback
+              </button>
+            </div>
           </div>
         </div>
       </div>

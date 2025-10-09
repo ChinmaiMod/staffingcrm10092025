@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
-import { createTenantAndProfile } from '../../api/edgeFunctions'
+import { supabase } from '../../api/supabaseClient'
 import './Auth.css'
 
 export default function Register() {
@@ -66,21 +66,55 @@ export default function Register() {
         throw new Error('No user returned from signup')
       }
 
-      // Create tenant and profile
-      await createTenantAndProfile(
-        data.user.id,
-        formData.email,
-        formData.username || formData.email.split('@')[0],
-        formData.company
-      )
+      // Create tenant and profile directly without Edge Function
+      try {
+        // Create tenant
+        const { data: tenantData, error: tenantError } = await supabase
+          .from('tenants')
+          .insert([{
+            name: formData.company,
+            owner_id: data.user.id,
+            subscription_status: 'trialing',
+            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days trial
+          }])
+          .select()
+          .single()
 
-      setSuccess(
-        'Registration successful! Please check your email to verify your account.'
-      )
+        if (tenantError) {
+          console.error('Tenant creation error:', tenantError)
+          throw new Error('Failed to create company profile')
+        }
 
-      setTimeout(() => {
-        navigate('/login')
-      }, 3000)
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: data.user.id,
+            email: formData.email,
+            username: formData.username || formData.email.split('@')[0],
+            tenant_id: tenantData.id,
+            role: 'tenant_admin',
+            status: 'active',
+          }])
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+          throw new Error('Failed to create user profile')
+        }
+
+        setSuccess(
+          'Registration successful! Please check your email to verify your account, then you can login.'
+        )
+
+        setTimeout(() => {
+          navigate('/login')
+        }, 3000)
+      } catch (dbError) {
+        console.error('Database error:', dbError)
+        // If database operations fail, we should clean up the auth user
+        // but for now, we'll just show the error
+        throw dbError
+      }
     } catch (err) {
       console.error('Registration error:', err)
       setError(err.message || 'An error occurred during registration')

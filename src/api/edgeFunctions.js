@@ -49,6 +49,15 @@ export async function createCheckoutSession(priceId, tenantId, profileId, billin
   })
 }
 
+// Bulk Email Function
+export async function sendBulkEmail(recipients, subject, body, token) {
+  return callEdgeFunction('sendBulkEmail', {
+    recipients,
+    subject,
+    body,
+  }, token)
+}
+
 export async function applyPromoCode(code, planName, billingCycle) {
   return callEdgeFunction('applyPromoCode', {
     code,

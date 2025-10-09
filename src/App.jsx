@@ -19,6 +19,9 @@ import TenantAdmin from './components/Dashboard/TenantAdmin'
 import SuperAdmin from './components/Dashboard/SuperAdmin'
 import CRMApp from './components/CRM/CRMApp'
 
+// Feedback Component
+import Feedback from './components/Feedback/Feedback'
+
 // Protected Route
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -83,6 +86,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CRMApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute>
+                <Feedback />
               </ProtectedRoute>
             }
           />

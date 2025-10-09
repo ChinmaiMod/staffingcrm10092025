@@ -15,35 +15,149 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS visa_status (
   visa_status_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 
+-- Insert visa status data (Note: tenant_id will need to be set per tenant)
+-- For global/default data, insert with NULL tenant_id or use a function to populate per tenant
+INSERT INTO visa_status (code, label, tenant_id) 
+SELECT code, label, NULL FROM (VALUES
+  ('F1', 'F1'),
+  ('OPT', 'OPT'),
+  ('STEM_OPT', 'STEM OPT'),
+  ('H1B', 'H1B'),
+  ('H4', 'H4'),
+  ('H4_EAD', 'H4 EAD'),
+  ('GC_EAD', 'GC EAD'),
+  ('L1B', 'L1B'),
+  ('L2S', 'L2S'),
+  ('B1_B2', 'B1/B2'),
+  ('J1', 'J1'),
+  ('TN', 'TN'),
+  ('E3', 'E3'),
+  ('GC', 'GC'),
+  ('USC', 'USC')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS job_titles (
   job_title_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   category text NOT NULL CHECK (category IN ('IT','HEALTHCARE')),
   title text NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 
+-- Insert IT job titles
+INSERT INTO job_titles (category, title, tenant_id)
+SELECT category, title, NULL FROM (VALUES
+  ('IT', 'Java Back End Developer'),
+  ('IT', 'Java Full Stack Developer'),
+  ('IT', 'Dotnet Developer'),
+  ('IT', 'Python Developer'),
+  ('IT', 'Data Analyst'),
+  ('IT', 'AWS Data Engineer'),
+  ('IT', 'Azure Data Engineer'),
+  ('IT', 'GCP Data Engineer'),
+  ('IT', 'Big Data Developer'),
+  ('IT', 'Power BI Developer'),
+  ('IT', 'Qliksense Developer'),
+  ('IT', 'Tableau Developer'),
+  ('IT', 'Informatica Developer'),
+  ('IT', 'Talend Developer'),
+  ('IT', 'Abinitio Developer'),
+  ('IT', 'Oracle PL/SQL Developer'),
+  ('IT', 'Oracle Apex Developer'),
+  ('IT', 'Oracle EBS Techno-functional consultant'),
+  ('IT', 'Oracle EBS Functional consultant'),
+  ('IT', 'Business Analyst'),
+  ('IT', 'Manual QA'),
+  ('IT', 'Automation QA'),
+  ('IT', 'ETL Tester'),
+  ('IT', 'iOS Developer'),
+  ('IT', 'Android Developer'),
+  ('IT', 'AWS Devops'),
+  ('IT', 'Azure Devops'),
+  ('IT', 'GCP Devops'),
+  ('IT', 'Manhattan WMS'),
+  ('IT', 'Embedded Engineer'),
+  ('IT', 'Servicenow Admin'),
+  ('IT', 'Servicenow Developer'),
+  ('IT', 'Oracle DBA'),
+  ('IT', 'SQL DBA'),
+  ('IT', 'Scrum Master'),
+  ('IT', 'Project Manager'),
+  ('IT', 'Mainframe Developer'),
+  ('IT', 'Mainframe Architect'),
+  ('HEALTHCARE', 'Licensed Practical Nurse(LPN)'),
+  ('HEALTHCARE', 'GNA'),
+  ('HEALTHCARE', 'Registered nurse (RN)'),
+  ('HEALTHCARE', 'Respiratory Therapist (RRT)'),
+  ('HEALTHCARE', 'Nurse Practitioner (NP)')
+) AS t(category, title)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS reasons_for_contact (
   reason_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL
 );
+
+-- Insert reasons for contact
+INSERT INTO reasons_for_contact (code, label, tenant_id)
+SELECT code, label, NULL FROM (VALUES
+  ('TRAINING_PLACEMENT', 'Training and Placement'),
+  ('MARKETING_PLACEMENT', 'Marketing and Placement'),
+  ('H1B_SPONSORSHIP', 'H1B Sponsorship'),
+  ('H1B_TRANSFER', 'H1B Transfer'),
+  ('GC_PROCESSING', 'GC Processing')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS contact_statuses (
   status_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL
 );
 
+-- Insert contact statuses
+INSERT INTO contact_statuses (code, label, tenant_id)
+SELECT code, label, NULL FROM (VALUES
+  ('INITIAL_CONTACT', 'Initial Contact'),
+  ('SPOKE_TO_CANDIDATE', 'Spoke to candidate'),
+  ('RESUME_NEEDS_PREP', 'Resume needs to be prepared'),
+  ('RESUME_PREPARED', 'Resume prepared and sent for review'),
+  ('ASSIGNED_TO_RECRUITER', 'Assigned to Recruiter'),
+  ('RECRUITER_MARKETING', 'Recruiter started marketing'),
+  ('PLACED', 'Placed into Job'),
+  ('DECLINED_MARKETING', 'Candidate declined marketing'),
+  ('ON_VACATION', 'Candidate on vacation'),
+  ('NOT_RESPONDING', 'Candidate not responding'),
+  ('EXCLUSIVE_ROLES', 'Exclusive roles only')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS role_types (
   role_type_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL
 );
+
+-- Insert role types
+INSERT INTO role_types (code, label, tenant_id)
+SELECT code, label, NULL FROM (VALUES
+  ('REMOTE', 'Remote'),
+  ('HYBRID_LOCAL', 'Hybrid Local'),
+  ('ONSITE_LOCAL', 'Onsite Local'),
+  ('RELOCATE', 'Open to Relocate')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS countries (
   country_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,12 +165,116 @@ CREATE TABLE IF NOT EXISTS countries (
   name text NOT NULL
 );
 
+-- Insert countries
+INSERT INTO countries (code, name)
+SELECT code, name FROM (VALUES
+  ('USA', 'USA'),
+  ('INDIA', 'India')
+) AS t(code, name)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS states (
   state_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   country_id uuid REFERENCES countries(country_id) ON DELETE CASCADE,
   code text,
   name text NOT NULL
 );
+
+-- Insert USA states
+INSERT INTO states (country_id, code, name)
+SELECT c.country_id, t.code, t.name
+FROM countries c
+CROSS JOIN (VALUES
+  ('AL', 'Alabama'),
+  ('AK', 'Alaska'),
+  ('AZ', 'Arizona'),
+  ('AR', 'Arkansas'),
+  ('CA', 'California'),
+  ('CO', 'Colorado'),
+  ('CT', 'Connecticut'),
+  ('DE', 'Delaware'),
+  ('FL', 'Florida'),
+  ('GA', 'Georgia'),
+  ('HI', 'Hawaii'),
+  ('ID', 'Idaho'),
+  ('IL', 'Illinois'),
+  ('IN', 'Indiana'),
+  ('IA', 'Iowa'),
+  ('KS', 'Kansas'),
+  ('KY', 'Kentucky'),
+  ('LA', 'Louisiana'),
+  ('ME', 'Maine'),
+  ('MD', 'Maryland'),
+  ('MA', 'Massachusetts'),
+  ('MI', 'Michigan'),
+  ('MN', 'Minnesota'),
+  ('MS', 'Mississippi'),
+  ('MO', 'Missouri'),
+  ('MT', 'Montana'),
+  ('NE', 'Nebraska'),
+  ('NV', 'Nevada'),
+  ('NH', 'New Hampshire'),
+  ('NJ', 'New Jersey'),
+  ('NM', 'New Mexico'),
+  ('NY', 'New York'),
+  ('NC', 'North Carolina'),
+  ('ND', 'North Dakota'),
+  ('OH', 'Ohio'),
+  ('OK', 'Oklahoma'),
+  ('OR', 'Oregon'),
+  ('PA', 'Pennsylvania'),
+  ('RI', 'Rhode Island'),
+  ('SC', 'South Carolina'),
+  ('SD', 'South Dakota'),
+  ('TN', 'Tennessee'),
+  ('TX', 'Texas'),
+  ('UT', 'Utah'),
+  ('VT', 'Vermont'),
+  ('VA', 'Virginia'),
+  ('WA', 'Washington'),
+  ('WV', 'West Virginia'),
+  ('WI', 'Wisconsin'),
+  ('WY', 'Wyoming')
+) AS t(code, name)
+WHERE c.code = 'USA'
+ON CONFLICT DO NOTHING;
+
+-- Insert India states
+INSERT INTO states (country_id, code, name)
+SELECT c.country_id, NULL, t.name
+FROM countries c
+CROSS JOIN (VALUES
+  ('Andhra Pradesh'),
+  ('Arunachal Pradesh'),
+  ('Assam'),
+  ('Bihar'),
+  ('Chhattisgarh'),
+  ('Goa'),
+  ('Gujarat'),
+  ('Haryana'),
+  ('Himachal Pradesh'),
+  ('Jharkhand'),
+  ('Karnataka'),
+  ('Kerala'),
+  ('Madhya Pradesh'),
+  ('Maharashtra'),
+  ('Manipur'),
+  ('Meghalaya'),
+  ('Mizoram'),
+  ('Nagaland'),
+  ('Odisha'),
+  ('Punjab'),
+  ('Rajasthan'),
+  ('Sikkim'),
+  ('Tamil Nadu'),
+  ('Telangana'),
+  ('Tripura'),
+  ('Uttar Pradesh'),
+  ('Uttarakhand'),
+  ('West Bengal')
+) AS t(name)
+WHERE c.code = 'INDIA'
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS cities (
   city_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,15 +284,38 @@ CREATE TABLE IF NOT EXISTS cities (
 
 CREATE TABLE IF NOT EXISTS years_experience (
   years_experience_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL
 );
 
+-- Insert years of experience ranges
+INSERT INTO years_experience (code, label, tenant_id)
+SELECT code, label, NULL FROM (VALUES
+  ('0', '0'),
+  ('1_3', '1 to 3'),
+  ('4_6', '4 to 6'),
+  ('7_9', '7 to 9'),
+  ('10_15', '10 to 15'),
+  ('15_PLUS', '15+')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS referral_sources (
   referral_source_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   code text NOT NULL,
   label text NOT NULL
 );
+
+-- Insert referral sources
+INSERT INTO referral_sources (code, label, tenant_id)
+SELECT code, label, NULL FROM (VALUES
+  ('FB', 'FB'),
+  ('GOOGLE', 'Google'),
+  ('FRIEND', 'Friend')
+) AS t(code, label)
+ON CONFLICT DO NOTHING;
 
 -- ============================================
 -- CONTACTS
@@ -129,6 +370,7 @@ CREATE TABLE IF NOT EXISTS contact_attachments (
   contact_id uuid REFERENCES contacts(contact_id) ON DELETE CASCADE,
   storage_path text NOT NULL,
   file_name text,
+  description text, -- Description/note for the attachment (e.g., "Resume", "Cover Letter", "Portfolio")
   content_type text,
   size_bytes bigint,
   uploaded_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
@@ -289,17 +531,32 @@ CREATE POLICY "contacts_delete_owner_or_admin" ON contacts
     ))
   );
 
--- Allow members to view reference lookups (for front-end autocomplete)
-CREATE POLICY "refs_select_all" ON visa_status FOR SELECT USING (true);
-CREATE POLICY "refs_select_all_job_titles" ON job_titles FOR SELECT USING (true);
-CREATE POLICY "refs_select_all_reasons" ON reasons_for_contact FOR SELECT USING (true);
-CREATE POLICY "refs_select_all_statuses" ON contact_statuses FOR SELECT USING (true);
-CREATE POLICY "refs_select_all_role_types" ON role_types FOR SELECT USING (true);
+-- Allow members to view reference lookups (tenant-scoped for tenant-specific tables)
+CREATE POLICY "refs_select_tenant_visa" ON visa_status FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = visa_status.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_job_titles" ON job_titles FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = job_titles.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_reasons" ON reasons_for_contact FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = reasons_for_contact.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_statuses" ON contact_statuses FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = contact_statuses.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_role_types" ON role_types FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = role_types.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_years_exp" ON years_experience FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = years_experience.tenant_id)
+);
+CREATE POLICY "refs_select_tenant_referrals" ON referral_sources FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.tenant_id = referral_sources.tenant_id)
+);
+-- Countries, states, cities remain global (shared across all tenants)
 CREATE POLICY "refs_select_countries" ON countries FOR SELECT USING (true);
 CREATE POLICY "refs_select_states" ON states FOR SELECT USING (true);
 CREATE POLICY "refs_select_cities" ON cities FOR SELECT USING (true);
-CREATE POLICY "refs_select_years_exp" ON years_experience FOR SELECT USING (true);
-CREATE POLICY "refs_select_referrals" ON referral_sources FOR SELECT USING (true);
 
 -- Policies for attachments and comments: tenant members may insert; owners/admins may update/delete
 CREATE POLICY "attachments_select_tenant" ON contact_attachments
@@ -390,48 +647,54 @@ CREATE POLICY "service_role_all_notification_configs" ON notification_configs FO
 -- The front-end may seed these values on first-run; included here for convenience
 -- ============================================
 
--- Insert common visa statuses if not exists
-INSERT INTO visa_status(code, label)
-SELECT v.code, v.label FROM (VALUES
-  ('F1','F1'),('OPT','OPT'),('STEM_OPT','STEM OPT'),('H1B','H1B'),('H4','H4'),('H4_EAD','H4 EAD'),('GC_EAD','GC EAD'),('L1B','L1B'),('L2S','L2S'),('B1B2','B1/B2'),('J1','J1'),('TN','TN'),('E3','E3'),('GC','Green Card'),('USC','US Citizen')
-) AS v(code,label)
-WHERE NOT EXISTS (SELECT 1 FROM visa_status WHERE code = v.code);
+-- Insert common visa statuses if not exists (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO visa_status(tenant_id, code, label)
+-- SELECT 'YOUR_TENANT_ID', v.code, v.label FROM (VALUES
+--   ('F1','F1'),('OPT','OPT'),('STEM_OPT','STEM OPT'),('H1B','H1B'),('H4','H4'),('H4_EAD','H4 EAD'),('GC_EAD','GC EAD'),('L1B','L1B'),('L2S','L2S'),('B1B2','B1/B2'),('J1','J1'),('TN','TN'),('E3','E3'),('GC','Green Card'),('USC','US Citizen')
+-- ) AS v(code,label)
+-- WHERE NOT EXISTS (SELECT 1 FROM visa_status WHERE tenant_id = 'YOUR_TENANT_ID' AND code = v.code);
 
--- Insert sample years_experience buckets
-INSERT INTO years_experience(code, label)
-SELECT y.code, y.label FROM (VALUES
-  ('0','0'),('1_3','1 to 3'),('4_6','4 to 6'),('7_9','7 to 9'),('10_15','10 to 15'),('15_plus','15+')
-) AS y(code,label)
-WHERE NOT EXISTS (SELECT 1 FROM years_experience WHERE code = y.code);
+-- Insert sample years_experience buckets (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO years_experience(tenant_id, code, label)
+-- SELECT 'YOUR_TENANT_ID', y.code, y.label FROM (VALUES
+--   ('0','0'),('1_3','1 to 3'),('4_6','4 to 6'),('7_9','7 to 9'),('10_15','10 to 15'),('15_plus','15+')
+-- ) AS y(code,label)
+-- WHERE NOT EXISTS (SELECT 1 FROM years_experience WHERE tenant_id = 'YOUR_TENANT_ID' AND code = y.code);
 
--- Insert some default contact statuses
-INSERT INTO contact_statuses(code, label)
-SELECT s.code, s.label FROM (VALUES
-  ('INITIAL','Initial Contact'),('SPOKE','Spoke to candidate'),('RESUME_PREP','Resume needs to be prepared'),('RESUME_DONE','Resume prepared and sent for review'),
-  ('ASSIGNED','Assigned to Recruiter'),('MARKETING','Recruiter started marketing'),('PLACED','Placed into Job'),('DECLINED','Candidate declined marketing'),('VACATION','Candidate on vacation'),('NO_RESPONSE','Candidate not responding')
-) AS s(code,label)
-WHERE NOT EXISTS (SELECT 1 FROM contact_statuses WHERE code = s.code);
+-- Insert some default contact statuses (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO contact_statuses(tenant_id, code, label)
+-- SELECT 'YOUR_TENANT_ID', s.code, s.label FROM (VALUES
+--   ('INITIAL','Initial Contact'),('SPOKE','Spoke to candidate'),('RESUME_PREP','Resume needs to be prepared'),('RESUME_DONE','Resume prepared and sent for review'),
+--   ('ASSIGNED','Assigned to Recruiter'),('MARKETING','Recruiter started marketing'),('PLACED','Placed into Job'),('DECLINED','Candidate declined marketing'),('VACATION','Candidate on vacation'),('NO_RESPONSE','Candidate not responding')
+-- ) AS s(code,label)
+-- WHERE NOT EXISTS (SELECT 1 FROM contact_statuses WHERE tenant_id = 'YOUR_TENANT_ID' AND code = s.code);
 
--- Insert some role types
-INSERT INTO role_types(code,label)
-SELECT r.code, r.label FROM (VALUES
-  ('REMOTE','Remote'),('HYBRID','Hybrid Local'),('ONSITE','Onsite Local'),('RELOCATE','Open to Relocate')
-) AS r(code,label)
-WHERE NOT EXISTS (SELECT 1 FROM role_types WHERE code = r.code);
+-- Insert some role types (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO role_types(tenant_id, code, label)
+-- SELECT 'YOUR_TENANT_ID', r.code, r.label FROM (VALUES
+--   ('REMOTE','Remote'),('HYBRID','Hybrid Local'),('ONSITE','Onsite Local'),('RELOCATE','Open to Relocate')
+-- ) AS r(code,label)
+-- WHERE NOT EXISTS (SELECT 1 FROM role_types WHERE tenant_id = 'YOUR_TENANT_ID' AND code = r.code);
 
--- Insert referral sources
-INSERT INTO referral_sources(code,label)
-SELECT f.code, f.label FROM (VALUES
-  ('FB','Facebook'),('GOOGLE','Google'),('FRIEND','Friend')
-) AS f(code,label)
-WHERE NOT EXISTS (SELECT 1 FROM referral_sources WHERE code = f.code);
+-- Insert referral sources (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO referral_sources(tenant_id, code, label)
+-- SELECT 'YOUR_TENANT_ID', f.code, f.label FROM (VALUES
+--   ('FB','Facebook'),('GOOGLE','Google'),('FRIEND','Friend')
+-- ) AS f(code,label)
+-- WHERE NOT EXISTS (SELECT 1 FROM referral_sources WHERE tenant_id = 'YOUR_TENANT_ID' AND code = f.code);
 
--- Insert a small set of IT job titles (the UI can seed more if needed)
-INSERT INTO job_titles(category,title)
-SELECT j.category, j.title FROM (VALUES
-  ('IT','Java Back End Developer'),('IT','Java Full Stack Developer'),('IT','Dotnet Developer'),('IT','Python Developer'),('IT','Data Analyst'),('IT','AWS Data Engineer'),('IT','Azure Data Engineer'),('IT','GCP Data Engineer')
-) AS j(category,title)
-WHERE NOT EXISTS (SELECT 1 FROM job_titles WHERE category = j.category AND title = j.title LIMIT 1);
+-- Insert a small set of IT job titles (commented out - should be seeded per tenant)
+-- To seed for a specific tenant, run:
+-- INSERT INTO job_titles(tenant_id, category, title)
+-- SELECT 'YOUR_TENANT_ID', j.category, j.title FROM (VALUES
+--   ('IT','Java Back End Developer'),('IT','Java Full Stack Developer'),('IT','Dotnet Developer'),('IT','Python Developer'),('IT','Data Analyst'),('IT','AWS Data Engineer'),('IT','Azure Data Engineer'),('IT','GCP Data Engineer')
+-- ) AS j(category,title)
+-- WHERE NOT EXISTS (SELECT 1 FROM job_titles WHERE tenant_id = 'YOUR_TENANT_ID' AND category = j.category AND title = j.title LIMIT 1);
 
 -- ============================================
 -- END
