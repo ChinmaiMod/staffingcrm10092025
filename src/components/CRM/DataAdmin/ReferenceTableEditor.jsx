@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { validateTextField } from '../../../utils/validators'
 
 export default function ReferenceTableEditor({ table, onClose }) {
   const [items, setItems] = useState([])
@@ -6,6 +7,8 @@ export default function ReferenceTableEditor({ table, onClose }) {
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [newItemValue, setNewItemValue] = useState('')
+  const [error, setError] = useState('')
+  const [fieldError, setFieldError] = useState('')
 
   useEffect(() => {
     loadItems()
@@ -35,19 +38,41 @@ export default function ReferenceTableEditor({ table, onClose }) {
   }
 
   const handleAdd = async () => {
-    if (!newItemValue.trim()) return
+    setError('')
+    setFieldError('')
+
+    // Validate new item value (2-100 characters)
+    const validation = validateTextField(newItemValue, {
+      required: true,
+      minLength: 2,
+      maxLength: 100,
+      fieldName: 'Value'
+    });
+
+    if (!validation.valid) {
+      setFieldError(validation.error);
+      return;
+    }
+
+    // Check for duplicates
+    const trimmedValue = newItemValue.trim();
+    if (items.some(item => item.value.toLowerCase() === trimmedValue.toLowerCase())) {
+      setFieldError('This value already exists in the list');
+      return;
+    }
 
     try {
       // TODO: API call to create
       const newItem = {
         id: Date.now(),
-        value: newItemValue,
+        value: trimmedValue,
         is_active: true,
       }
       setItems(prev => [...prev, newItem])
       setNewItemValue('')
+      setFieldError('')
     } catch (err) {
-      alert('Error adding item: ' + err.message)
+      setError('Error adding item: ' + err.message)
     }
   }
 
@@ -57,17 +82,38 @@ export default function ReferenceTableEditor({ table, onClose }) {
   }
 
   const handleSaveEdit = async (id) => {
-    if (!editValue.trim()) return
+    setError('')
+
+    // Validate edit value (2-100 characters)
+    const validation = validateTextField(editValue, {
+      required: true,
+      minLength: 2,
+      maxLength: 100,
+      fieldName: 'Value'
+    });
+
+    if (!validation.valid) {
+      setError(validation.error);
+      return;
+    }
+
+    // Check for duplicates (excluding current item)
+    const trimmedValue = editValue.trim();
+    if (items.some(item => item.id !== id && item.value.toLowerCase() === trimmedValue.toLowerCase())) {
+      setError('This value already exists in the list');
+      return;
+    }
 
     try {
       // TODO: API call to update
       setItems(prev => prev.map(item =>
-        item.id === id ? { ...item, value: editValue } : item
+        item.id === id ? { ...item, value: trimmedValue } : item
       ))
       setEditingId(null)
       setEditValue('')
+      setError('')
     } catch (err) {
-      alert('Error updating item: ' + err.message)
+      setError('Error updating item: ' + err.message)
     }
   }
 
@@ -106,20 +152,35 @@ export default function ReferenceTableEditor({ table, onClose }) {
     <div className="data-table-container">
       <div className="table-header">
         <h2>{table.icon} {table.label}</h2>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={newItemValue}
-            onChange={(e) => setNewItemValue(e.target.value)}
-            placeholder="New item value..."
-            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '250px' }}
-            onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
-          />
-          <button className="btn btn-primary" onClick={handleAdd}>
-            + Add New
-          </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={newItemValue}
+              onChange={(e) => {
+                setNewItemValue(e.target.value)
+                setFieldError('')
+              }}
+              className={fieldError ? 'error' : ''}
+              placeholder="New item value..."
+              style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '250px' }}
+              onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
+            />
+            <button className="btn btn-primary" onClick={handleAdd}>
+              + Add New
+            </button>
+          </div>
+          {fieldError && (
+            <small className="error-text" style={{ marginTop: '-8px' }}>{fieldError}</small>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+          {error}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="empty-state">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../../api/supabaseClient';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useTenant } from '../../contexts/TenantProvider';
+import { validateTextField, validateSelect, handleSupabaseError, handleError } from '../../utils/validators';
 import './Feedback.css';
 
 const Feedback = () => {
@@ -17,6 +18,7 @@ const Feedback = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,6 +26,45 @@ const Feedback = () => {
       ...prev,
       [name]: value
     }));
+    // Clear field error when user types
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+
+    // Validate category
+    const categoryValidation = validateSelect(formData.category, { required: true });
+    if (!categoryValidation.valid) {
+      errors.category = categoryValidation.error;
+    }
+
+    // Validate subject (10-200 characters)
+    const subjectValidation = validateTextField(formData.subject, {
+      required: true,
+      minLength: 10,
+      maxLength: 200,
+      fieldName: 'Subject'
+    });
+    if (!subjectValidation.valid) {
+      errors.subject = subjectValidation.error;
+    }
+
+    // Validate message (20-2000 characters)
+    const messageValidation = validateTextField(formData.message, {
+      required: true,
+      minLength: 20,
+      maxLength: 2000,
+      fieldName: 'Message'
+    });
+    if (!messageValidation.valid) {
+      errors.message = messageValidation.error;
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -31,6 +72,14 @@ const Feedback = () => {
     setLoading(true);
     setError('');
     setSuccess(false);
+    setFieldErrors({});
+
+    // Validate form
+    if (!validateForm()) {
+      setError('Please fix the errors below');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Insert feedback into database
@@ -39,15 +88,18 @@ const Feedback = () => {
         .insert([{
           tenant_id: tenant.tenant_id,
           user_id: user.id,
-          subject: formData.subject,
-          message: formData.message,
+          subject: formData.subject.trim(),
+          message: formData.message.trim(),
           category: formData.category,
           status: 'NEW'
         }])
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        const dbErrorMessage = handleSupabaseError(dbError);
+        throw new Error(dbErrorMessage);
+      }
 
       // Send email via edge function
       const { data: emailData, error: emailError } = await supabase.functions.invoke('sendFeedbackEmail', {
@@ -78,7 +130,7 @@ const Feedback = () => {
 
     } catch (err) {
       console.error('Error submitting feedback:', err);
-      setError(err.message || 'Failed to submit feedback. Please try again.');
+      setError(handleError(err, 'feedback submission'));
     } finally {
       setLoading(false);
     }
@@ -135,6 +187,7 @@ const Feedback = () => {
             name="category"
             value={formData.category}
             onChange={handleChange}
+            className={fieldErrors.category ? 'error' : ''}
             required
           >
             <option value="FEATURE_REQUEST">Feature Request</option>
@@ -143,6 +196,9 @@ const Feedback = () => {
             <option value="QUESTION">Question</option>
             <option value="OTHER">Other</option>
           </select>
+          {fieldErrors.category && (
+            <small className="error-text">{fieldErrors.category}</small>
+          )}
         </div>
 
         <div className="form-group">
@@ -153,10 +209,17 @@ const Feedback = () => {
             name="subject"
             value={formData.subject}
             onChange={handleChange}
-            placeholder="Brief summary of your suggestion..."
+            className={fieldErrors.subject ? 'error' : ''}
+            placeholder="Brief summary of your suggestion (10-200 characters)..."
             maxLength={200}
             required
           />
+          {fieldErrors.subject && (
+            <small className="error-text">{fieldErrors.subject}</small>
+          )}
+          <small style={{ color: '#64748b', fontSize: '12px' }}>
+            {formData.subject.length} / 200 characters
+          </small>
         </div>
 
         <div className="form-group">
@@ -166,10 +229,14 @@ const Feedback = () => {
             name="message"
             value={formData.message}
             onChange={handleChange}
-            placeholder="Please provide details about your suggestion, idea, or feedback..."
+            className={fieldErrors.message ? 'error' : ''}
+            placeholder="Please provide details about your suggestion, idea, or feedback (20-2000 characters)..."
             maxLength={maxLength}
             required
           />
+          {fieldErrors.message && (
+            <small className="error-text">{fieldErrors.message}</small>
+          )}
           <div className={`character-count ${messageLength > maxLength * 0.9 ? 'warning' : ''} ${messageLength >= maxLength ? 'error' : ''}`}>
             {messageLength} / {maxLength} characters
           </div>

@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import MultiSelect from '../common/MultiSelect'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
+import { 
+  validateEmail, 
+  validatePhoneNumber, 
+  validateTextField, 
+  validateSelect,
+  handleError 
+} from '../../../utils/validators'
 
 // Reference data - in production, fetch from API
 const CONTACT_TYPES = [
@@ -102,6 +109,7 @@ export default function ContactForm({ contact, onSave, onCancel }) {
   const [availableJobTitles, setAvailableJobTitles] = useState(IT_JOB_TITLES)
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
   
   // Status change tracking
   const initialStatus = useRef(contact?.status || 'Initial Contact')
@@ -126,6 +134,11 @@ export default function ContactForm({ contact, onSave, onCancel }) {
   }, [formData.contact_type])
 
   const handleChange = (field, value) => {
+    // Clear field error when user changes value
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+
     // Special handling for status changes
     if (field === 'status' && contact && value !== initialStatus.current) {
       // Status is changing - show modal for remarks
@@ -196,11 +209,95 @@ export default function ContactForm({ contact, onSave, onCancel }) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
+  const validateForm = () => {
+    const errors = {};
+
+    // Validate first name (2-50 characters, letters and spaces only)
+    const firstNameValidation = validateTextField(formData.first_name, {
+      required: true,
+      minLength: 2,
+      maxLength: 50,
+      pattern: /^[a-zA-Z\s'-]+$/,
+      fieldName: 'First name'
+    });
+    if (!firstNameValidation.valid) {
+      errors.first_name = firstNameValidation.error;
+    }
+
+    // Validate last name (2-50 characters, letters and spaces only)
+    const lastNameValidation = validateTextField(formData.last_name, {
+      required: true,
+      minLength: 2,
+      maxLength: 50,
+      pattern: /^[a-zA-Z\s'-]+$/,
+      fieldName: 'Last name'
+    });
+    if (!lastNameValidation.valid) {
+      errors.last_name = lastNameValidation.error;
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.valid) {
+      errors.email = emailValidation.error;
+    }
+
+    // Validate phone (optional but must be valid if provided)
+    if (formData.phone && formData.phone.trim()) {
+      const phoneValidation = validatePhoneNumber(formData.phone);
+      if (!phoneValidation.valid) {
+        errors.phone = phoneValidation.error;
+      }
+    }
+
+    // Validate contact type
+    const contactTypeValidation = validateSelect(formData.contact_type, { required: true });
+    if (!contactTypeValidation.valid) {
+      errors.contact_type = contactTypeValidation.error;
+    }
+
+    // Validate city (if provided, 2-100 characters)
+    if (formData.city && formData.city.trim()) {
+      const cityValidation = validateTextField(formData.city, {
+        minLength: 2,
+        maxLength: 100,
+        pattern: /^[a-zA-Z\s'-]+$/,
+        fieldName: 'City'
+      });
+      if (!cityValidation.valid) {
+        errors.city = cityValidation.error;
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    
+    // Validate form
+    if (!validateForm()) {
+      // Scroll to first error
+      const firstErrorField = Object.keys(fieldErrors)[0];
+      const errorElement = document.getElementById(firstErrorField);
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        errorElement.focus();
+      }
+      return;
+    }
+
     // Pass form data, attachments, and status change remarks to parent
     const saveData = {
       ...formData,
+      // Trim text fields
+      first_name: formData.first_name.trim(),
+      last_name: formData.last_name.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone ? formData.phone.trim() : '',
+      city: formData.city ? formData.city.trim() : '',
+      remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
       statusChanged: formData.status !== initialStatus.current
     }
@@ -216,54 +313,82 @@ export default function ContactForm({ contact, onSave, onCancel }) {
         <div className="form-group">
           <label>First Name <span style={{ color: 'red' }}>*</span></label>
           <input
+            id="first_name"
             type="text"
             value={formData.first_name}
             onChange={(e) => handleChange('first_name', e.target.value)}
+            className={fieldErrors.first_name ? 'error' : ''}
+            placeholder="John"
             required
           />
+          {fieldErrors.first_name && (
+            <small className="error-text">{fieldErrors.first_name}</small>
+          )}
         </div>
 
         <div className="form-group">
           <label>Last Name <span style={{ color: 'red' }}>*</span></label>
           <input
+            id="last_name"
             type="text"
             value={formData.last_name}
             onChange={(e) => handleChange('last_name', e.target.value)}
+            className={fieldErrors.last_name ? 'error' : ''}
+            placeholder="Doe"
             required
           />
+          {fieldErrors.last_name && (
+            <small className="error-text">{fieldErrors.last_name}</small>
+          )}
         </div>
 
         <div className="form-group">
           <label>Email <span style={{ color: 'red' }}>*</span></label>
           <input
+            id="email"
             type="email"
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
+            className={fieldErrors.email ? 'error' : ''}
+            placeholder="john.doe@example.com"
             required
           />
+          {fieldErrors.email && (
+            <small className="error-text">{fieldErrors.email}</small>
+          )}
         </div>
 
         <div className="form-group">
           <label>Phone</label>
           <input
+            id="phone"
             type="tel"
             value={formData.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
+            className={fieldErrors.phone ? 'error' : ''}
             placeholder="(555) 123-4567"
           />
+          {fieldErrors.phone && (
+            <small className="error-text">{fieldErrors.phone}</small>
+          )}
         </div>
 
         <div className="form-group">
           <label>Contact Type <span style={{ color: 'red' }}>*</span></label>
           <select
+            id="contact_type"
             value={formData.contact_type}
             onChange={(e) => handleChange('contact_type', e.target.value)}
+            className={fieldErrors.contact_type ? 'error' : ''}
             required
           >
             {CONTACT_TYPES.map(type => (
               <option key={type.value} value={type.value}>{type.label}</option>
             ))}
           </select>
+          {fieldErrors.contact_type && (
+            <small className="error-text">{fieldErrors.contact_type}</small>
+          )}
         </div>
 
         <div className="form-group">
@@ -373,11 +498,16 @@ export default function ContactForm({ contact, onSave, onCancel }) {
         <div className="form-group">
           <label>City</label>
           <input
+            id="city"
             type="text"
             value={formData.city}
             onChange={(e) => handleChange('city', e.target.value)}
+            className={fieldErrors.city ? 'error' : ''}
             placeholder="Enter city..."
           />
+          {fieldErrors.city && (
+            <small className="error-text">{fieldErrors.city}</small>
+          )}
         </div>
 
         {showCandidateFields && (

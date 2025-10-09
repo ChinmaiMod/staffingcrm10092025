@@ -90,8 +90,13 @@ export function AuthProvider({ children }) {
   }
 
   const resetPassword = async (email) => {
+    // Get the current origin or use environment variable
+    const redirectUrl = import.meta.env.VITE_FRONTEND_URL 
+      ? `${import.meta.env.VITE_FRONTEND_URL}/reset-password`
+      : `${window.location.origin}/reset-password`;
+
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${import.meta.env.VITE_FRONTEND_URL}/reset-password`,
+      redirectTo: redirectUrl,
     })
     return { data, error }
   }
