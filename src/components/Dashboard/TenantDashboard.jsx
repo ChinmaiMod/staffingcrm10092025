@@ -154,6 +154,14 @@ export default function TenantDashboard() {
                 Submit Feedback
               </button>
             </div>
+
+            <div className="module-card">
+              <h3>🐛 Report an Issue</h3>
+              <p>Report bugs and technical problems</p>
+              <button className="btn btn-danger" onClick={() => navigate('/report-issue')}>
+                Report Issue
+              </button>
+            </div>
           </div>
         </div>
       </div>

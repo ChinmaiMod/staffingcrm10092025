@@ -22,6 +22,9 @@ import CRMApp from './components/CRM/CRMApp'
 // Feedback Component
 import Feedback from './components/Feedback/Feedback'
 
+// Issue Report Component
+import IssueReport from './components/IssueReport/IssueReport'
+
 // Protected Route
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -94,6 +97,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Feedback />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/report-issue"
+            element={
+              <ProtectedRoute>
+                <IssueReport />
               </ProtectedRoute>
             }
           />
