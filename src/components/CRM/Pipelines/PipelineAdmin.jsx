@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useAuth } from '../../../contexts/AuthProvider'
+import { validateTextField, handleSupabaseError, handleError } from '../../../utils/validators'
 import './PipelineAdmin.css'
 
 export default function PipelineAdmin() {
@@ -17,6 +18,10 @@ export default function PipelineAdmin() {
   const [showStageForm, setShowStageForm] = useState(false)
   const [editingPipeline, setEditingPipeline] = useState(null)
   const [editingStage, setEditingStage] = useState(null)
+  
+  // Validation error states
+  const [pipelineFieldErrors, setPipelineFieldErrors] = useState({})
+  const [stageFieldErrors, setStageFieldErrors] = useState({})
   
   const [pipelineForm, setPipelineForm] = useState({
     name: '',
@@ -91,6 +96,9 @@ export default function PipelineAdmin() {
       icon: '📊',
       is_default: false
     })
+    setPipelineFieldErrors({})
+    setError('')
+    setSuccess('')
     setShowPipelineForm(true)
   }
 
@@ -103,7 +111,59 @@ export default function PipelineAdmin() {
       icon: pipeline.icon || '📊',
       is_default: pipeline.is_default || false
     })
+    setPipelineFieldErrors({})
+    setError('')
+    setSuccess('')
     setShowPipelineForm(true)
+  }
+
+  const validatePipelineForm = () => {
+    const errors = {}
+
+    // Validate pipeline name (3-100 characters)
+    const nameValidation = validateTextField(pipelineForm.name, {
+      required: true,
+      minLength: 3,
+      maxLength: 100,
+      fieldName: 'Pipeline name'
+    })
+    if (!nameValidation.valid) {
+      errors.name = nameValidation.error
+    }
+
+    // Validate description (optional, max 500 characters)
+    if (pipelineForm.description && pipelineForm.description.trim()) {
+      const descValidation = validateTextField(pipelineForm.description, {
+        required: false,
+        maxLength: 500,
+        fieldName: 'Description'
+      })
+      if (!descValidation.valid) {
+        errors.description = descValidation.error
+      }
+    }
+
+    // Validate icon (1-2 characters for emoji)
+    if (pipelineForm.icon && pipelineForm.icon.trim()) {
+      const iconValidation = validateTextField(pipelineForm.icon, {
+        required: false,
+        minLength: 1,
+        maxLength: 2,
+        fieldName: 'Icon'
+      })
+      if (!iconValidation.valid) {
+        errors.icon = iconValidation.error
+      }
+    }
+
+    // Validate color (hex format)
+    const colorPattern = /^#[0-9A-Fa-f]{6}$/
+    if (pipelineForm.color && !colorPattern.test(pipelineForm.color)) {
+      errors.color = 'Color must be a valid hex color (e.g., #4F46E5)'
+    }
+
+    setPipelineFieldErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSavePipeline = async (e) => {
@@ -111,6 +171,12 @@ export default function PipelineAdmin() {
     setError('')
     setSuccess('')
     
+    // Validate form
+    if (!validatePipelineForm()) {
+      setError('Please fix the validation errors before saving')
+      return
+    }
+
     try {
       const pipelineData = {
         ...pipelineForm,
@@ -119,16 +185,19 @@ export default function PipelineAdmin() {
 
       if (editingPipeline) {
         // Update existing pipeline
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('pipelines')
           .update(pipelineData)
           .eq('pipeline_id', editingPipeline.pipeline_id)
         
-        if (error) throw error
+        if (updateError) {
+          const errorMessage = handleSupabaseError(updateError)
+          throw new Error(errorMessage)
+        }
         setSuccess('Pipeline updated successfully')
       } else {
         // Create new pipeline
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('pipelines')
           .insert([{
             ...pipelineData,
@@ -136,30 +205,41 @@ export default function PipelineAdmin() {
             display_order: pipelines.length
           }])
         
-        if (error) throw error
+        if (insertError) {
+          const errorMessage = handleSupabaseError(insertError)
+          throw new Error(errorMessage)
+        }
         setSuccess('Pipeline created successfully')
       }
       
       setShowPipelineForm(false)
+      setPipelineFieldErrors({})
       fetchPipelines()
     } catch (err) {
       console.error('Error saving pipeline:', err)
-      setError(err.message || 'Failed to save pipeline')
+      const errorMessage = handleError(err, 'saving pipeline')
+      setError(errorMessage)
     }
   }
 
   const handleDeletePipeline = async (pipeline) => {
-    if (!confirm(`Are you sure you want to delete "${pipeline.name}"? This will also delete all stages and assignments.`)) {
+    if (!confirm(`Are you sure you want to delete "${pipeline.name}"?\n\nThis will also delete all stages and assignments. This action cannot be undone.`)) {
       return
     }
     
     try {
-      const { error } = await supabase
+      setError('')
+      setSuccess('')
+      
+      const { error: deleteError } = await supabase
         .from('pipelines')
         .delete()
         .eq('pipeline_id', pipeline.pipeline_id)
       
-      if (error) throw error
+      if (deleteError) {
+        const errorMessage = handleSupabaseError(deleteError)
+        throw new Error(errorMessage)
+      }
       
       setSuccess('Pipeline deleted successfully')
       fetchPipelines()
@@ -168,7 +248,8 @@ export default function PipelineAdmin() {
       }
     } catch (err) {
       console.error('Error deleting pipeline:', err)
-      setError(err.message || 'Failed to delete pipeline')
+      const errorMessage = handleError(err, 'deleting pipeline')
+      setError(errorMessage)
     }
   }
 
@@ -181,6 +262,9 @@ export default function PipelineAdmin() {
       display_order: stages.length,
       is_final: false
     })
+    setStageFieldErrors({})
+    setError('')
+    setSuccess('')
     setShowStageForm(true)
   }
 
@@ -193,7 +277,46 @@ export default function PipelineAdmin() {
       display_order: stage.display_order,
       is_final: stage.is_final || false
     })
+    setStageFieldErrors({})
+    setError('')
+    setSuccess('')
     setShowStageForm(true)
+  }
+
+  const validateStageForm = () => {
+    const errors = {}
+
+    // Validate stage name (3-100 characters)
+    const nameValidation = validateTextField(stageForm.name, {
+      required: true,
+      minLength: 3,
+      maxLength: 100,
+      fieldName: 'Stage name'
+    })
+    if (!nameValidation.valid) {
+      errors.name = nameValidation.error
+    }
+
+    // Validate description (optional, max 300 characters)
+    if (stageForm.description && stageForm.description.trim()) {
+      const descValidation = validateTextField(stageForm.description, {
+        required: false,
+        maxLength: 300,
+        fieldName: 'Description'
+      })
+      if (!descValidation.valid) {
+        errors.description = descValidation.error
+      }
+    }
+
+    // Validate color (hex format)
+    const colorPattern = /^#[0-9A-Fa-f]{6}$/
+    if (stageForm.color && !colorPattern.test(stageForm.color)) {
+      errors.color = 'Color must be a valid hex color (e.g., #6366F1)'
+    }
+
+    setStageFieldErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSaveStage = async (e) => {
@@ -205,6 +328,12 @@ export default function PipelineAdmin() {
       setError('Please select a pipeline first')
       return
     }
+
+    // Validate form
+    if (!validateStageForm()) {
+      setError('Please fix the validation errors before saving')
+      return
+    }
     
     try {
       const stageData = {
@@ -214,49 +343,64 @@ export default function PipelineAdmin() {
 
       if (editingStage) {
         // Update existing stage
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('pipeline_stages')
           .update(stageData)
           .eq('stage_id', editingStage.stage_id)
         
-        if (error) throw error
+        if (updateError) {
+          const errorMessage = handleSupabaseError(updateError)
+          throw new Error(errorMessage)
+        }
         setSuccess('Stage updated successfully')
       } else {
         // Create new stage
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('pipeline_stages')
           .insert([stageData])
         
-        if (error) throw error
+        if (insertError) {
+          const errorMessage = handleSupabaseError(insertError)
+          throw new Error(errorMessage)
+        }
         setSuccess('Stage created successfully')
       }
       
       setShowStageForm(false)
+      setStageFieldErrors({})
       fetchStages(selectedPipeline.pipeline_id)
     } catch (err) {
       console.error('Error saving stage:', err)
-      setError(err.message || 'Failed to save stage')
+      const errorMessage = handleError(err, 'saving stage')
+      setError(errorMessage)
     }
   }
 
   const handleDeleteStage = async (stage) => {
-    if (!confirm(`Are you sure you want to delete "${stage.name}"?`)) {
+    if (!confirm(`Are you sure you want to delete "${stage.name}"?\n\nThis action cannot be undone.`)) {
       return
     }
     
     try {
-      const { error } = await supabase
+      setError('')
+      setSuccess('')
+      
+      const { error: deleteError } = await supabase
         .from('pipeline_stages')
         .delete()
         .eq('stage_id', stage.stage_id)
       
-      if (error) throw error
+      if (deleteError) {
+        const errorMessage = handleSupabaseError(deleteError)
+        throw new Error(errorMessage)
+      }
       
       setSuccess('Stage deleted successfully')
       fetchStages(selectedPipeline.pipeline_id)
     } catch (err) {
       console.error('Error deleting stage:', err)
-      setError(err.message || 'Failed to delete stage')
+      const errorMessage = handleError(err, 'deleting stage')
+      setError(errorMessage)
     }
   }
 
@@ -272,17 +416,25 @@ export default function PipelineAdmin() {
     
     // Update display_order for all stages
     try {
+      setError('')
+      
       for (let i = 0; i < newStages.length; i++) {
-        await supabase
+        const { error: reorderError } = await supabase
           .from('pipeline_stages')
           .update({ display_order: i })
           .eq('stage_id', newStages[i].stage_id)
+        
+        if (reorderError) {
+          const errorMessage = handleSupabaseError(reorderError)
+          throw new Error(errorMessage)
+        }
       }
       
       fetchStages(selectedPipeline.pipeline_id)
     } catch (err) {
       console.error('Error reordering stages:', err)
-      setError('Failed to reorder stages')
+      const errorMessage = handleError(err, 'reordering stages')
+      setError(errorMessage)
     }
   }
 
@@ -434,19 +586,33 @@ export default function PipelineAdmin() {
                 <input
                   type="text"
                   value={pipelineForm.name}
-                  onChange={(e) => setPipelineForm({ ...pipelineForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setPipelineForm({ ...pipelineForm, name: e.target.value })
+                    setPipelineFieldErrors({ ...pipelineFieldErrors, name: '' })
+                  }}
+                  className={pipelineFieldErrors.name ? 'error' : ''}
                   required
                   placeholder="e.g., Recruitment Pipeline"
                 />
+                {pipelineFieldErrors.name && (
+                  <small className="error-text">{pipelineFieldErrors.name}</small>
+                )}
               </div>
               <div className="form-group">
                 <label>Description</label>
                 <textarea
                   value={pipelineForm.description}
-                  onChange={(e) => setPipelineForm({ ...pipelineForm, description: e.target.value })}
+                  onChange={(e) => {
+                    setPipelineForm({ ...pipelineForm, description: e.target.value })
+                    setPipelineFieldErrors({ ...pipelineFieldErrors, description: '' })
+                  }}
+                  className={pipelineFieldErrors.description ? 'error' : ''}
                   placeholder="Brief description of this pipeline"
                   rows="3"
                 />
+                {pipelineFieldErrors.description && (
+                  <small className="error-text">{pipelineFieldErrors.description}</small>
+                )}
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -454,18 +620,32 @@ export default function PipelineAdmin() {
                   <input
                     type="text"
                     value={pipelineForm.icon}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, icon: e.target.value })}
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, icon: e.target.value })
+                      setPipelineFieldErrors({ ...pipelineFieldErrors, icon: '' })
+                    }}
+                    className={pipelineFieldErrors.icon ? 'error' : ''}
                     placeholder="📊"
                     maxLength="2"
                   />
+                  {pipelineFieldErrors.icon && (
+                    <small className="error-text">{pipelineFieldErrors.icon}</small>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Color</label>
                   <input
                     type="color"
                     value={pipelineForm.color}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, color: e.target.value })}
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, color: e.target.value })
+                      setPipelineFieldErrors({ ...pipelineFieldErrors, color: '' })
+                    }}
+                    className={pipelineFieldErrors.color ? 'error' : ''}
                   />
+                  {pipelineFieldErrors.color && (
+                    <small className="error-text">{pipelineFieldErrors.color}</small>
+                  )}
                 </div>
               </div>
               <div className="form-group">
@@ -505,27 +685,48 @@ export default function PipelineAdmin() {
                 <input
                   type="text"
                   value={stageForm.name}
-                  onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setStageForm({ ...stageForm, name: e.target.value })
+                    setStageFieldErrors({ ...stageFieldErrors, name: '' })
+                  }}
+                  className={stageFieldErrors.name ? 'error' : ''}
                   required
                   placeholder="e.g., Qualified"
                 />
+                {stageFieldErrors.name && (
+                  <small className="error-text">{stageFieldErrors.name}</small>
+                )}
               </div>
               <div className="form-group">
                 <label>Description</label>
                 <textarea
                   value={stageForm.description}
-                  onChange={(e) => setStageForm({ ...stageForm, description: e.target.value })}
+                  onChange={(e) => {
+                    setStageForm({ ...stageForm, description: e.target.value })
+                    setStageFieldErrors({ ...stageFieldErrors, description: '' })
+                  }}
+                  className={stageFieldErrors.description ? 'error' : ''}
                   placeholder="Brief description of this stage"
                   rows="2"
                 />
+                {stageFieldErrors.description && (
+                  <small className="error-text">{stageFieldErrors.description}</small>
+                )}
               </div>
               <div className="form-group">
                 <label>Color</label>
                 <input
                   type="color"
                   value={stageForm.color}
-                  onChange={(e) => setStageForm({ ...stageForm, color: e.target.value })}
+                  onChange={(e) => {
+                    setStageForm({ ...stageForm, color: e.target.value })
+                    setStageFieldErrors({ ...stageFieldErrors, color: '' })
+                  }}
+                  className={stageFieldErrors.color ? 'error' : ''}
                 />
+                {stageFieldErrors.color && (
+                  <small className="error-text">{stageFieldErrors.color}</small>
+                )}
               </div>
               <div className="form-group">
                 <label className="checkbox-label">
