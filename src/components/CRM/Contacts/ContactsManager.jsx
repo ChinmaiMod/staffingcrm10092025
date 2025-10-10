@@ -253,11 +253,16 @@ export default function ContactsManager() {
   }
 
   const filteredContacts = contacts.filter(contact => {
-    // Basic search
+    // Basic search - use null coalescing for safety
+    const firstName = (contact.first_name || '').toLowerCase()
+    const lastName = (contact.last_name || '').toLowerCase()
+    const email = (contact.email || '').toLowerCase()
+    const searchTermLower = searchTerm.toLowerCase()
+    
     const matchesSearch = 
-      contact.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      firstName.includes(searchTermLower) ||
+      lastName.includes(searchTermLower) ||
+      email.includes(searchTermLower)
     
     // Basic filters
     const matchesStatus = filterStatus === 'all' || contact.status === filterStatus

@@ -8,12 +8,18 @@ export default function ForgotPassword() {
   const { resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [fieldError, setFieldError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Prevent double submission
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
     setError('')
     setSuccess('')
     setFieldError('')
@@ -23,6 +29,7 @@ export default function ForgotPassword() {
     if (!emailValidation.valid) {
       setFieldError(emailValidation.error)
       setError('Please enter a valid email address')
+      setIsSubmitting(false)
       return
     }
     
@@ -40,6 +47,7 @@ export default function ForgotPassword() {
       setError(handleError(err, 'password reset'))
     } finally {
       setLoading(false)
+      setIsSubmitting(false)
     }
   }
 

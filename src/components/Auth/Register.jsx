@@ -24,6 +24,7 @@ export default function Register() {
     confirmPassword: '',
   })
   const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -70,12 +71,18 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Prevent double submission
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
     setError('')
     setSuccess('')
     setFieldErrors({})
 
     if (!validateForm()) {
       setError('Please fix the errors below before continuing')
+      setIsSubmitting(false)
       return
     }
 
@@ -161,6 +168,7 @@ export default function Register() {
       setError(handleError(err, 'registration'))
     } finally {
       setLoading(false)
+      setIsSubmitting(false)
     }
   }
 

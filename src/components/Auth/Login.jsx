@@ -13,6 +13,7 @@ export default function Login() {
     password: '',
   })
   const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
 
@@ -36,12 +37,18 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Prevent double submission
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
     setError('')
     setFieldErrors({})
     
     // Validate form before submitting
     if (!validateForm()) {
       setError('Please fix the errors below')
+      setIsSubmitting(false)
       return
     }
     
@@ -78,6 +85,7 @@ export default function Login() {
       }
     } finally {
       setLoading(false)
+      setIsSubmitting(false)
     }
   }
 

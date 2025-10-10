@@ -133,6 +133,34 @@ export default function ContactForm({ contact, onSave, onCancel }) {
     }
   }, [formData.contact_type])
 
+  // Sync form data when contact prop changes (Bug #7 fix)
+  useEffect(() => {
+    if (contact) {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        contact_type: 'it_candidate',
+        visa_status: '',
+        job_title: '',
+        reasons_for_contact: [],
+        status: 'Initial Contact',
+        role_types: [],
+        country: 'USA',
+        state: '',
+        city: '',
+        years_experience: '',
+        referral_source: '',
+        recruiting_team_lead: '',
+        recruiter: '',
+        remarks: '',
+        ...contact
+      })
+      initialStatus.current = contact.status || 'Initial Contact'
+    }
+  }, [contact])
+
   const handleChange = (field, value) => {
     // Clear field error when user changes value
     if (fieldErrors[field]) {

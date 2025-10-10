@@ -14,6 +14,7 @@ export default function ResetPassword() {
     confirmPassword: '',
   })
   const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [hasValidToken, setHasValidToken] = useState(null)
@@ -80,12 +81,18 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Prevent double submission
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
     setError('')
     setSuccess('')
     setFieldErrors({})
 
     if (!validateForm()) {
       setError('Please fix the errors below')
+      setIsSubmitting(false)
       return
     }
 
@@ -106,6 +113,7 @@ export default function ResetPassword() {
       setError(handleError(err, 'password update'))
     } finally {
       setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
