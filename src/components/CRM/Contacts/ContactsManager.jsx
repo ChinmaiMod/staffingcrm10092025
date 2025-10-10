@@ -252,7 +252,8 @@ export default function ContactsManager() {
     setIsAdvancedFilterActive(false)
   }
 
-  const filteredContacts = contacts.filter(contact => {
+  // Defensive programming: ensure contacts is always an array (Bug #9 fix)
+  const filteredContacts = (contacts || []).filter(contact => {
     // Basic search - use null coalescing for safety
     const firstName = (contact.first_name || '').toLowerCase()
     const lastName = (contact.last_name || '').toLowerCase()
