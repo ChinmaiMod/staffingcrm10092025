@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from './AuthProvider'
 
@@ -17,16 +17,46 @@ export function TenantProvider({ children }) {
   const [tenant, setTenant] = useState(null)
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
+  
+  // Track if component is mounted to prevent setState on unmounted component
+  const isMountedRef = useRef(true)
+  // Track abort controller for cleanup
+  const abortControllerRef = useRef(null)
 
   useEffect(() => {
-    if (profile?.tenant_id) {
-      fetchTenantData(profile.tenant_id)
-    } else {
-      setLoading(false)
+    // Cancel any pending requests when tenant_id changes
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
-  }, [profile])
 
-  const fetchTenantData = async (tenantId) => {
+    if (profile?.tenant_id) {
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController()
+      fetchTenantData(profile.tenant_id, abortControllerRef.current.signal)
+    } else {
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      // Abort any pending requests when component unmounts or tenant_id changes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [profile?.tenant_id]) // Only depend on tenant_id, not entire profile object
+
+  // Set isMounted flag on mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const fetchTenantData = async (tenantId, signal) => {
     try {
       // Fetch tenant
       const { data: tenantData, error: tenantError } = await supabase
@@ -36,7 +66,11 @@ export function TenantProvider({ children }) {
         .single()
 
       if (tenantError) throw tenantError
-      setTenant(tenantData)
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setTenant(tenantData)
+      }
 
       // Fetch active subscription
       const { data: subData, error: subError } = await supabase
@@ -49,19 +83,40 @@ export function TenantProvider({ children }) {
         .maybeSingle()
 
       if (subError && subError.code !== 'PGRST116') throw subError
-      setSubscription(subData)
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setSubscription(subData)
+      }
     } catch (error) {
-      console.error('Error fetching tenant data:', error)
-      setTenant(null)
-      setSubscription(null)
+      // Don't log error if request was aborted (component unmounted)
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching tenant data:', error)
+      }
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setTenant(null)
+        setSubscription(null)
+      }
     } finally {
-      setLoading(false)
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
   }
 
   const refreshTenantData = () => {
     if (profile?.tenant_id) {
-      fetchTenantData(profile.tenant_id)
+      // Cancel any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      
+      // Create new abort controller
+      abortControllerRef.current = new AbortController()
+      fetchTenantData(profile.tenant_id, abortControllerRef.current.signal)
     }
   }
 
