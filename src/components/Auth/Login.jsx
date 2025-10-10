@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
 import { validateEmail, handleError } from '../../utils/validators'
+import { logger } from '../../utils/logger'
 import './Auth.css'
 
 export default function Login() {
@@ -69,7 +70,7 @@ export default function Login() {
       // Redirect will be handled by AuthProvider and route protection
       navigate('/dashboard')
     } catch (err) {
-      console.error('Login error:', err)
+      logger.error('Login error:', err)
       
       // Handle specific error cases
       if (err.message.includes('Email not confirmed')) {

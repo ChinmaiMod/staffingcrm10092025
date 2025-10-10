@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthProvider'
+import { logger } from '../utils/logger'
 
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -35,7 +36,7 @@ export default function ProtectedRoute({ children }) {
 
   // If loading timed out, show error and redirect to login
   if (loadingTimeout) {
-    console.error('Authentication loading timed out')
+    logger.error('Authentication loading timed out')
     return <Navigate to="/login" replace />
   }
 

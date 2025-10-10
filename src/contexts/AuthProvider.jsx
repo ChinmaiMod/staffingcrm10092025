@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
+import { logger } from '../utils/logger'
 
 const AuthContext = createContext({})
 
@@ -69,7 +70,7 @@ export function AuthProvider({ children }) {
       if (error) throw error
       setProfile(data)
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      logger.error('Error fetching profile:', error)
       setProfile(null)
     } finally {
       setLoading(false)
@@ -151,7 +152,7 @@ export function AuthProvider({ children }) {
       
       return { data, error }
     } catch (err) {
-      console.error('Password update error:', err)
+      logger.error('Password update error:', err)
       return { data: null, error: err }
     }
   }

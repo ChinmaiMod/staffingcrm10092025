@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
 import { supabase } from '../../api/supabaseClient'
+import { logger } from '../../utils/logger'
 import { 
   validateEmail, 
   validatePassword, 
@@ -103,7 +104,7 @@ export default function Register() {
 
       // Create tenant and profile using Edge Function
       try {
-        console.log('Calling createTenantAndProfile with:', {
+        logger.log('Calling createTenantAndProfile with:', {
           userId: data.user.id,
           email: formData.email.trim(),
           username: formData.username.trim() || formData.email.split('@')[0],
@@ -122,17 +123,17 @@ export default function Register() {
           }
         )
 
-        console.log('Function response:', { functionData, functionError })
+        logger.log('Function response:', { functionData, functionError })
 
         // Handle Edge Function errors
         // When Edge Function returns non-2xx status, the error details are in functionData.error
         if (functionError || functionData?.error) {
-          console.error('Function error details:', { functionError, functionData })
+          logger.error('Function error details:', { functionError, functionData })
           
           // Extract the error message from the response body
           let errorMessage = functionData?.error || functionError?.message || 'Registration failed. Please try again.'
           
-          console.log('Extracted error message:', errorMessage)
+          logger.log('Extracted error message:', errorMessage)
           
           // Check if it's a duplicate user/email error
           if (errorMessage.includes('already exists') || 
@@ -148,7 +149,7 @@ export default function Register() {
         }
 
         if (!functionData?.success) {
-          console.error('Function response invalid:', functionData)
+          logger.error('Function response invalid:', functionData)
           throw new Error('Invalid response from registration service. Please try again.')
         }
 
@@ -160,11 +161,11 @@ export default function Register() {
           navigate('/login')
         }, 3000)
       } catch (dbError) {
-        console.error('Database error:', dbError)
+        logger.error('Database error:', dbError)
         throw dbError
       }
     } catch (err) {
-      console.error('Registration error:', err)
+      logger.error('Registration error:', err)
       setError(handleError(err, 'registration'))
     } finally {
       setLoading(false)

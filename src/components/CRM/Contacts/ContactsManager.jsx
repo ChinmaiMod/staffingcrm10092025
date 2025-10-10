@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
 import { applyAdvancedFilters, describeFilter, isFilterEmpty } from '../../../utils/filterEngine'
+import { logger } from '../../../utils/logger'
 import ContactForm from './ContactForm'
 import ContactDetail from './ContactDetail'
 import AdvancedFilterBuilder from './AdvancedFilterBuilder'
@@ -107,7 +108,7 @@ export default function ContactsManager() {
     } catch (err) {
       // Bug #13 fix: Ignore abort errors, only handle real errors
       if (err.name === 'AbortError') {
-        console.log('loadContacts request was aborted')
+        logger.log('loadContacts request was aborted')
         return
       }
       
@@ -179,7 +180,7 @@ export default function ContactsManager() {
       //   }
       // }
       
-      console.log('Saving contact with status history:', { 
+      logger.log('Saving contact with status history:', { 
         contactData: contactFields,
         statusChanged,
         statusChangeRemarks,
@@ -259,14 +260,14 @@ export default function ContactsManager() {
         session?.access_token
       )
       
-      console.log('Bulk email result:', result)
+      logger.log('Bulk email result:', result)
       
       alert(`Email sent successfully to ${result.successful} of ${result.total} contact(s)!`)
       setShowBulkEmailModal(false)
       setBulkEmailData({ subject: '', body: '' })
       setSelectedContacts([])
     } catch (err) {
-      console.error('Bulk email error:', err)
+      logger.error('Bulk email error:', err)
       alert('Error sending email: ' + err.message)
     } finally {
       setSendingEmail(false)

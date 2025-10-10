@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from './AuthProvider'
+import { logger } from '../utils/logger'
 
 const TenantContext = createContext({})
 
@@ -91,7 +92,7 @@ export function TenantProvider({ children }) {
     } catch (error) {
       // Don't log error if request was aborted (component unmounted)
       if (error.name !== 'AbortError') {
-        console.error('Error fetching tenant data:', error)
+        logger.error('Error fetching tenant data:', error)
       }
       
       // Only update state if component is still mounted
