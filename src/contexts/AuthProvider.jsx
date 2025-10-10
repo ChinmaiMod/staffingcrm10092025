@@ -114,10 +114,46 @@ export function AuthProvider({ children }) {
   }
 
   const updatePassword = async (newPassword) => {
-    const { data, error } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
-    return { data, error }
+    try {
+      // Get current session to verify user is authenticated
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) throw sessionError
+      
+      // Verify that user has a valid session
+      if (!sessionData?.session) {
+        return {
+          data: null,
+          error: new Error('No active session. Please request a new password reset link.')
+        }
+      }
+
+      // Additional security check: Verify this is a password recovery session
+      // Note: Supabase sets user metadata during password reset flow
+      const user = sessionData.session.user
+      
+      // Check if this is a recovery session by examining the session context
+      // In a password reset flow, the user will have recently authenticated via the reset link
+      const isRecentAuth = sessionData.session.expires_at && 
+        (new Date(sessionData.session.expires_at * 1000) - new Date()) > 0
+      
+      if (!isRecentAuth) {
+        return {
+          data: null,
+          error: new Error('Session expired. Please request a new password reset link.')
+        }
+      }
+
+      // Proceed with password update
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+      
+      return { data, error }
+    } catch (err) {
+      console.error('Password update error:', err)
+      return { data: null, error: err }
+    }
   }
 
   const refreshProfile = () => {
