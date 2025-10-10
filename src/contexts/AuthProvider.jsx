@@ -18,14 +18,19 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
 
   useEffect(() => {
+    // Track if this is the initial load to prevent duplicate profile fetches
+    let isInitialLoad = true
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
+        isInitialLoad = false // Mark initial load as complete
       } else {
         setLoading(false)
+        isInitialLoad = false
       }
     })
 
@@ -33,6 +38,13 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Skip the immediate SIGNED_IN event that fires right after getSession()
+      // This prevents fetching the same profile twice on initial page load
+      if (isInitialLoad && _event === 'SIGNED_IN') {
+        isInitialLoad = false
+        return
+      }
+
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
