@@ -572,7 +572,7 @@ export default function ContactForm({ contact, onSave, onCancel }) {
           {attachments.length > 0 && (
             <div className="attachment-list" style={{ marginTop: '16px' }}>
               {attachments.map((attachment, index) => (
-                <div key={index} className="attachment-item" style={{
+                <div key={attachment.id || attachment.name || `attachment-${index}`} className="attachment-item" style={{
                   padding: '12px',
                   backgroundColor: '#f8fafc',
                   borderRadius: '6px',

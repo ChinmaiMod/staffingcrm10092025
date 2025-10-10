@@ -129,7 +129,7 @@ export default function Plans() {
 
               <ul className="features-list">
                 {plan.features.map((feature, index) => (
-                  <li key={index}>
+                  <li key={`${planKey}-feature-${index}`}>
                     <span className="checkmark">✓</span>
                     {feature}
                   </li>
