@@ -169,6 +169,11 @@ export default function ContactForm({ contact, onSave, onCancel }) {
 
     // Special handling for status changes
     if (field === 'status' && contact && value !== initialStatus.current) {
+      // Bug #15 fix: Don't open another modal if one is already showing
+      if (showStatusModal) {
+        return  // Prevent multiple modals
+      }
+      
       // Status is changing - show modal for remarks
       setPendingStatusChange({ field, value })
       setShowStatusModal(true)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -29,6 +29,10 @@ export default function ContactsManager() {
   const [advancedFilterConfig, setAdvancedFilterConfig] = useState(null)
   const [isAdvancedFilterActive, setIsAdvancedFilterActive] = useState(false)
 
+  // Bug #13 fix: Add refs for cleanup to prevent memory leaks
+  const isMountedRef = useRef(true)
+  const abortControllerRef = useRef(null)
+
   useEffect(() => {
     loadContacts()
     
@@ -42,13 +46,29 @@ export default function ContactsManager() {
     if (timeframeParam) {
       setFilterTimeframe(timeframeParam)
     }
+
+    // Bug #13 fix: Cleanup function
+    return () => {
+      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [searchParams])
 
   const loadContacts = async () => {
+    // Bug #13 fix: Abort previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Bug #13 fix: Create new abort controller for this request
+    abortControllerRef.current = new AbortController()
+
     try {
       setLoading(true)
       // TODO: Replace with actual API call
-      // const response = await listContacts()
+      // const response = await listContacts({ signal: abortControllerRef.current.signal })
       // setContacts(response.data || [])
       
       // Mock data for demonstration
@@ -79,10 +99,23 @@ export default function ContactsManager() {
           created_at: new Date().toISOString(),
         },
       ])
-      setLoading(false)
+      
+      // Bug #13 fix: Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     } catch (err) {
-      setError(err.message)
-      setLoading(false)
+      // Bug #13 fix: Ignore abort errors, only handle real errors
+      if (err.name === 'AbortError') {
+        console.log('loadContacts request was aborted')
+        return
+      }
+      
+      // Bug #13 fix: Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setError(err.message)
+        setLoading(false)
+      }
     }
   }
 

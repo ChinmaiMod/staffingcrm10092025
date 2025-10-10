@@ -9,7 +9,18 @@ export const validateEmail = (email) => {
     return { valid: false, error: 'Email address is required' }
   }
   
-  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+  // Bug #14 fix: Improved email regex to reject:
+  // - Consecutive dots (..)
+  // - Leading/trailing dots in local part
+  // - Leading/trailing dots in domain
+  // - Invalid domain structure
+  const emailRegex = /^[A-Za-z0-9][A-Za-z0-9._%+-]*[A-Za-z0-9]@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/
+  
+  // Additional check: no consecutive dots
+  if (email.includes('..')) {
+    return { valid: false, error: 'Email address cannot contain consecutive dots (..)' }
+  }
+  
   if (!emailRegex.test(email.trim())) {
     return { valid: false, error: 'Please enter a valid email address (e.g., user@example.com)' }
   }
