@@ -157,12 +157,12 @@ const Feedback = () => {
     <div className="feedback-page">
       <div className="feedback-header">
         <h1>💡 Suggestions & Ideas</h1>
-        <p>We'd love to hear your feedback! Share your ideas, report bugs, or suggest improvements.</p>
+        <p>We&apos;d love to hear your feedback! Share your ideas, report bugs, or suggest improvements.</p>
       </div>
 
       {success && (
         <div className="success-message">
-          ✓ Thank you for your feedback! We've received your message and will review it shortly.
+          ✓ Thank you for your feedback! We&apos;ve received your message and will review it shortly.
         </div>
       )}
 

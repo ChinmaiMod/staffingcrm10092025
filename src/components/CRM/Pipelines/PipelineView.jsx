@@ -300,7 +300,7 @@ export default function PipelineView() {
       {stages.length === 0 && selectedPipeline && (
         <div className="empty-state">
           <h3>No Stages Defined</h3>
-          <p>This pipeline doesn't have any stages yet. Add stages in Data Administration.</p>
+          <p>This pipeline doesn&apos;t have any stages yet. Add stages in Data Administration.</p>
           <button 
             className="btn btn-primary"
             onClick={() => navigate('/crm/data-admin')}

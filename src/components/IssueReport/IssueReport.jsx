@@ -262,7 +262,7 @@ const IssueReport = () => {
 
       {success && (
         <div className="success-message">
-          ✓ Thank you for reporting this issue! We'll investigate and get back to you shortly.
+          ✓ Thank you for reporting this issue! We&apos;ll investigate and get back to you shortly.
         </div>
       )}
 

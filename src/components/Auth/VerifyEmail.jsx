@@ -96,7 +96,7 @@ export default function VerifyEmail() {
         {!token && !success && (
           <>
             <p className="auth-subtitle">
-              Didn't receive a verification email? Enter your email below to resend it.
+              Didn&apos;t receive a verification email? Enter your email below to resend it.
             </p>
 
             <form onSubmit={handleResend} className="auth-form">

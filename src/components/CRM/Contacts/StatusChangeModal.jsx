@@ -77,7 +77,7 @@ export default function StatusChangeModal({
           </div>
 
           <div className="info-box">
-            <strong>Note:</strong> This remark will be permanently saved in the contact's status history 
+            <strong>Note:</strong> This remark will be permanently saved in the contact&apos;s status history 
             and cannot be edited later. Make sure to provide clear and complete information.
           </div>
         </div>

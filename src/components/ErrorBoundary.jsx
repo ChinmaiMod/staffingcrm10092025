@@ -9,6 +9,9 @@ class ErrorBoundary extends React.Component {
       error: null,
       errorInfo: null
     }
+    // Bind methods to this instance
+    this.handleReset = this.handleReset.bind(this)
+    this.handleReload = this.handleReload.bind(this)
   }
 
   static getDerivedStateFromError(error) {
@@ -29,7 +32,7 @@ class ErrorBoundary extends React.Component {
     // logErrorToService(error, errorInfo)
   }
 
-  handleReset = () => {
+  handleReset() {
     this.setState({
       hasError: false,
       error: null,
@@ -37,7 +40,7 @@ class ErrorBoundary extends React.Component {
     })
   }
 
-  handleReload = () => {
+  handleReload() {
     window.location.reload()
   }
 
@@ -85,7 +88,7 @@ class ErrorBoundary extends React.Component {
               marginBottom: '24px',
               lineHeight: '1.6'
             }}>
-              We encountered an unexpected error. Don't worry, your data is safe. 
+              We encountered an unexpected error. Don&apos;t worry, your data is safe. 
               You can try reloading the page or going back to continue.
             </p>
 

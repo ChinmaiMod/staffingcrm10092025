@@ -18,6 +18,7 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [hasValidToken, setHasValidToken] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
 
   // Check for access_token or error in URL hash on mount
   useEffect(() => {

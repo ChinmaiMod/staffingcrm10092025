@@ -66,7 +66,7 @@ export const validatePassword = (password, options = {}) => {
     return { valid: false, error: 'Password must contain at least one number' }
   }
 
-  if (requireSpecialChars && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (requireSpecialChars && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
     return { valid: false, error: 'Password must contain at least one special character' }
   }
 
@@ -137,7 +137,7 @@ export const validatePhone = (phone, required = false) => {
   }
 
   // Remove common formatting characters
-  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '')
+  const cleaned = phone.replace(/[\s\-()\.]/g, '')
   
   if (!/^\+?[0-9]{10,15}$/.test(cleaned)) {
     return { valid: false, error: 'Please enter a valid phone number (10-15 digits)' }
