@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import MultiSelect from '../common/MultiSelect'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
@@ -6,8 +6,7 @@ import {
   validateEmail, 
   validatePhone, 
   validateTextField, 
-  validateSelect,
-  handleError 
+  validateSelect
 } from '../../../utils/validators'
 
 // Reference data - in production, fetch from API
@@ -108,7 +107,6 @@ export default function ContactForm({ contact, onSave, onCancel }) {
   const [availableStates, setAvailableStates] = useState(USA_STATES)
   const [availableJobTitles, setAvailableJobTitles] = useState(IT_JOB_TITLES)
   const [attachments, setAttachments] = useState([])
-  const [uploading, setUploading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   
   // Status change tracking

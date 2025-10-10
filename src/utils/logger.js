@@ -129,16 +129,9 @@ export const logError = (error, context = '', additionalData = {}) => {
     // In production, you could send to monitoring service
     // Example: Sentry.captureException(error, { tags: { context }, extra: additionalData })
     
-    // For now, just store critical info
-    const errorInfo = {
-      message: error.message,
-      context,
-      timestamp: new Date().toISOString(),
-      ...additionalData
-    }
-    
     // You could send this to a logging service
-    // sendToLoggingService(errorInfo)
+    // For now, we're not storing error info in production
+    // sendToLoggingService({ message: error.message, context, timestamp: new Date().toISOString(), ...additionalData })
   }
 }
 

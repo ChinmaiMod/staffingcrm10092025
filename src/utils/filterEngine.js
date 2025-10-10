@@ -52,9 +52,9 @@ function applyCondition(contact, condition) {
  * Apply all conditions in a group with AND/OR logic
  */
 function applyGroup(contact, group) {
-  const { conditions, logicalOperator } = group
+  const { conditions, operator = 'AND' } = group  // Default to AND if not specified
 
-  if (logicalOperator === 'AND') {
+  if (operator === 'and' || operator === 'AND') {
     // All conditions must match
     return conditions.every(condition => applyCondition(contact, condition))
   } else {
@@ -71,10 +71,10 @@ export function applyAdvancedFilters(contacts, filterConfig) {
     return contacts
   }
 
-  const { groups, groupOperator } = filterConfig
+  const { groups, groupOperator = 'OR' } = filterConfig  // Default to OR if not specified
 
   return contacts.filter(contact => {
-    if (groupOperator === 'AND') {
+    if (groupOperator === 'AND' || groupOperator === 'and') {
       // All groups must match
       return groups.every(group => applyGroup(contact, group))
     } else {
@@ -95,7 +95,7 @@ export function buildSupabaseQuery(supabase, filterConfig) {
     return query
   }
 
-  const { groups, groupOperator } = filterConfig
+  const { groups } = filterConfig
 
   // For complex AND/OR logic, we may need to fetch all and filter client-side
   // Or build complex SQL using .or() and .and() chains
@@ -104,7 +104,7 @@ export function buildSupabaseQuery(supabase, filterConfig) {
   // Example for simple single-group filters:
   if (groups.length === 1) {
     const group = groups[0]
-    group.conditions.forEach((condition, index) => {
+    group.conditions.forEach((condition) => {
       const { field, operator, value } = condition
 
       if (operator === 'is_empty') {
@@ -138,7 +138,7 @@ export function describeFilter(filterConfig) {
 
   const { groups, groupOperator } = filterConfig
 
-  const groupDescriptions = groups.map((group, groupIndex) => {
+  const groupDescriptions = groups.map((group) => {
     const conditionDescriptions = group.conditions.map(condition => {
       const { field, operator, value } = condition
       const fieldLabel = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -152,7 +152,8 @@ export function describeFilter(filterConfig) {
       return `${fieldLabel} ${operatorText} "${valueText}"`
     })
 
-    const groupDesc = conditionDescriptions.join(` ${group.logicalOperator} `)
+    const groupOperatorText = group.operator || 'and'
+    const groupDesc = conditionDescriptions.join(` ${groupOperatorText} `)
     return groups.length > 1 ? `(${groupDesc})` : groupDesc
   })
 

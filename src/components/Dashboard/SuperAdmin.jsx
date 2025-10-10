@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../api/supabaseClient'
 import { useAuth } from '../../contexts/AuthProvider'
 import { updateTenantStatus } from '../../api/edgeFunctions'

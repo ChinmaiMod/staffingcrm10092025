@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useAuth } from '../../../contexts/AuthProvider'
 import { validateTextField, handleSupabaseError, handleError } from '../../../utils/validators'
@@ -39,17 +39,7 @@ export default function PipelineAdmin() {
     is_final: false
   })
 
-  useEffect(() => {
-    fetchPipelines()
-  }, [])
-
-  useEffect(() => {
-    if (selectedPipeline) {
-      fetchStages(selectedPipeline.pipeline_id)
-    }
-  }, [selectedPipeline])
-
-  const fetchPipelines = async () => {
+  const fetchPipelines = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -69,7 +59,17 @@ export default function PipelineAdmin() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedPipeline])
+
+  useEffect(() => {
+    fetchPipelines()
+  }, [fetchPipelines])
+
+  useEffect(() => {
+    if (selectedPipeline) {
+      fetchStages(selectedPipeline.pipeline_id)
+    }
+  }, [selectedPipeline])
 
   const fetchStages = async (pipelineId) => {
     try {

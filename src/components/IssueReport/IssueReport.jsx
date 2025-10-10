@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../api/supabaseClient';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useTenant } from '../../contexts/TenantProvider';
@@ -121,7 +121,7 @@ const IssueReport = () => {
     const fileName = `${issueId}-${Date.now()}.${fileExt}`;
     const filePath = `issue-screenshots/${tenant.tenant_id}/${fileName}`;
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('attachments')
       .upload(filePath, screenshot);
 

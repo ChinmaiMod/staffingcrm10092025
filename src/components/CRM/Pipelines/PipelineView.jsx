@@ -10,7 +10,6 @@ export default function PipelineView() {
   const [pipelines, setPipelines] = useState([])
   const [selectedPipeline, setSelectedPipeline] = useState(null)
   const [stages, setStages] = useState([])
-  const [contacts, setContacts] = useState([])
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -90,10 +89,6 @@ export default function PipelineView() {
       if (assignError) throw assignError
       
       setAssignments(assignmentData || [])
-      
-      // Extract unique contacts
-      const uniqueContacts = assignmentData?.map(a => a.contacts).filter(Boolean) || []
-      setContacts(uniqueContacts)
     } catch (err) {
       console.error('Error fetching contacts:', err)
       setError('Failed to load contacts')

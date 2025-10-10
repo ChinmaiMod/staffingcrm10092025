@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import StatusHistory from './StatusHistory'
 
 export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
@@ -10,33 +10,7 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
   const [uploading, setUploading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
 
-  useEffect(() => {
-    // TODO: Load attachments and comments from API
-    // Mock data
-    setAttachments([
-      { id: 1, name: 'resume.pdf', url: '#', uploaded_at: new Date().toISOString() },
-      { id: 2, name: 'certificate.jpg', url: '#', uploaded_at: new Date().toISOString() },
-    ])
-    setComments([
-      {
-        id: 1,
-        text: 'Initial contact made. Candidate seems interested in remote positions.',
-        created_by: 'John Admin',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        text: 'Sent resume template for review.',
-        created_by: 'Jane Recruiter',
-        created_at: new Date().toISOString(),
-      },
-    ])
-
-    // Load status history
-    loadStatusHistory()
-  }, [contact])
-
-  const loadStatusHistory = async () => {
+  const loadStatusHistory = useCallback(async () => {
     setLoadingHistory(true)
     try {
       // TODO: Replace with actual API call
@@ -74,7 +48,33 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
       console.error('Error loading status history:', err)
       setLoadingHistory(false)
     }
-  }
+  }, [contact.contact_id])
+
+  useEffect(() => {
+    // TODO: Load attachments and comments from API
+    // Mock data
+    setAttachments([
+      { id: 1, name: 'resume.pdf', url: '#', uploaded_at: new Date().toISOString() },
+      { id: 2, name: 'certificate.jpg', url: '#', uploaded_at: new Date().toISOString() },
+    ])
+    setComments([
+      {
+        id: 1,
+        text: 'Initial contact made. Candidate seems interested in remote positions.',
+        created_by: 'John Admin',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 2,
+        text: 'Sent resume template for review.',
+        created_by: 'Jane Recruiter',
+        created_at: new Date().toISOString(),
+      },
+    ])
+
+    // Load status history
+    loadStatusHistory()
+  }, [contact, loadStatusHistory])
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files)

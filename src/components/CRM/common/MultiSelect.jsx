@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function MultiSelect({ options, selected = [], onChange, placeholder = 'Select...' }) {
   const [isOpen, setIsOpen] = useState(false)

@@ -1,22 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../api/supabaseClient'
-import { useAuth } from '../../contexts/AuthProvider'
 import { createInvite } from '../../api/edgeFunctions'
 import { useTenant } from '../../contexts/TenantProvider'
 import { handleSupabaseError } from '../../utils/validators'
 
 export default function TenantAdmin() {
-  const { profile } = useAuth()
   const { tenant, loading, refreshTenantData } = useTenant()
   const [users, setUsers] = useState([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [sending, setSending] = useState(false)
 
-  useEffect(() => {
-    if (tenant?.tenant_id) fetchUsers()
-  }, [tenant])
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -29,7 +23,11 @@ export default function TenantAdmin() {
     } catch (err) {
       console.error('Error fetching users', err)
     }
-  }
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    if (tenant?.tenant_id) fetchUsers()
+  }, [tenant, fetchUsers])
 
   const sendInvite = async () => {
     if (!inviteEmail) return

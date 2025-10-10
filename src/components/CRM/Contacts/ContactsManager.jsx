@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -10,7 +10,7 @@ import AdvancedFilterBuilder from './AdvancedFilterBuilder'
 
 export default function ContactsManager() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user, session } = useAuth()
+  const { session } = useAuth()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -68,12 +68,17 @@ export default function ContactsManager() {
 
     try {
       setLoading(true)
+      logger.log('Loading contacts...')
+      
       // TODO: Replace with actual API call
       // const response = await listContacts({ signal: abortControllerRef.current.signal })
       // setContacts(response.data || [])
       
+      // Simulate async operation with setTimeout
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       // Mock data for demonstration
-      setContacts([
+      const mockContacts = [
         {
           contact_id: 1,
           first_name: 'John',
@@ -99,11 +104,15 @@ export default function ContactsManager() {
           years_experience: '7 to 9',
           created_at: new Date().toISOString(),
         },
-      ])
+      ]
+      
+      logger.log('Mock contacts loaded:', mockContacts.length)
       
       // Bug #13 fix: Only update state if component is still mounted
       if (isMountedRef.current) {
+        setContacts(mockContacts)
         setLoading(false)
+        logger.log('Contacts state updated, loading complete')
       }
     } catch (err) {
       // Bug #13 fix: Ignore abort errors, only handle real errors
@@ -111,6 +120,8 @@ export default function ContactsManager() {
         logger.log('loadContacts request was aborted')
         return
       }
+      
+      logger.error('Error loading contacts:', err)
       
       // Bug #13 fix: Only update state if component is still mounted
       if (isMountedRef.current) {
@@ -198,7 +209,7 @@ export default function ContactsManager() {
     }
   }
 
-  const handleDeleteContact = async (contactId) => {
+  const handleDeleteContact = async () => {
     if (!confirm('Are you sure you want to delete this contact?')) return
     
     try {

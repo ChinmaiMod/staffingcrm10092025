@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { validateTextField } from '../../../utils/validators'
 
-export default function ReferenceTableEditor({ table, onClose }) {
+export default function ReferenceTableEditor({ table }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -10,11 +10,7 @@ export default function ReferenceTableEditor({ table, onClose }) {
   const [error, setError] = useState('')
   const [fieldError, setFieldError] = useState('')
 
-  useEffect(() => {
-    loadItems()
-  }, [table.id])
-
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     try {
       setLoading(true)
       // TODO: Load from API
@@ -35,7 +31,11 @@ export default function ReferenceTableEditor({ table, onClose }) {
       alert('Error loading data: ' + err.message)
       setLoading(false)
     }
-  }
+  }, [table.id])
+
+  useEffect(() => {
+    loadItems()
+  }, [loadItems])
 
   const handleAdd = async () => {
     setError('')

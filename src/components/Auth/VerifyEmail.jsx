@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { verifyToken, resendVerification, acceptInvite as acceptInviteEdge } from '../../api/edgeFunctions'
 import { useAuth } from '../../contexts/AuthProvider'
@@ -17,13 +17,7 @@ export default function VerifyEmail() {
   const [email, setEmail] = useState('')
   const [resending, setResending] = useState(false)
 
-  useEffect(() => {
-    if (token) {
-      handleVerify()
-    }
-  }, [token])
-
-  const handleVerify = async () => {
+  const handleVerify = useCallback(async () => {
     setLoading(true)
     setError('')
     
@@ -52,7 +46,13 @@ export default function VerifyEmail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token, inviteToken, user, navigate])
+
+  useEffect(() => {
+    if (token) {
+      handleVerify()
+    }
+  }, [token, handleVerify])
 
   const handleResend = async (e) => {
     e.preventDefault()

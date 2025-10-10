@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 
 export default function TenantDashboard() {
-  const { user, profile, signOut } = useAuth()
+  const { profile, signOut } = useAuth()
   const { tenant, subscription, getPlanName } = useTenant()
   const navigate = useNavigate()
 

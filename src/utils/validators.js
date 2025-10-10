@@ -137,7 +137,7 @@ export const validatePhone = (phone, required = false) => {
   }
 
   // Remove common formatting characters
-  const cleaned = phone.replace(/[\s\-()\.]/g, '')
+  const cleaned = phone.replace(/[\s\-().]/g, '')
   
   if (!/^\+?[0-9]{10,15}$/.test(cleaned)) {
     return { valid: false, error: 'Please enter a valid phone number (10-15 digits)' }
@@ -386,6 +386,11 @@ export const formatErrorMessage = (error) => {
 // Supabase error handler
 export const handleSupabaseError = (error) => {
   console.error('Supabase error:', error)
+  
+  // Handle null/undefined errors
+  if (!error) {
+    return 'An error occurred while processing your request. Please try again.'
+  }
   
   // Common Supabase error codes
   const errorMap = {

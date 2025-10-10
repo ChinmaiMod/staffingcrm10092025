@@ -3,7 +3,7 @@ import { supabase } from '../api/supabaseClient'
 import { useAuth } from './AuthProvider'
 import { logger } from '../utils/logger'
 
-const TenantContext = createContext({})
+export const TenantContext = createContext({})
 
 export const useTenant = () => {
   const context = useContext(TenantContext)
@@ -57,7 +57,7 @@ export function TenantProvider({ children }) {
     }
   }, [])
 
-  const fetchTenantData = async (tenantId, signal) => {
+  const fetchTenantData = async (tenantId) => {
     try {
       // Fetch tenant
       const { data: tenantData, error: tenantError } = await supabase

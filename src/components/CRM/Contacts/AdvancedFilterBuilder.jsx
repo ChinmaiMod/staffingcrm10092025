@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 
 // Field definitions with operators
 const FILTER_FIELDS = [
@@ -285,7 +285,6 @@ export default function AdvancedFilterBuilder({ onApplyFilters, onClose, initial
                         value={condition.field}
                         onChange={(e) => {
                           const newField = e.target.value
-                          const newFieldConfig = getFieldConfig(newField)
                           const newOperators = getOperatorsForField(newField)
                           updateCondition(group.id, condition.id, {
                             field: newField,

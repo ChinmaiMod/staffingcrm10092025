@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function AutocompleteSelect({ options, value, onChange, placeholder = 'Type to search...' }) {
   const [inputValue, setInputValue] = useState(value || '')

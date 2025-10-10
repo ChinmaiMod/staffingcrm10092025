@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { logger } from '../utils/logger'
 
-const AuthContext = createContext({})
+export const AuthContext = createContext({})
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -131,7 +131,6 @@ export function AuthProvider({ children }) {
 
       // Additional security check: Verify this is a password recovery session
       // Note: Supabase sets user metadata during password reset flow
-      const user = sessionData.session.user
       
       // Check if this is a recovery session by examining the session context
       // In a password reset flow, the user will have recently authenticated via the reset link

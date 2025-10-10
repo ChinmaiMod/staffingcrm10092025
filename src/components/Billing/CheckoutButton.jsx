@@ -6,7 +6,6 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
 export default function CheckoutButton({
   priceId,
-  planName,
   billingCycle,
   tenantId,
   profileId,
