@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
+import { requestPasswordReset } from '../api/edgeFunctions'
 import { logger } from '../utils/logger'
 
 export const AuthContext = createContext({})
@@ -108,10 +109,16 @@ export function AuthProvider({ children }) {
       ? `${import.meta.env.VITE_FRONTEND_URL}/reset-password`
       : `${window.location.origin}/reset-password`;
 
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    })
-    return { data, error }
+    try {
+      const data = await requestPasswordReset(email, redirectUrl)
+      return { data, error: null }
+    } catch (edgeError) {
+      logger.warn('Falling back to Supabase mailer for password reset', edgeError)
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      })
+      return { data, error }
+    }
   }
 
   const updatePassword = async (newPassword) => {

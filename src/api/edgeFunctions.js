@@ -48,6 +48,14 @@ export async function verifyToken(token) {
   return callEdgeFunction('verifyToken', { token })
 }
 
+export async function requestPasswordReset(email, redirectTo = null) {
+  const payload = { email }
+  if (redirectTo) {
+    payload.redirectTo = redirectTo
+  }
+  return callEdgeFunction('requestPasswordReset', payload)
+}
+
 export async function createCheckoutSession(priceId, tenantId, profileId, billingCycle, promoCode = null) {
   return callEdgeFunction('createCheckoutSession', {
     priceId,

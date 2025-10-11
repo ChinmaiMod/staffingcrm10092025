@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
 import { validatePassword, validatePasswordConfirmation, handleError } from '../../utils/validators'
+import { supabase } from '../../api/supabaseClient'
 import './Auth.css'
 
 export default function ResetPassword() {
@@ -18,44 +19,78 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [hasValidToken, setHasValidToken] = useState(null)
+  const [verifyingToken, setVerifyingToken] = useState(true)
   const [fieldErrors, setFieldErrors] = useState({})
 
   // Check for access_token or error in URL hash on mount
   useEffect(() => {
-    const checkUrlHash = () => {
-      const hash = location.hash.substring(1) // Remove the #
-      const params = new URLSearchParams(hash)
-      
-      const accessToken = params.get('access_token')
-      const errorParam = params.get('error')
-      const errorCode = params.get('error_code')
-      const errorDescription = params.get('error_description')
-      
+    const verifyTokens = async () => {
+      setVerifyingToken(true)
+      setError('')
+
+      const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
+      const searchParams = new URLSearchParams(location.search)
+
+      const errorParam = hashParams.get('error') || searchParams.get('error')
+      const errorCode = hashParams.get('error_code') || searchParams.get('error_code')
+      const errorDescription = hashParams.get('error_description') || searchParams.get('error_description')
+      const typeParam = hashParams.get('type') || searchParams.get('type')
+
       if (errorParam) {
-        // Handle error from Supabase
         let errorMessage = 'Unable to reset password. '
-        
-        if (errorCode === 'otp_expired') {
+
+        if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
           errorMessage += 'The password reset link has expired. Please request a new one.'
         } else if (errorDescription) {
           errorMessage += decodeURIComponent(errorDescription.replace(/\+/g, ' '))
         } else {
           errorMessage += errorParam
         }
-        
+
         setError(errorMessage)
         setHasValidToken(false)
-      } else if (accessToken) {
-        // Valid token found
-        setHasValidToken(true)
-      } else {
-        // No token in URL
-        setError('Invalid or missing reset token. Please request a new password reset link.')
+        setVerifyingToken(false)
+        return
+      }
+
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const code = searchParams.get('code') || searchParams.get('token_hash')
+
+      try {
+        if (accessToken && refreshToken) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+
+          if (sessionError) {
+            throw sessionError
+          }
+
+          setHasValidToken(true)
+        } else if (code && (!typeParam || typeParam === 'recovery')) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+          if (exchangeError) {
+            throw exchangeError
+          }
+
+          setHasValidToken(true)
+        } else {
+          setError('Invalid or missing reset token. Please request a new password reset link.')
+          setHasValidToken(false)
+        }
+      } catch (err) {
+        console.error('Token verification error:', err)
+        setError(handleError(err, 'token verification'))
         setHasValidToken(false)
+      } finally {
+        setVerifyingToken(false)
       }
     }
-    
-    checkUrlHash()
+
+    verifyTokens()
   }, [location])
 
   const validateForm = () => {
@@ -164,7 +199,14 @@ export default function ResetPassword() {
           </div>
         )}
 
-        {hasValidToken !== false && (
+        {verifyingToken && (
+          <div className="auth-status">
+            <div className="loading-spinner" role="status" aria-live="polite"></div>
+            <p>Validating your reset link…</p>
+          </div>
+        )}
+
+        {!verifyingToken && hasValidToken !== false && (
           <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
             <label htmlFor="password">New Password *</label>
