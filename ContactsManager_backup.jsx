@@ -35,6 +35,8 @@ export default function ContactsManager() {
   const abortControllerRef = useRef(null)
 
   useEffect(() => {
+    loadContacts()
+    
     // Apply filters from URL parameters
     const statusParam = searchParams.get('status')
     const timeframeParam = searchParams.get('timeframe')
@@ -46,9 +48,6 @@ export default function ContactsManager() {
       setFilterTimeframe(timeframeParam)
     }
 
-    // Load contacts once on mount
-    loadContacts()
-
     // Bug #13 fix: Cleanup function
     return () => {
       isMountedRef.current = false
@@ -56,7 +55,7 @@ export default function ContactsManager() {
         abortControllerRef.current.abort()
       }
     }
-  }, []) // Empty dependency array - only run once on mount
+  }, [searchParams])
 
   const loadContacts = async () => {
     // Bug #13 fix: Abort previous request if still pending
@@ -69,13 +68,12 @@ export default function ContactsManager() {
 
     try {
       setLoading(true)
-      
       // TODO: Replace with actual API call
       // const response = await listContacts({ signal: abortControllerRef.current.signal })
       // setContacts(response.data || [])
       
       // Mock data for demonstration
-      const mockContacts = [
+      setContacts([
         {
           contact_id: 1,
           first_name: 'John',
@@ -101,10 +99,12 @@ export default function ContactsManager() {
           years_experience: '7 to 9',
           created_at: new Date().toISOString(),
         },
-      ]
+      ])
       
-      setContacts(mockContacts)
-      setLoading(false)
+      // Bug #13 fix: Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     } catch (err) {
       // Bug #13 fix: Ignore abort errors, only handle real errors
       if (err.name === 'AbortError') {
@@ -112,9 +112,11 @@ export default function ContactsManager() {
         return
       }
       
-      logger.error('Error loading contacts:', err)
-      setError(err.message)
-      setLoading(false)
+      // Bug #13 fix: Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setError(err.message)
+        setLoading(false)
+      }
     }
   }
 

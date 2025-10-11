@@ -7,6 +7,8 @@ import PipelineView from './Pipelines/PipelineView'
 import DataAdministration from './DataAdmin/DataAdministration'
 import NotificationsManager from './Notifications/NotificationsManager'
 import EmailTemplates from './EmailTemplates/EmailTemplates'
+import Feedback from '../Feedback/Feedback'
+import IssueReport from '../IssueReport/IssueReport'
 import './CRM.css'
 
 export default function CRMApp() {
@@ -31,6 +33,8 @@ export default function CRMApp() {
     { id: 'data-admin', label: 'Data Administration', icon: '⚙️', path: '/crm/data-admin' },
     { id: 'notifications', label: 'Notifications', icon: '🔔', path: '/crm/notifications' },
     { id: 'email-templates', label: 'Email Templates', icon: '📧', path: '/crm/email-templates' },
+    { id: 'feedback', label: 'Suggestions/Ideas ?', icon: '💡', path: '/crm/feedback' },
+    { id: 'issue-report', label: 'Report an Issue', icon: '🐛', path: '/crm/issue-report' },
   ]
 
   return (
@@ -75,6 +79,8 @@ export default function CRMApp() {
           <Route path="/data-admin/*" element={<DataAdministration />} />
           <Route path="/notifications" element={<NotificationsManager />} />
           <Route path="/email-templates" element={<EmailTemplates />} />
+          <Route path="/feedback" element={<Feedback />} />
+          <Route path="/issue-report" element={<IssueReport />} />
         </Routes>
       </main>
     </div>

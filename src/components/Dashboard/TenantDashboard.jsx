@@ -146,22 +146,6 @@ export default function TenantDashboard() {
                 </button>
               </div>
             )}
-
-            <div className="module-card">
-              <h3>💡 Suggestions/Ideas ?</h3>
-              <p>Share your feedback and ideas</p>
-              <button className="btn btn-primary" onClick={() => navigate('/feedback')}>
-                Submit Feedback
-              </button>
-            </div>
-
-            <div className="module-card">
-              <h3>🐛 Report an Issue</h3>
-              <p>Report bugs and technical problems</p>
-              <button className="btn btn-danger" onClick={() => navigate('/report-issue')}>
-                Report Issue
-              </button>
-            </div>
           </div>
         </div>
       </div>
