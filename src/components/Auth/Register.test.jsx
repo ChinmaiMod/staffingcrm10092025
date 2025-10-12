@@ -1,8 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render } from '../../test/utils.jsx'
 import Register from './Register.jsx'
+
+const mockInvoke = vi.hoisted(() => vi.fn())
+
+vi.mock('../../api/supabaseClient', () => ({
+  supabase: {
+    functions: {
+      invoke: mockInvoke,
+    },
+  },
+}))
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -16,6 +26,11 @@ vi.mock('react-router-dom', async () => {
 describe('Register Component', () => {
   const mockSignUp = vi.fn()
 
+  beforeEach(() => {
+    mockSignUp.mockReset()
+    mockInvoke.mockReset()
+  })
+
   it('should render registration form', () => {
     render(<Register />, {
       authValue: { signUp: mockSignUp, loading: false },
@@ -23,10 +38,10 @@ describe('Register Component', () => {
 
     expect(screen.getByRole('heading', { name: /create.*account/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^username/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/company name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^password/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/company name/i)).toBeInTheDocument()
   })
 
   it('should validate all required fields', async () => {
@@ -82,14 +97,15 @@ describe('Register Component', () => {
   it('should successfully register with valid data', async () => {
     const user = userEvent.setup()
     mockSignUp.mockResolvedValue({ data: { user: { id: '123' } }, error: null })
+    mockInvoke.mockResolvedValue({ data: { success: true }, error: null })
     
     render(<Register />, {
       authValue: { signUp: mockSignUp, loading: false },
     })
 
     await user.type(screen.getByLabelText(/email/i), 'newuser@example.com')
-    await user.type(screen.getByLabelText(/^username/i), 'newuser')
     await user.type(screen.getByLabelText(/company name/i), 'Test Company')
+    await user.type(screen.getByLabelText(/phone number/i), '1234567890')
     await user.type(screen.getByLabelText(/^password/i), 'SecurePass123!')
     await user.type(screen.getByLabelText(/confirm password/i), 'SecurePass123!')
     await user.click(screen.getByRole('button', { name: /create account/i }))
@@ -99,6 +115,13 @@ describe('Register Component', () => {
         'newuser@example.com',
         'SecurePass123!'
       )
+      expect(mockInvoke).toHaveBeenCalledWith('createTenantAndProfile', expect.objectContaining({
+        body: expect.objectContaining({
+          email: 'newuser@example.com',
+          companyName: 'Test Company',
+          phoneNumber: '1234567890',
+        })
+      }))
     })
   })
 
@@ -108,13 +131,13 @@ describe('Register Component', () => {
       data: null,
       error: { message: 'User already registered' } 
     })
+    mockInvoke.mockResolvedValue({ data: { error: 'User already registered' }, error: null })
     
     render(<Register />, {
       authValue: { signUp: mockSignUp, loading: false },
     })
 
     await user.type(screen.getByLabelText(/email/i), 'existing@example.com')
-    await user.type(screen.getByLabelText(/^username/i), 'existinguser')
     await user.type(screen.getByLabelText(/company name/i), 'Test Company')
     await user.type(screen.getByLabelText(/^password/i), 'Password123!')
     await user.type(screen.getByLabelText(/confirm password/i), 'Password123!')

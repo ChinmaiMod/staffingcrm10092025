@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../api/supabaseClient';
 import './AssignUserRoles.css';
 
@@ -23,62 +23,7 @@ const AssignUserRoles = () => {
     pipeline_ids: []
   });
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get current user's profile and role
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_role_assignments!inner(
-            user_roles(*)
-          )
-        `)
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-      
-      setCurrentUser(profileData);
-      const userRole = profileData.user_role_assignments[0]?.user_roles;
-      setCurrentUserRole(userRole);
-
-      // Check if user can manage roles
-      if (!userRole?.can_manage_roles) {
-        setError('You do not have permission to manage user roles.');
-        setLoading(false);
-        return;
-      }
-
-      // Load all users with their current roles
-      await loadUsers(profileData.tenant_id);
-
-      // Load available roles (based on current user's level)
-      await loadRoles(userRole.hierarchy_level);
-
-      // Load businesses for the tenant
-      await loadBusinesses(profileData.tenant_id);
-
-      setLoading(false);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
-  const loadUsers = async (tenantId) => {
+  const loadUsers = useCallback(async (tenantId) => {
     const { data, error } = await supabase
       .from('profiles')
       .select(`
@@ -108,9 +53,9 @@ const AssignUserRoles = () => {
 
     if (error) throw error;
     setUsers(data || []);
-  };
+  }, []);
 
-  const loadRoles = async (currentUserLevel) => {
+  const loadRoles = useCallback(async (currentUserLevel) => {
     // Only load roles that the current user can assign
     // CEO (level 5) can assign all roles
     // Manager (level 4) can assign levels 1-3
@@ -125,9 +70,9 @@ const AssignUserRoles = () => {
 
     if (error) throw error;
     setRoles(data || []);
-  };
+  }, []);
 
-  const loadBusinesses = async (tenantId) => {
+  const loadBusinesses = useCallback(async (tenantId) => {
     const { data, error } = await supabase
       .from('businesses')
       .select('*')
@@ -136,7 +81,62 @@ const AssignUserRoles = () => {
 
     if (error) throw error;
     setBusinesses(data || []);
-  };
+  }, []);
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        // Get current user's profile and role
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            user_role_assignments!inner(
+              user_roles(*)
+            )
+          `)
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        setCurrentUser(profileData);
+        const userRole = profileData.user_role_assignments[0]?.user_roles;
+        setCurrentUserRole(userRole);
+
+        // Check if user can manage roles
+        if (!userRole?.can_manage_roles) {
+          setError('You do not have permission to manage user roles.');
+          setLoading(false);
+          return;
+        }
+
+        // Load all users with their current roles
+        await loadUsers(profileData.tenant_id);
+
+        // Load available roles (based on current user's level)
+        await loadRoles(userRole.hierarchy_level);
+
+        // Load businesses for the tenant
+        await loadBusinesses(profileData.tenant_id);
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [loadUsers, loadRoles, loadBusinesses]);
 
   const loadContactTypes = async (tenantId, businessIds) => {
     if (!businessIds || businessIds.length === 0) {

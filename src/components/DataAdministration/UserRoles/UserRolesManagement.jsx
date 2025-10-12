@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../api/supabaseClient';
 import { useAuth } from '../../../contexts/AuthProvider';
 import './UserRolesManagement.css';
@@ -41,12 +41,10 @@ function UserRolesManagement() {
   
   const [selectedMenuItems, setSelectedMenuItems] = useState([]);
 
-  useEffect(() => {
-    loadRoles();
-    loadMenuItems();
-  }, [profile]);
-
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
+    if (!profile?.tenant_id) {
+      return;
+    }
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -63,9 +61,9 @@ function UserRolesManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.tenant_id]);
 
-  const loadMenuItems = async () => {
+  const loadMenuItems = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('menu_items')
@@ -78,7 +76,16 @@ function UserRolesManagement() {
     } catch (err) {
       console.error('Error loading menu items:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!profile?.tenant_id) {
+      setLoading(false);
+      return;
+    }
+    loadRoles();
+    loadMenuItems();
+  }, [profile?.tenant_id, loadRoles, loadMenuItems]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -553,7 +560,7 @@ function UserRolesManagement() {
                           checked={formData.can_view_subordinate_records}
                           onChange={handleInputChange}
                         />
-                        <span>Can view subordinates' records</span>
+                        <span>Can view subordinates&rsquo; records</span>
                       </label>
                       <label className="checkbox-label">
                         <input
@@ -584,7 +591,7 @@ function UserRolesManagement() {
                           checked={formData.can_edit_subordinate_records}
                           onChange={handleInputChange}
                         />
-                        <span>Can edit subordinates' records</span>
+                        <span>Can edit subordinates&rsquo; records</span>
                       </label>
                       <label className="checkbox-label">
                         <input
@@ -615,7 +622,7 @@ function UserRolesManagement() {
                           checked={formData.can_delete_subordinate_records}
                           onChange={handleInputChange}
                         />
-                        <span>Can delete subordinates' records</span>
+                        <span>Can delete subordinates&rsquo; records</span>
                       </label>
                       <label className="checkbox-label">
                         <input

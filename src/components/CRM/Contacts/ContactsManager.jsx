@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -10,7 +10,7 @@ import AdvancedFilterBuilder from './AdvancedFilterBuilder'
 
 export default function ContactsManager() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user, session } = useAuth()
+  const { session } = useAuth()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -34,31 +34,7 @@ export default function ContactsManager() {
   const isMountedRef = useRef(true)
   const abortControllerRef = useRef(null)
 
-  useEffect(() => {
-    // Apply filters from URL parameters
-    const statusParam = searchParams.get('status')
-    const timeframeParam = searchParams.get('timeframe')
-    
-    if (statusParam) {
-      setFilterStatus(statusParam)
-    }
-    if (timeframeParam) {
-      setFilterTimeframe(timeframeParam)
-    }
-
-    // Load contacts once on mount
-    loadContacts()
-
-    // Bug #13 fix: Cleanup function
-    return () => {
-      isMountedRef.current = false
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, []) // Empty dependency array - only run once on mount
-
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     // Bug #13 fix: Abort previous request if still pending
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -116,7 +92,31 @@ export default function ContactsManager() {
       setError(err.message)
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // Apply filters from URL parameters
+    const statusParam = searchParams.get('status')
+    const timeframeParam = searchParams.get('timeframe')
+    
+    if (statusParam) {
+      setFilterStatus(statusParam)
+    }
+    if (timeframeParam) {
+      setFilterTimeframe(timeframeParam)
+    }
+
+    // Load contacts once on mount and when search params change
+    loadContacts()
+
+    // Bug #13 fix: Cleanup function
+    return () => {
+      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [searchParams, loadContacts])
 
   const handleCreateContact = () => {
     setSelectedContact(null)
@@ -202,6 +202,7 @@ export default function ContactsManager() {
     try {
       // TODO: Implement actual API call
       // await deleteContact(contactId)
+      logger.log('Deleting contact (mock flow):', contactId)
       await loadContacts()
     } catch (err) {
       alert('Error deleting contact: ' + err.message)

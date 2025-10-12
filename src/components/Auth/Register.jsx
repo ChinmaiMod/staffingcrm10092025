@@ -129,12 +129,28 @@ export default function Register() {
         // When Edge Function returns non-2xx status, the error details are in functionData.error
         if (functionError || functionData?.error) {
           logger.error('Function error details:', { functionError, functionData })
-          
-          // Extract the error message from the response body
+
           let errorMessage = functionData?.error || functionError?.message || 'Registration failed. Please try again.'
-          
-          logger.log('Extracted error message:', errorMessage)
-          
+          let errorCode = functionData?.code || null
+
+          // Attempt to read structured error payload from the Edge Function response
+          if (functionError && typeof functionError === 'object' && functionError.context) {
+            try {
+              const errorResponse = await functionError.context.json()
+              if (errorResponse?.error) {
+                errorMessage = errorResponse.error
+              }
+              if (errorResponse?.code) {
+                errorCode = errorResponse.code
+              }
+              logger.log('Parsed edge function error response:', errorResponse)
+            } catch (parseError) {
+              logger.warn('Failed to parse edge function error response', parseError)
+            }
+          }
+
+          logger.log('Extracted error message:', errorMessage, 'code:', errorCode)
+
           // Check if it's a duplicate user/email error
           if (errorMessage.includes('already exists') || 
               errorMessage.includes('already registered') ||
@@ -147,6 +163,14 @@ export default function Register() {
           
           // Check if it's a domain already registered error
           if (errorMessage.includes('domain') && errorMessage.includes('already exists')) {
+            setError(errorMessage)
+            setLoading(false)
+            setIsSubmitting(false)
+            return
+          }
+
+          // Special handling for provisioning delay
+          if (errorCode === 'unknown_error' && errorMessage.includes('provisioned')) {
             setError(errorMessage)
             setLoading(false)
             setIsSubmitting(false)

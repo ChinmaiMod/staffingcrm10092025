@@ -9,6 +9,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const MAX_USER_CHECK_ATTEMPTS = 6
+const USER_CHECK_DELAY_MS = 250
+
 serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -39,6 +44,25 @@ serve(async (req) => {
 
     if (!userId || !email || !companyName) {
       throw new Error('Missing required fields: userId, email, companyName')
+    }
+
+    // Ensure auth.users row has finished replicating before we create the profile
+    console.log('Verifying auth user availability...')
+    let authUserReady = false
+    for (let attempt = 1; attempt <= MAX_USER_CHECK_ATTEMPTS; attempt++) {
+      const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(userId)
+
+      if (authUserData?.user) {
+        authUserReady = true
+        break
+      }
+
+      console.log('Auth user not ready yet', { attempt, authUserError })
+      await wait(USER_CHECK_DELAY_MS * attempt)
+    }
+
+    if (!authUserReady) {
+      throw new Error('Your account is still being provisioned. Please retry registration in a few seconds.')
     }
 
     // Extract email domain
@@ -88,6 +112,7 @@ serve(async (req) => {
 
     // Create tenant
     console.log('Creating tenant...')
+    let createdTenantId: string | null = null
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .insert({
@@ -109,6 +134,7 @@ serve(async (req) => {
       throw new Error(`Failed to create tenant: ${tenantError.message}`)
     }
     console.log('Tenant created:', tenant.tenant_id, 'with domain:', emailDomain)
+    createdTenantId = tenant.tenant_id
 
     // Create profile
     console.log('Creating profile...')
@@ -131,6 +157,10 @@ serve(async (req) => {
       // Check for duplicate key error (PostgreSQL error code 23505)
       if (profileError.code === '23505') {
         throw new Error('This account already exists. Please try logging in instead.')
+      }
+      if (createdTenantId) {
+        console.log('Rolling back tenant due to profile creation failure', { tenantId: createdTenantId })
+        await supabase.from('tenants').delete().eq('tenant_id', createdTenantId)
       }
       
       throw new Error(`Failed to create profile: ${profileError.message}`)
@@ -196,11 +226,13 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Edge function error:', error)
+    const errorResponse = {
+      error: error?.message || 'Unknown error occurred',
+      code: error?.code ?? error?.name ?? 'unknown_error',
+      details: error?.stack || error?.toString()
+    }
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.toString()
-      }),
+      JSON.stringify(errorResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
