@@ -7,6 +7,13 @@
 
 ## ✅ Completed Tasks
 
+### 🚀 2025-10-12 Deployment Update
+- ✅ Pushed latest frontend/backend changes to `origin/deployment/production-ready`
+- ✅ Re-ran lint, build, and unit test suite (73 passed / 28 skipped)
+- ✅ Redeployed `createTenantAndProfile` edge function (version 9) via Supabase MCP
+- ✅ Verified Supabase migrations list via MCP; no new migrations required
+- 🔄 Next: Trigger Vercel production deploy once ready
+
 ### 1. Database Migrations ✅
 - ✅ Migrations 000-003: Already applied (initial schema, RLS policies)
 - ✅ Migration 012: user_feedback table deployed
