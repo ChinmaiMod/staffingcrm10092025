@@ -1,7 +1,7 @@
 -- ============================================
 -- SEED GLOBAL USER ROLES
 -- Inserts the 5 standard system roles
--- Run this AFTER 020_fix_global_user_roles.sql
+-- Run this AFTER 022_remove_tenant_from_user_roles.sql
 -- ============================================
 
 -- ============================================
@@ -9,7 +9,7 @@
 -- ============================================
 
 -- Clear any existing data (in case of re-run)
-TRUNCATE TABLE user_roles CASCADE;
+DELETE FROM user_roles WHERE is_system_role = true;
 
 INSERT INTO user_roles (
   role_name, 
