@@ -113,7 +113,7 @@ DROP TABLE IF EXISTS role_menu_permissions CASCADE;
 CREATE TABLE role_menu_permissions (
   permission_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   role_id uuid REFERENCES user_roles(role_id) ON DELETE CASCADE NOT NULL,
-  menu_item_id uuid REFERENCES menu_items(menu_item_id) ON DELETE CASCADE NOT NULL,
+  menu_item_id bigint REFERENCES menu_items(menu_item_id) ON DELETE CASCADE NOT NULL,
   can_access boolean DEFAULT true,
   created_at timestamptz DEFAULT now(),
   UNIQUE(role_id, menu_item_id)
