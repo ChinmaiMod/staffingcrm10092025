@@ -97,6 +97,7 @@ This will create:
 - **RLS Policies**: Tenant isolation and security rules
 - **Indexes**: Performance optimizations
 - **Triggers**: Automatic timestamp updates
+- **Seed Data**: Migration `023_seed_intuites_lookup_data` provisions Intuites LLC with a default business, lookup tables, and sample contacts for demos
 
 ### 3. Verify Database Setup
 

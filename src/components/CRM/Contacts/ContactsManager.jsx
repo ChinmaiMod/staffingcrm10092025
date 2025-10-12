@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
+import { useTenant } from '../../../contexts/TenantProvider'
+import { supabase } from '../../../api/supabaseClient'
 import { applyAdvancedFilters, describeFilter, isFilterEmpty } from '../../../utils/filterEngine'
 import { logger } from '../../../utils/logger'
 import ContactForm from './ContactForm'
@@ -10,7 +12,8 @@ import AdvancedFilterBuilder from './AdvancedFilterBuilder'
 
 export default function ContactsManager() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { session } = useAuth()
+  const { session, profile } = useAuth()
+  const { tenant } = useTenant()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -44,42 +47,86 @@ export default function ContactsManager() {
     abortControllerRef.current = new AbortController()
 
     try {
-      setLoading(true)
-      
-      // TODO: Replace with actual API call
-      // const response = await listContacts({ signal: abortControllerRef.current.signal })
-      // setContacts(response.data || [])
-      
-      // Mock data for demonstration
-      const mockContacts = [
-        {
-          contact_id: 1,
-          first_name: 'John',
-          last_name: 'Doe',
-          email: 'john.doe@example.com',
-          phone: '(555) 123-4567',
-          contact_type: 'it_candidate',
-          status: 'Initial Contact',
-          visa_status: 'H1B',
-          job_title: 'Java Full Stack Developer',
-          years_experience: '4 to 6',
-          created_at: new Date().toISOString(),
-        },
-        {
-          contact_id: 2,
-          first_name: 'Jane',
-          last_name: 'Smith',
-          email: 'jane.smith@example.com',
-          phone: '(555) 987-6543',
-          contact_type: 'healthcare_candidate',
-          status: 'Spoke to candidate',
-          job_title: 'Registered nurse (RN)',
-          years_experience: '7 to 9',
-          created_at: new Date().toISOString(),
-        },
-      ]
-      
-      setContacts(mockContacts)
+  setLoading(true)
+  setError(null)
+
+      if (!tenant?.tenant_id) {
+        logger.warn('No tenant available, skipping contact load')
+        setContacts([])
+        setLoading(false)
+        return
+      }
+
+      const { data, error: contactsError } = await supabase
+        .from('contacts')
+        .select(`
+          contact_id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          contact_type,
+          created_at,
+          updated_at,
+          remarks,
+          visa_status:visa_status_id (code, label),
+          job_title:job_title_id (title, category),
+          status:status_id (code, label),
+          years_experience:years_experience_id (code, label),
+          referral_source:referral_source_id (code, label),
+          reasons:contact_reasons (reasons_for_contact (code, label)),
+          role_types:contact_role_types (role_types (code, label)),
+          country:country_id (name, code),
+          state:state_id (name, code),
+          city:city_id (name)
+        `)
+        .eq('tenant_id', tenant.tenant_id)
+        .order('created_at', { ascending: false })
+        .abortSignal(abortControllerRef.current.signal)
+
+      if (contactsError) {
+        throw contactsError
+      }
+
+      const normalizedContacts = (data || []).map((contact) => {
+        const reasons = contact.reasons?.map((reason) => reason.reasons_for_contact?.label)?.filter(Boolean) || []
+        const roleTypes = contact.role_types?.map((role) => role.role_types?.label)?.filter(Boolean) || []
+
+        const contactTypeRaw = contact.contact_type || null
+        const contactTypeKey = contactTypeRaw ? contactTypeRaw.toLowerCase() : null
+
+        return {
+          contact_id: contact.contact_id,
+          first_name: contact.first_name,
+          last_name: contact.last_name,
+          email: contact.email,
+          phone: contact.phone,
+          contact_type: contactTypeRaw,
+          contact_type_key: contactTypeKey,
+          status: contact.status?.label || contact.status?.code || 'Unknown',
+          status_code: contact.status?.code || null,
+          visa_status: contact.visa_status?.label || contact.visa_status?.code || null,
+          visa_status_code: contact.visa_status?.code || null,
+          job_title: contact.job_title?.title || null,
+          job_title_category: contact.job_title?.category || null,
+          years_experience: contact.years_experience?.label || contact.years_experience?.code || null,
+          years_experience_code: contact.years_experience?.code || null,
+          referral_source: contact.referral_source?.label || contact.referral_source?.code || null,
+          referral_source_code: contact.referral_source?.code || null,
+          reasons_for_contact: reasons,
+          role_types: roleTypes,
+          remarks: contact.remarks,
+          country: contact.country?.name || null,
+          country_code: contact.country?.code || null,
+          state: contact.state?.name || null,
+          state_code: contact.state?.code || null,
+          city: contact.city?.name || null,
+          created_at: contact.created_at,
+          updated_at: contact.updated_at
+        }
+      })
+
+      setContacts(normalizedContacts)
       setLoading(false)
     } catch (err) {
       // Bug #13 fix: Ignore abort errors, only handle real errors
@@ -88,11 +135,12 @@ export default function ContactsManager() {
         return
       }
       
-      logger.error('Error loading contacts:', err)
-      setError(err.message)
-      setLoading(false)
+  logger.error('Error loading contacts:', err)
+  setError(err.message || 'Failed to load contacts')
+  setContacts([])
+  setLoading(false)
     }
-  }, [])
+  }, [tenant?.tenant_id])
 
   useEffect(() => {
     // Apply filters from URL parameters
@@ -107,7 +155,11 @@ export default function ContactsManager() {
     }
 
     // Load contacts once on mount and when search params change
-    loadContacts()
+    if (tenant?.tenant_id && profile?.id) {
+      loadContacts()
+    } else {
+      setLoading(false)
+    }
 
     // Bug #13 fix: Cleanup function
     return () => {
@@ -116,7 +168,7 @@ export default function ContactsManager() {
         abortControllerRef.current.abort()
       }
     }
-  }, [searchParams, loadContacts])
+  }, [searchParams, loadContacts, tenant?.tenant_id, profile?.id])
 
   const handleCreateContact = () => {
     setSelectedContact(null)
@@ -124,7 +176,21 @@ export default function ContactsManager() {
   }
 
   const handleEditContact = (contact) => {
-    setSelectedContact(contact)
+    const editableContact = {
+      ...contact,
+      contact_type: contact.contact_type_key || contact.contact_type?.toLowerCase() || 'it_candidate',
+      visa_status: contact.visa_status,
+      job_title: contact.job_title,
+      years_experience: contact.years_experience,
+      referral_source: contact.referral_source,
+      reasons_for_contact: contact.reasons_for_contact,
+      role_types: contact.role_types,
+      country: contact.country,
+      state: contact.state,
+      city: contact.city
+    }
+
+    setSelectedContact(editableContact)
     setShowForm(true)
   }
 
@@ -300,17 +366,25 @@ export default function ContactsManager() {
     
     // Basic filters
     const matchesStatus = filterStatus === 'all' || contact.status === filterStatus
-    const matchesType = filterType === 'all' || contact.contact_type === filterType
+  const matchesType = filterType === 'all' || contact.contact_type_key === filterType
     
     // Timeframe filter (mock implementation - in production, filter by created_at date)
     let matchesTimeframe = true
-    if (filterTimeframe === 'week') {
-      // In production: check if created_at is within last 7 days
-      // For now, showing all contacts when "week" is selected
-      matchesTimeframe = true
-    } else if (filterTimeframe === 'month') {
-      // In production: check if created_at is within last 30 days
-      matchesTimeframe = true
+    if (filterTimeframe !== 'all') {
+      const createdAt = contact.created_at ? new Date(contact.created_at) : null
+      if (!createdAt || Number.isNaN(createdAt.getTime())) {
+        matchesTimeframe = false
+      } else {
+        const now = new Date()
+        const diffMs = now.getTime() - createdAt.getTime()
+        const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+        if (filterTimeframe === 'week') {
+          matchesTimeframe = diffDays <= 7
+        } else if (filterTimeframe === 'month') {
+          matchesTimeframe = diffDays <= 30
+        }
+      }
     }
 
     return matchesSearch && matchesStatus && matchesType && matchesTimeframe
@@ -400,9 +474,9 @@ export default function ContactsManager() {
             <option value="it_candidate">IT Candidate</option>
             <option value="healthcare_candidate">Healthcare Candidate</option>
             <option value="vendor_client">Vendor/Client</option>
-            <option value="empanelment_contact">Empanelment Contact</option>
-            <option value="internal_india">Internal Hire (India)</option>
-            <option value="internal_usa">Internal Hire (USA)</option>
+            <option value="vendor_empanelment">Vendor Empanelment</option>
+            <option value="employee_india">Employee (India)</option>
+            <option value="employee_usa">Employee (USA)</option>
           </select>
           <select 
             value={filterStatus}

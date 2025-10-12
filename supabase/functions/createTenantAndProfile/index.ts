@@ -112,7 +112,8 @@ serve(async (req) => {
 
     // Create tenant
     console.log('Creating tenant...')
-    let createdTenantId: string | null = null
+  let createdTenantId: string | null = null
+  let createdBusinessId: string | null = null
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .insert({
@@ -136,6 +137,118 @@ serve(async (req) => {
     console.log('Tenant created:', tenant.tenant_id, 'with domain:', emailDomain)
     createdTenantId = tenant.tenant_id
 
+    // Create default business for the tenant
+    console.log('Creating default business for tenant...')
+    let businessResponse = null
+    const { data: business, error: businessError } = await supabase
+      .from('businesses')
+      .insert({
+        tenant_id: tenant.tenant_id,
+        business_name: companyName,
+        business_type: 'GENERAL',
+        description: 'Default business created during registration',
+        industry: null,
+        is_default: true,
+        is_active: true,
+        created_by: userId,
+        updated_by: userId,
+        settings: {
+          initializedBy: 'createTenantAndProfile',
+          initializedAt: new Date().toISOString()
+        }
+      })
+      .select()
+      .single()
+
+    if (businessError) {
+      console.error('Business creation error:', businessError)
+
+      if (businessError.code === '23505') {
+        console.log('Business already exists, fetching existing record...')
+        const { data: existingBusiness, error: fetchBusinessError } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('is_default', { ascending: false })
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single()
+
+        if (fetchBusinessError || !existingBusiness) {
+          console.error('Failed to fetch existing business after conflict:', fetchBusinessError)
+          await supabase.from('tenants').delete().eq('tenant_id', tenant.tenant_id)
+          throw new Error('Failed to create default business: please contact support.')
+        }
+
+        businessResponse = existingBusiness
+
+        const { error: updateBusinessError } = await supabase
+          .from('businesses')
+          .update({
+            is_default: true,
+            is_active: true,
+            updated_by: userId
+          })
+          .eq('business_id', existingBusiness.business_id)
+
+        if (updateBusinessError) {
+          console.warn('Warning: failed to update existing business flags:', updateBusinessError)
+        }
+      } else {
+        if (createdTenantId) {
+          await supabase.from('tenants').delete().eq('tenant_id', createdTenantId)
+        }
+        throw new Error(`Failed to create default business: ${businessError.message}`)
+      }
+    } else {
+      businessResponse = business
+      createdBusinessId = business.business_id
+      console.log('Business created:', business.business_id)
+    }
+
+    if (!businessResponse) {
+      console.log('Business response missing, fetching latest business for tenant...')
+      const { data: fallbackBusiness, error: fallbackBusinessError } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('tenant_id', tenant.tenant_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (fallbackBusinessError) {
+        console.error('Failed to fetch fallback business record:', fallbackBusinessError)
+        if (createdTenantId) {
+          await supabase.from('tenants').delete().eq('tenant_id', createdTenantId)
+        }
+        throw new Error('Unable to determine default business for the new tenant. Please contact support.')
+      }
+
+      businessResponse = fallbackBusiness
+    }
+
+    // Audit log for business creation
+    if (businessResponse?.business_id) {
+      console.log('Recording business creation audit log...')
+      const { error: businessAuditError } = await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: userId,
+          tenant_id: tenant.tenant_id,
+          action: 'BUSINESS_CREATED',
+          resource_type: 'business',
+          resource_id: businessResponse.business_id,
+          details: {
+            business_name: businessResponse.business_name,
+            business_type: businessResponse.business_type
+          }
+        })
+
+      if (businessAuditError) {
+        console.warn('Failed to create business audit log:', businessAuditError)
+      }
+    }
+
     // Create profile
     console.log('Creating profile...')
     const { data: profile, error: profileError } = await supabase
@@ -157,6 +270,10 @@ serve(async (req) => {
       // Check for duplicate key error (PostgreSQL error code 23505)
       if (profileError.code === '23505') {
         throw new Error('This account already exists. Please try logging in instead.')
+      }
+      if (createdBusinessId) {
+        console.log('Rolling back business due to profile creation failure', { businessId: createdBusinessId })
+        await supabase.from('businesses').delete().eq('business_id', createdBusinessId)
       }
       if (createdTenantId) {
         console.log('Rolling back tenant due to profile creation failure', { tenantId: createdTenantId })
@@ -217,7 +334,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         tenant,
-        profile
+        profile,
+        business: businessResponse
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
