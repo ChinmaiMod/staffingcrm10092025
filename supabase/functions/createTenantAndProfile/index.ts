@@ -137,6 +137,38 @@ serve(async (req) => {
     }
     console.log('Profile created successfully')
 
+    // Assign CEO role to the first user (tenant creator)
+    console.log('Assigning CEO role to tenant creator...')
+    const { data: ceoRole, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role_id')
+      .eq('role_code', 'CEO')
+      .single()
+
+    if (roleError || !ceoRole) {
+      console.error('Failed to fetch CEO role:', roleError)
+      // Don't throw error - tenant and profile created successfully
+      console.warn('Warning: Could not assign CEO role. Role may need to be assigned manually.')
+    } else {
+      const { error: assignmentError } = await supabase
+        .from('user_role_assignments')
+        .insert({
+          user_id: userId,
+          role_id: ceoRole.role_id,
+          tenant_id: tenant.tenant_id,
+          assigned_by: userId, // Self-assigned during registration
+          is_active: true
+        })
+
+      if (assignmentError) {
+        console.error('Failed to assign CEO role:', assignmentError)
+        // Don't throw error - tenant and profile created successfully
+        console.warn('Warning: Could not assign CEO role. Role may need to be assigned manually.')
+      } else {
+        console.log('CEO role assigned successfully')
+      }
+    }
+
     // Create audit log
     console.log('Creating audit log...')
     await supabase
