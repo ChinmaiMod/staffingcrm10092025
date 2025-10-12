@@ -16,9 +16,11 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS tenants (
   tenant_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name     text NOT NULL,
+  email_domain     text,
   status           text DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED')),
   created_at       timestamptz DEFAULT now(),
-  updated_at       timestamptz DEFAULT now()
+  updated_at       timestamptz DEFAULT now(),
+  CONSTRAINT chk_email_domain_format CHECK (email_domain IS NULL OR (email_domain NOT LIKE '%@%' AND LENGTH(email_domain) > 2))
 );
 
 -- PROFILES
@@ -27,7 +29,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 CREATE TABLE IF NOT EXISTS profiles (
   id               uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email            text NOT NULL,
-  username         text,
+  phone_number     text,
   tenant_id        uuid REFERENCES tenants(tenant_id) ON DELETE SET NULL,
   role             text DEFAULT 'USER' CHECK (role IN ('ADMIN', 'USER', 'SUPER_ADMIN')),
   status           text DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACTIVE', 'SUSPENDED')),
@@ -114,6 +116,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_profiles_tenant ON profiles(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(lower(email));
 CREATE INDEX IF NOT EXISTS idx_profiles_status ON profiles(status);
+CREATE INDEX IF NOT EXISTS idx_profiles_phone ON profiles(phone_number) WHERE phone_number IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_email_domain_unique ON tenants(LOWER(email_domain));
+CREATE INDEX IF NOT EXISTS idx_tenants_email_domain ON tenants(email_domain);
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(tenant_id, status);
@@ -160,8 +166,9 @@ CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
 -- COMMENTS
 -- ============================================
 
-COMMENT ON TABLE tenants IS 'Stores tenant/company information for multi-tenancy';
-COMMENT ON TABLE profiles IS 'User profiles linked to auth.users with tenant association';
+COMMENT ON TABLE tenants IS 'Stores tenant/company information for multi-tenancy. One tenant per email domain.';
+COMMENT ON COLUMN tenants.email_domain IS 'Email domain of the first registered user (e.g., company.com). Enforces one tenant per domain.';
+COMMENT ON TABLE profiles IS 'User profiles linked to auth.users with tenant association - authentication via email only';
 COMMENT ON TABLE subscriptions IS 'Subscription plans and billing information';
 COMMENT ON TABLE payments IS 'Payment transaction records';
 COMMENT ON TABLE promo_codes IS 'Promotional discount codes';

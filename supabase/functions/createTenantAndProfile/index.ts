@@ -34,12 +34,19 @@ serve(async (req) => {
       }
     })
 
-    const { userId, email, username, companyName } = await req.json()
-    console.log('Request data:', { userId: !!userId, email: !!email, username, companyName })
+    const { userId, email, companyName, phoneNumber } = await req.json()
+    console.log('Request data:', { userId: !!userId, email: !!email, companyName, phoneNumber: !!phoneNumber })
 
     if (!userId || !email || !companyName) {
       throw new Error('Missing required fields: userId, email, companyName')
     }
+
+    // Extract email domain
+    const emailDomain = email.toLowerCase().split('@')[1]
+    if (!emailDomain) {
+      throw new Error('Invalid email format')
+    }
+    console.log('Email domain:', emailDomain)
 
     // Check if profile already exists
     console.log('Checking for existing profile...')
@@ -66,12 +73,26 @@ serve(async (req) => {
       throw new Error('This email address is already registered. Please try logging in instead.')
     }
 
+    // Check if domain is already registered to another tenant
+    console.log('Checking for existing tenant with same domain...')
+    const { data: existingTenant } = await supabase
+      .from('tenants')
+      .select('tenant_id, company_name, email_domain')
+      .ilike('email_domain', emailDomain)
+      .single()
+
+    if (existingTenant) {
+      console.log('Domain already registered:', emailDomain, 'to tenant:', existingTenant.company_name)
+      throw new Error(`A company account with the domain @${emailDomain} already exists (${existingTenant.company_name}). Please contact your company administrator to be added to the existing account.`)
+    }
+
     // Create tenant
     console.log('Creating tenant...')
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .insert({
         company_name: companyName,
+        email_domain: emailDomain,
         status: 'ACTIVE'
       })
       .select()
@@ -79,9 +100,15 @@ serve(async (req) => {
 
     if (tenantError) {
       console.error('Tenant creation error:', tenantError)
+      
+      // Check for unique constraint violation on email_domain
+      if (tenantError.code === '23505' && tenantError.message.includes('email_domain')) {
+        throw new Error(`A company account with the domain @${emailDomain} already exists. Please contact your company administrator to be added to the existing account.`)
+      }
+      
       throw new Error(`Failed to create tenant: ${tenantError.message}`)
     }
-    console.log('Tenant created:', tenant.tenant_id)
+    console.log('Tenant created:', tenant.tenant_id, 'with domain:', emailDomain)
 
     // Create profile
     console.log('Creating profile...')
@@ -90,7 +117,7 @@ serve(async (req) => {
       .insert({
         id: userId,
         email: email.toLowerCase(),
-        username: username || email.split('@')[0],
+        phone_number: phoneNumber || null,
         tenant_id: tenant.tenant_id,
         role: 'ADMIN',
         status: 'PENDING' // Will be ACTIVE after email verification

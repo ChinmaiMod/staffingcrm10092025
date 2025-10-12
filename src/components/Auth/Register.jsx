@@ -7,8 +7,8 @@ import {
   validateEmail, 
   validatePassword, 
   validatePasswordConfirmation,
-  validateUsername,
   validateCompanyName,
+  validatePhone,
   handleError
 } from '../../utils/validators'
 import './Auth.css'
@@ -19,8 +19,8 @@ export default function Register() {
   
   const [formData, setFormData] = useState({
     email: '',
-    username: '',
     company: '',
+    phone: '',
     password: '',
     confirmPassword: '',
   })
@@ -45,10 +45,10 @@ export default function Register() {
       errors.email = emailValidation.error
     }
     
-    // Validate username (optional but validate if provided)
-    const usernameValidation = validateUsername(formData.username, false)
-    if (!usernameValidation.valid) {
-      errors.username = usernameValidation.error
+    // Validate phone (optional)
+    const phoneValidation = validatePhone(formData.phone, false)
+    if (!phoneValidation.valid) {
+      errors.phone = phoneValidation.error
     }
 
     // Validate password
@@ -107,8 +107,8 @@ export default function Register() {
         logger.log('Calling createTenantAndProfile with:', {
           userId: data.user.id,
           email: formData.email.trim(),
-          username: formData.username.trim() || formData.email.split('@')[0],
           companyName: formData.company.trim(),
+          phoneNumber: formData.phone.trim() || null,
         })
 
         const { data: functionData, error: functionError } = await supabase.functions.invoke(
@@ -117,8 +117,8 @@ export default function Register() {
             body: {
               userId: data.user.id,
               email: formData.email.trim(),
-              username: formData.username.trim() || formData.email.split('@')[0],
               companyName: formData.company.trim(),
+              phoneNumber: formData.phone.trim() || null,
             },
           }
         )
@@ -141,6 +141,15 @@ export default function Register() {
               errorMessage.includes('already in use')) {
             setError(errorMessage)
             setLoading(false)
+            setIsSubmitting(false)
+            return
+          }
+          
+          // Check if it's a domain already registered error
+          if (errorMessage.includes('domain') && errorMessage.includes('already exists')) {
+            setError(errorMessage)
+            setLoading(false)
+            setIsSubmitting(false)
             return
           }
           
@@ -204,6 +213,10 @@ export default function Register() {
                   Go to Login Page
                 </Link>
               </div>
+            ) : error.includes('domain') && error.includes('administrator') ? (
+              <div style={{ marginTop: '10px', fontSize: '0.9em' }}>
+                <strong>Need access?</strong> Contact your company administrator to invite you to the existing account.
+              </div>
             ) : null}
           </div>
         )}
@@ -245,19 +258,19 @@ export default function Register() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="username">Username (optional)</label>
+            <label htmlFor="phone">Phone Number (optional)</label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              type="tel"
+              id="phone"
+              name="phone"
+              value={formData.phone}
               onChange={handleChange}
-              className={fieldErrors.username ? 'error' : ''}
-              placeholder="johndoe"
-              autoComplete="username"
+              className={fieldErrors.phone ? 'error' : ''}
+              placeholder="+1 (555) 123-4567"
+              autoComplete="tel"
             />
-            {fieldErrors.username && (
-              <small className="error-text">{fieldErrors.username}</small>
+            {fieldErrors.phone && (
+              <small className="error-text">{fieldErrors.phone}</small>
             )}
           </div>
 
