@@ -1,7 +1,114 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '../../../api/supabaseClient'
+import { useTenant } from '../../../contexts/TenantProvider'
 import { validateTextField } from '../../../utils/validators'
 
+const TABLE_CONFIG = {
+  visa_status: {
+    tableName: 'visa_status',
+    valueColumn: 'visa_status',
+    orderBy: 'visa_status',
+  },
+  job_titles_it: {
+    tableName: 'job_title',
+    valueColumn: 'job_title',
+    filters: { field: 'IT' },
+    insertDefaults: { field: 'IT' },
+    orderBy: 'job_title',
+  },
+  job_titles_healthcare: {
+    tableName: 'job_title',
+    valueColumn: 'job_title',
+    filters: { field: 'Healthcare' },
+    insertDefaults: { field: 'Healthcare' },
+    orderBy: 'job_title',
+  },
+  reasons_for_contact: {
+    tableName: 'reason_for_contact',
+    valueColumn: 'reason_for_contact',
+    orderBy: 'reason_for_contact',
+  },
+  statuses: {
+    tableName: 'workflow_status',
+    valueColumn: 'workflow_status',
+    orderBy: 'workflow_status',
+  },
+  role_types: {
+    tableName: 'type_of_roles',
+    valueColumn: 'type_of_roles',
+    orderBy: 'type_of_roles',
+  },
+  type_of_contact: {
+    tableName: 'type_of_contact',
+    valueColumn: 'type_of_contact',
+    orderBy: 'type_of_contact',
+  },
+  referral_sources: {
+    tableName: 'referral_sources',
+    valueColumn: 'referral_source',
+    orderBy: 'referral_source',
+  },
+}
+
+const MOCK_DATA = {
+  visa_status: ['F1', 'OPT', 'STEM OPT', 'H1B', 'H4', 'H4 EAD', 'GC EAD', 'L1B', 'L2S', 'B1/B2', 'J1', 'TN', 'E3', 'GC', 'USC'],
+  statuses: ['Initial Contact', 'Spoke to candidate', 'Resume needs to be prepared', 'Resume prepared and sent for review', 'Assigned to Recruiter', 'Recruiter started marketing', 'Placed into Job'],
+  role_types: ['Remote', 'Hybrid Local', 'Onsite Local', 'Open to Relocate'],
+  countries: ['USA', 'India'],
+  years_experience: ['0', '1 to 3', '4 to 6', '7 to 9', '10 -15', '15+'],
+  referral_sources: ['FB', 'Google', 'Friend'],
+}
+
+const extractPrimaryKey = (row, config) => {
+  const candidates = [
+    ...(config?.primaryKeyCandidates || []),
+    'id',
+    `${config?.tableName}_id`,
+    `${config?.tableName?.replace(/s$/, '')}_id`,
+  ].filter(Boolean)
+
+  for (const key of candidates) {
+    if (row && Object.prototype.hasOwnProperty.call(row, key)) {
+      return { key, value: row[key] }
+    }
+  }
+
+  const fallbackKey = row
+    ? Object.keys(row).find(field => field.endsWith('_id'))
+    : null
+
+  if (fallbackKey) {
+    return { key: fallbackKey, value: row[fallbackKey] }
+  }
+
+  return { key: 'id', value: row?.id ?? null }
+}
+
+const mapRowToItem = (row, config) => {
+  const { key: primaryKeyColumn, value: primaryKeyValue } = extractPrimaryKey(row, config)
+
+  return {
+    id: primaryKeyValue,
+    primaryKeyColumn,
+    value: row?.[config?.valueColumn ?? 'value'] ?? '',
+    business_id: row?.business_id ?? null,
+    is_active: row?.[config?.toggleField] ?? row?.is_active,
+    raw: row,
+  }
+}
+
+const normalizeBusinessId = (value) => {
+  if (!value && value !== 0) return ''
+  return String(value)
+}
+
 export default function ReferenceTableEditor({ table }) {
+  const { tenant } = useTenant()
+  const tableConfig = TABLE_CONFIG[table.id]
+  const isSupabaseBacked = Boolean(tableConfig)
+
+  const [businesses, setBusinesses] = useState([])
+  const [selectedBusinessId, setSelectedBusinessId] = useState('')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -10,65 +117,182 @@ export default function ReferenceTableEditor({ table }) {
   const [error, setError] = useState('')
   const [fieldError, setFieldError] = useState('')
 
+  const canToggleStatus = useMemo(() => Boolean(tableConfig?.toggleField), [tableConfig])
+
+  const loadBusinesses = useCallback(async () => {
+    if (!isSupabaseBacked || !tenant?.tenant_id) {
+      setBusinesses([])
+      return
+    }
+
+    const { data, error: businessError } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('tenant_id', tenant.tenant_id)
+      .order('created_at', { ascending: true })
+
+    if (businessError) {
+      setError(businessError.message)
+      setBusinesses([])
+      return
+    }
+
+    const mapped = (data || []).map((biz) => ({
+      id: normalizeBusinessId(biz.id ?? biz.business_id),
+      name: biz.business_name || 'Unnamed Business',
+    }))
+
+    setBusinesses(mapped)
+
+    setSelectedBusinessId((prev) => {
+      if (prev) return prev
+      return mapped.length > 0 ? mapped[0].id : ''
+    })
+  }, [isSupabaseBacked, tenant?.tenant_id])
+
   const loadItems = useCallback(async () => {
     try {
       setLoading(true)
-      // TODO: Load from API
-      // For now, mock data
-      const mockData = {
-        visa_status: ['F1', 'OPT', 'STEM OPT', 'H1B', 'H4', 'H4 EAD', 'GC EAD', 'L1B', 'L2S', 'B1/B2', 'J1', 'TN', 'E3', 'GC', 'USC'],
-        statuses: ['Initial Contact', 'Spoke to candidate', 'Resume needs to be prepared', 'Resume prepared and sent for review', 'Assigned to Recruiter', 'Recruiter started marketing', 'Placed into Job'],
-        role_types: ['Remote', 'Hybrid Local', 'Onsite Local', 'Open to Relocate'],
-        countries: ['USA', 'India'],
-        years_experience: ['0', '1 to 3', '4 to 6', '7 to 9', '10 -15', '15+'],
-        referral_sources: ['FB', 'Google', 'Friend'],
+      setError('')
+
+      if (!isSupabaseBacked) {
+        const data = (MOCK_DATA[table.id] || []).map((value, index) => ({
+          id: index + 1,
+          value,
+          business_id: null,
+          is_active: true,
+        }))
+        setItems(data)
+        setLoading(false)
+        return
       }
-      
-      const data = mockData[table.id] || []
-      setItems(data.map((value, index) => ({ id: index + 1, value, is_active: true })))
-      setLoading(false)
+
+      if (!tenant?.tenant_id) {
+        setItems([])
+        setLoading(false)
+        return
+      }
+
+      let query = supabase
+        .from(tableConfig.tableName)
+        .select('*')
+        .eq('tenant_id', tenant.tenant_id)
+
+      if (tableConfig.filters) {
+        Object.entries(tableConfig.filters).forEach(([key, value]) => {
+          query = query.eq(key, value)
+        })
+      }
+
+      if (selectedBusinessId) {
+        query = query.or(`business_id.eq.${selectedBusinessId},business_id.is.null`)
+      }
+
+      if (tableConfig.orderBy) {
+        query = query.order(tableConfig.orderBy, { ascending: true })
+      }
+
+      const { data, error: fetchError } = await query
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      setItems((data || []).map((row) => mapRowToItem(row, tableConfig)))
     } catch (err) {
-      alert('Error loading data: ' + err.message)
+      setError(err.message)
+      setItems([])
+    } finally {
       setLoading(false)
     }
-  }, [table.id])
+  }, [isSupabaseBacked, table.id, tableConfig, tenant?.tenant_id, selectedBusinessId])
+
+  useEffect(() => {
+    loadBusinesses()
+  }, [loadBusinesses])
 
   useEffect(() => {
     loadItems()
   }, [loadItems])
 
+  useEffect(() => {
+    if (!isSupabaseBacked) return
+    if (businesses.length === 0) {
+      setItems([])
+    }
+  }, [businesses.length, isSupabaseBacked])
+
   const handleAdd = async () => {
     setError('')
     setFieldError('')
 
-    // Validate new item value (2-100 characters)
     const validation = validateTextField(newItemValue, {
       required: true,
       minLength: 2,
       maxLength: 100,
-      fieldName: 'Value'
-    });
+      fieldName: 'Value',
+    })
 
     if (!validation.valid) {
-      setFieldError(validation.error);
-      return;
+      setFieldError(validation.error)
+      return
     }
 
-    // Check for duplicates
-    const trimmedValue = newItemValue.trim();
-    if (items.some(item => item.value.toLowerCase() === trimmedValue.toLowerCase())) {
-      setFieldError('This value already exists in the list');
-      return;
+    const trimmedValue = newItemValue.trim()
+
+    if (items.some((item) => item.value?.toLowerCase?.() === trimmedValue.toLowerCase())) {
+      setFieldError('This value already exists in the list')
+      return
     }
 
     try {
-      // TODO: API call to create
-      const newItem = {
-        id: Date.now(),
-        value: trimmedValue,
-        is_active: true,
+      if (!isSupabaseBacked) {
+        const newItem = {
+          id: Date.now(),
+          value: trimmedValue,
+          business_id: null,
+          is_active: true,
+        }
+        setItems((prev) => [...prev, newItem])
+        setNewItemValue('')
+        return
       }
-      setItems(prev => [...prev, newItem])
+
+      if (!selectedBusinessId) {
+        setFieldError('Select a business before adding new values')
+        return
+      }
+
+      if (!tenant?.tenant_id) {
+        setError('Tenant context unavailable. Please try again later.')
+        return
+      }
+
+      const payload = {
+        tenant_id: tenant.tenant_id,
+        business_id: selectedBusinessId,
+        [tableConfig.valueColumn]: trimmedValue,
+      }
+
+      if (tableConfig.insertDefaults) {
+        Object.assign(payload, tableConfig.insertDefaults)
+      }
+
+      const { data, error: insertError } = await supabase
+        .from(tableConfig.tableName)
+        .insert(payload)
+        .select('*')
+        .maybeSingle()
+
+      if (insertError) {
+        throw insertError
+      }
+
+      if (!data) {
+        throw new Error('Insert succeeded but no data returned')
+      }
+
+      setItems((prev) => [...prev, mapRowToItem(data, tableConfig)])
       setNewItemValue('')
       setFieldError('')
     } catch (err) {
@@ -78,40 +302,58 @@ export default function ReferenceTableEditor({ table }) {
 
   const handleEdit = (item) => {
     setEditingId(item.id)
-    setEditValue(item.value)
+    setEditValue(item.value || '')
   }
 
   const handleSaveEdit = async (id) => {
     setError('')
 
-    // Validate edit value (2-100 characters)
     const validation = validateTextField(editValue, {
       required: true,
       minLength: 2,
       maxLength: 100,
-      fieldName: 'Value'
-    });
+      fieldName: 'Value',
+    })
 
     if (!validation.valid) {
-      setError(validation.error);
-      return;
+      setError(validation.error)
+      return
     }
 
-    // Check for duplicates (excluding current item)
-    const trimmedValue = editValue.trim();
-    if (items.some(item => item.id !== id && item.value.toLowerCase() === trimmedValue.toLowerCase())) {
-      setError('This value already exists in the list');
-      return;
+    const trimmedValue = editValue.trim()
+
+    if (items.some((item) => item.id !== id && item.value?.toLowerCase?.() === trimmedValue.toLowerCase())) {
+      setError('This value already exists in the list')
+      return
     }
 
     try {
-      // TODO: API call to update
-      setItems(prev => prev.map(item =>
-        item.id === id ? { ...item, value: trimmedValue } : item
-      ))
+      if (!isSupabaseBacked) {
+        setItems((prev) => prev.map((item) => (item.id === id ? { ...item, value: trimmedValue } : item)))
+      } else {
+        const item = items.find((row) => row.id === id)
+        if (!item) {
+          setError('Unable to locate the selected record.')
+          return
+        }
+
+        const primaryKeyColumn = item.primaryKeyColumn || 'id'
+
+        const { error: updateError } = await supabase
+          .from(tableConfig.tableName)
+          .update({ [tableConfig.valueColumn]: trimmedValue })
+          .eq(primaryKeyColumn, item.id)
+          .eq('tenant_id', tenant?.tenant_id)
+
+        if (updateError) {
+          throw updateError
+        }
+
+        setItems((prev) => prev.map((row) => (row.id === id ? { ...row, value: trimmedValue } : row)))
+      }
+
       setEditingId(null)
       setEditValue('')
-      setError('')
     } catch (err) {
       setError('Error updating item: ' + err.message)
     }
@@ -123,11 +365,30 @@ export default function ReferenceTableEditor({ table }) {
   }
 
   const handleToggleActive = async (id) => {
+    if (!canToggleStatus) return
+
     try {
-      // TODO: API call to toggle
-      setItems(prev => prev.map(item =>
-        item.id === id ? { ...item, is_active: !item.is_active } : item
-      ))
+      const item = items.find((row) => row.id === id)
+      if (!item) return
+
+      if (!isSupabaseBacked) {
+        setItems((prev) => prev.map((row) => (row.id === id ? { ...row, is_active: !row.is_active } : row)))
+        return
+      }
+
+      const nextStatus = !item.is_active
+
+      const { error: toggleError } = await supabase
+        .from(tableConfig.tableName)
+        .update({ [tableConfig.toggleField]: nextStatus })
+        .eq(item.primaryKeyColumn || 'id', item.id)
+        .eq('tenant_id', tenant?.tenant_id)
+
+      if (toggleError) {
+        throw toggleError
+      }
+
+      setItems((prev) => prev.map((row) => (row.id === id ? { ...row, is_active: nextStatus } : row)))
     } catch (err) {
       alert('Error toggling status: ' + err.message)
     }
@@ -137,12 +398,39 @@ export default function ReferenceTableEditor({ table }) {
     if (!confirm('Are you sure you want to delete this item?')) return
 
     try {
-      // TODO: API call to delete
-      setItems(prev => prev.filter(item => item.id !== id))
+      if (!isSupabaseBacked) {
+        setItems((prev) => prev.filter((item) => item.id !== id))
+        return
+      }
+
+      const item = items.find((row) => row.id === id)
+      if (!item) {
+        setError('Unable to locate the selected record.')
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from(tableConfig.tableName)
+        .delete()
+        .eq(item.primaryKeyColumn || 'id', item.id)
+        .eq('tenant_id', tenant?.tenant_id)
+
+      if (deleteError) {
+        throw deleteError
+      }
+
+      setItems((prev) => prev.filter((row) => row.id !== id))
     } catch (err) {
       alert('Error deleting item: ' + err.message)
     }
   }
+
+  const businessNameLookup = useMemo(() => {
+    return businesses.reduce((acc, biz) => {
+      acc[biz.id] = biz.name
+      return acc
+    }, {})
+  }, [businesses])
 
   if (loading) {
     return <div className="loading">Loading {table.label}...</div>
@@ -153,6 +441,25 @@ export default function ReferenceTableEditor({ table }) {
       <div className="table-header">
         <h2>{table.icon} {table.label}</h2>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexDirection: 'column' }}>
+          {isSupabaseBacked && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label style={{ fontSize: '14px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                Business
+                <select
+                  value={selectedBusinessId}
+                  onChange={(event) => setSelectedBusinessId(event.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px' }}
+                >
+                  {businesses.length === 0 && <option value="">No businesses available</option>}
+                  {businesses.map((business) => (
+                    <option key={business.id} value={business.id}>
+                      {business.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <input
               type="text"
@@ -164,7 +471,7 @@ export default function ReferenceTableEditor({ table }) {
               className={fieldError ? 'error' : ''}
               placeholder="New item value..."
               style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '250px' }}
-              onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             />
             <button className="btn btn-primary" onClick={handleAdd}>
               + Add New
@@ -182,7 +489,13 @@ export default function ReferenceTableEditor({ table }) {
         </div>
       )}
 
-      {items.length === 0 ? (
+      {isSupabaseBacked && businesses.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🏢</div>
+          <h3>No Businesses Found</h3>
+          <p>Please create a business before managing {table.label.toLowerCase()}.</p>
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📋</div>
           <h3>No Items</h3>
@@ -193,15 +506,19 @@ export default function ReferenceTableEditor({ table }) {
           <thead>
             <tr>
               <th style={{ width: '60px' }}>ID</th>
+              {isSupabaseBacked && <th style={{ width: '180px' }}>Business</th>}
               <th>Value</th>
-              <th style={{ width: '120px' }}>Status</th>
+              {canToggleStatus && <th style={{ width: '120px' }}>Status</th>}
               <th style={{ width: '200px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map(item => (
+            {items.map((item) => (
               <tr key={item.id}>
                 <td>{item.id}</td>
+                {isSupabaseBacked && (
+                  <td>{item.business_id ? (businessNameLookup[normalizeBusinessId(item.business_id)] || 'Unknown Business') : 'Global'}</td>
+                )}
                 <td>
                   {editingId === item.id ? (
                     <input
@@ -209,31 +526,33 @@ export default function ReferenceTableEditor({ table }) {
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
                       autoFocus
                     />
                   ) : (
-                    <span style={{ opacity: item.is_active ? 1 : 0.5 }}>
+                    <span style={{ opacity: item.is_active === false ? 0.5 : 1 }}>
                       {item.value}
                     </span>
                   )}
                 </td>
-                <td>
-                  <span className={`status-badge ${item.is_active ? 'initial-contact' : ''}`}>
-                    {item.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
+                {canToggleStatus && (
+                  <td>
+                    <span className={`status-badge ${item.is_active === false ? '' : 'initial-contact'}`}>
+                      {item.is_active === false ? 'Inactive' : 'Active'}
+                    </span>
+                  </td>
+                )}
                 <td>
                   <div className="action-buttons">
                     {editingId === item.id ? (
                       <>
-                        <button 
+                        <button
                           className="btn btn-sm btn-success"
                           onClick={() => handleSaveEdit(item.id)}
                         >
                           Save
                         </button>
-                        <button 
+                        <button
                           className="btn btn-sm btn-secondary"
                           onClick={handleCancelEdit}
                         >
@@ -242,19 +561,21 @@ export default function ReferenceTableEditor({ table }) {
                       </>
                     ) : (
                       <>
-                        <button 
+                        <button
                           className="btn btn-sm btn-primary"
                           onClick={() => handleEdit(item)}
                         >
                           Edit
                         </button>
-                        <button 
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => handleToggleActive(item.id)}
-                        >
-                          {item.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button 
+                        {canToggleStatus && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleToggleActive(item.id)}
+                          >
+                            {item.is_active === false ? 'Activate' : 'Deactivate'}
+                          </button>
+                        )}
+                        <button
                           className="btn btn-sm btn-danger"
                           onClick={() => handleDelete(item.id)}
                         >
