@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from './AuthProvider'
 import { logger } from '../utils/logger'
@@ -13,10 +13,53 @@ export const useTenant = () => {
   return context
 }
 
+const TENANT_DATA_STORAGE_KEY = 'crm::tenant_data'
+const SUBSCRIPTION_STORAGE_KEY = 'crm::tenant_subscription'
+
+const safeParse = (value) => {
+  try {
+    return value ? JSON.parse(value) : null
+  } catch (error) {
+    logger.warn?.('Failed to parse tenant cache', error)
+    return null
+  }
+}
+
+const getInitialTenantState = () => {
+  if (typeof window === 'undefined') {
+    return { tenant: null, subscription: null }
+  }
+
+  return {
+    tenant: safeParse(window.localStorage.getItem(TENANT_DATA_STORAGE_KEY)),
+    subscription: safeParse(window.localStorage.getItem(SUBSCRIPTION_STORAGE_KEY)),
+  }
+}
+
+const persistTenantState = (tenantData, subscriptionData) => {
+  if (typeof window === 'undefined') return
+  try {
+    if (tenantData) {
+      window.localStorage.setItem(TENANT_DATA_STORAGE_KEY, JSON.stringify(tenantData))
+    } else {
+      window.localStorage.removeItem(TENANT_DATA_STORAGE_KEY)
+    }
+
+    if (subscriptionData) {
+      window.localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(subscriptionData))
+    } else {
+      window.localStorage.removeItem(SUBSCRIPTION_STORAGE_KEY)
+    }
+  } catch (error) {
+    logger.warn?.('Failed to persist tenant state', error)
+  }
+}
+
 export function TenantProvider({ children }) {
-  const { profile } = useAuth()
-  const [tenant, setTenant] = useState(null)
-  const [subscription, setSubscription] = useState(null)
+  const { profile, tenantId: authTenantId, setTenantId: setAuthTenantId } = useAuth()
+  const initialState = useMemo(() => getInitialTenantState(), [])
+  const [tenant, setTenant] = useState(initialState.tenant)
+  const [subscription, setSubscription] = useState(initialState.subscription)
   const [loading, setLoading] = useState(true)
   
   // Track if component is mounted to prevent setState on unmounted component
@@ -24,30 +67,34 @@ export function TenantProvider({ children }) {
   // Track abort controller for cleanup
   const abortControllerRef = useRef(null)
 
+  const effectiveTenantId = profile?.tenant_id || authTenantId || tenant?.tenant_id || null
+
   useEffect(() => {
-    // Cancel any pending requests when tenant_id changes
+    if (!isMountedRef.current) return () => {}
+
+    // Cancel any pending requests when tenant changes
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
 
-    if (profile?.tenant_id) {
-      // Create new abort controller for this request
+    if (effectiveTenantId) {
       abortControllerRef.current = new AbortController()
-      fetchTenantData(profile.tenant_id, abortControllerRef.current.signal)
+      fetchTenantData(effectiveTenantId, abortControllerRef.current.signal)
     } else {
       if (isMountedRef.current) {
+        setTenant(null)
+        setSubscription(null)
+        persistTenantState(null, null)
         setLoading(false)
       }
     }
 
-    // Cleanup function
     return () => {
-      // Abort any pending requests when component unmounts or tenant_id changes
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
     }
-  }, [profile?.tenant_id]) // Only depend on tenant_id, not entire profile object
+  }, [effectiveTenantId])
 
   // Set isMounted flag on mount/unmount
   useEffect(() => {
@@ -88,6 +135,7 @@ export function TenantProvider({ children }) {
       // Only update state if component is still mounted
       if (isMountedRef.current) {
         setSubscription(subData)
+        persistTenantState(tenantData, subData || null)
       }
     } catch (error) {
       // Don't log error if request was aborted (component unmounted)
@@ -99,6 +147,7 @@ export function TenantProvider({ children }) {
       if (isMountedRef.current) {
         setTenant(null)
         setSubscription(null)
+        persistTenantState(null, null)
       }
     } finally {
       // Only update state if component is still mounted
@@ -109,7 +158,7 @@ export function TenantProvider({ children }) {
   }
 
   const refreshTenantData = () => {
-    if (profile?.tenant_id) {
+    if (effectiveTenantId) {
       // Cancel any pending requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
@@ -117,7 +166,17 @@ export function TenantProvider({ children }) {
       
       // Create new abort controller
       abortControllerRef.current = new AbortController()
-      fetchTenantData(profile.tenant_id, abortControllerRef.current.signal)
+      fetchTenantData(effectiveTenantId, abortControllerRef.current.signal)
+    }
+  }
+
+  const setTenantOverride = (nextTenant, nextSubscription = null) => {
+    setTenant(nextTenant)
+    setSubscription(nextSubscription)
+    persistTenantState(nextTenant, nextSubscription)
+
+    if (nextTenant?.tenant_id) {
+      setAuthTenantId(nextTenant.tenant_id)
     }
   }
 
@@ -133,9 +192,11 @@ export function TenantProvider({ children }) {
     tenant,
     subscription,
     loading,
+    tenantId: effectiveTenantId,
     refreshTenantData,
     hasActivePlan,
     getPlanName,
+    setTenantOverride,
   }
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>

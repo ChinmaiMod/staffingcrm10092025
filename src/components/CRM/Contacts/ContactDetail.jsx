@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import StatusHistory from './StatusHistory'
+import { supabase } from '../../../api/supabaseClient'
+import { useTenant } from '../../../contexts/TenantProvider'
+import { useAuth } from '../../../contexts/AuthProvider'
+import { createUniqueFileName, formatFileSize } from '../../../utils/fileUtils'
+import { logger } from '../../../utils/logger'
 
 export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
   const [activeTab, setActiveTab] = useState('details')
@@ -9,101 +14,186 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
   const [newComment, setNewComment] = useState('')
   const [uploading, setUploading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [loadingAttachments, setLoadingAttachments] = useState(false)
+
+  const { tenant } = useTenant()
+  const { profile } = useAuth()
 
   const loadStatusHistory = useCallback(async () => {
+    if (!contact?.contact_id) return
+
     setLoadingHistory(true)
     try {
-      // TODO: Replace with actual API call
-      // const response = await supabase
-      //   .from('contact_status_history')
-      //   .select('*, changed_by:profiles(full_name)')
-      //   .eq('contact_id', contact.contact_id)
-      //   .order('changed_at', { ascending: false })
-      
-      // Mock data for demonstration
-      setStatusHistory([
-        {
-          history_id: 1,
-          contact_id: contact.contact_id,
-          old_status: 'Initial Contact',
-          new_status: 'Spoke to candidate',
-          remarks: 'Had a detailed conversation with the candidate. They are actively looking for remote opportunities and have 5+ years of Java experience. Interested in full-stack roles with Spring Boot and React.',
-          changed_by: 'current-user-id',
-          changed_by_name: 'John Admin',
-          changed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-        },
-        {
-          history_id: 2,
-          contact_id: contact.contact_id,
-          old_status: null,
-          new_status: 'Initial Contact',
-          remarks: 'First contact established via LinkedIn. Candidate responded to our outreach message.',
-          changed_by: 'current-user-id',
-          changed_by_name: 'Jane Recruiter',
-          changed_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-        },
-      ])
-      setLoadingHistory(false)
+      const { data, error } = await supabase
+        .from('contact_status_history')
+        .select(`
+          history_id,
+          contact_id,
+          old_status,
+          new_status,
+          notes,
+          changed_at,
+          changed_by,
+          profiles:profiles!contact_status_history_changed_by_fkey(id, email, full_name)
+        `)
+        .eq('contact_id', contact.contact_id)
+        .order('changed_at', { ascending: false })
+
+      if (error) {
+        throw error
+      }
+
+      const mapped = (data || []).map((item) => ({
+        history_id: item.history_id,
+        contact_id: item.contact_id,
+        old_status: item.old_status,
+        new_status: item.new_status,
+        remarks: item.notes,
+        changed_by: item.changed_by,
+        changed_by_name: item.profiles?.full_name || item.profiles?.email || 'System',
+        changed_at: item.changed_at
+      }))
+
+      setStatusHistory(mapped)
     } catch (err) {
-      console.error('Error loading status history:', err)
+      logger.error('Error loading status history:', err)
+      setStatusHistory([])
+    } finally {
       setLoadingHistory(false)
     }
-  }, [contact.contact_id])
+  }, [contact?.contact_id])
+
+  const loadAttachments = useCallback(async () => {
+    if (!contact?.contact_id) return
+    setLoadingAttachments(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('contact_attachments')
+        .select('attachment_id, file_name, file_path, description, size_bytes, content_type, uploaded_at, uploaded_by')
+        .eq('contact_id', contact.contact_id)
+        .order('uploaded_at', { ascending: false })
+
+      if (error) {
+        throw error
+      }
+
+      const storageBucket = supabase.storage.from('contact-attachments')
+      const withUrls = await Promise.all(
+        (data || []).map(async (item) => {
+          const { data: signed, error: signedError } = await storageBucket.createSignedUrl(item.file_path, 60 * 60)
+          if (signedError) {
+            throw signedError
+          }
+
+          return {
+            attachment_id: item.attachment_id,
+            file_name: item.file_name,
+            file_path: item.file_path,
+            description: item.description,
+            size_bytes: item.size_bytes,
+            content_type: item.content_type,
+            uploaded_at: item.uploaded_at,
+            uploaded_by: item.uploaded_by,
+            url: signed?.signedUrl || null
+          }
+        })
+      )
+
+      setAttachments(withUrls)
+    } catch (err) {
+      logger.error('Error loading attachments:', err)
+      setAttachments([])
+    } finally {
+      setLoadingAttachments(false)
+    }
+  }, [contact?.contact_id])
 
   useEffect(() => {
-    // TODO: Load attachments and comments from API
-    // Mock data
-    setAttachments([
-      { id: 1, name: 'resume.pdf', url: '#', uploaded_at: new Date().toISOString() },
-      { id: 2, name: 'certificate.jpg', url: '#', uploaded_at: new Date().toISOString() },
-    ])
-    setComments([
-      {
-        id: 1,
-        text: 'Initial contact made. Candidate seems interested in remote positions.',
-        created_by: 'John Admin',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        text: 'Sent resume template for review.',
-        created_by: 'Jane Recruiter',
-        created_at: new Date().toISOString(),
-      },
-    ])
-
-    // Load status history
+    // Comments functionality pending API implementation
+    setComments([])
+    loadAttachments()
     loadStatusHistory()
-  }, [contact, loadStatusHistory])
+  }, [contact, loadAttachments, loadStatusHistory])
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files)
-    if (files.length === 0) return
+    if (!files.length || !tenant?.tenant_id || !contact?.contact_id) return
 
     setUploading(true)
     try {
-      // TODO: Implement file upload to Supabase Storage
-      // For each file:
-      // 1. Upload to storage
-      // 2. Create attachment record in DB
-      // 3. Refresh attachments list
-      
-      alert('File upload not yet implemented. Need to configure Supabase Storage.')
-      setUploading(false)
+      const storageBucket = supabase.storage.from('contact-attachments')
+
+      for (const file of files) {
+        const uniqueName = createUniqueFileName(file.name)
+        const storagePath = `${tenant.tenant_id}/${contact.contact_id}/${uniqueName}`
+
+        const { error: uploadError } = await storageBucket.upload(storagePath, file, {
+          upsert: false,
+          contentType: file.type || 'application/octet-stream'
+        })
+
+        if (uploadError) {
+          throw uploadError
+        }
+
+        const { error: metadataError } = await supabase
+          .from('contact_attachments')
+          .insert({
+            contact_id: contact.contact_id,
+            tenant_id: tenant.tenant_id,
+            business_id: contact.business_id || null,
+            file_name: file.name,
+            file_path: storagePath,
+            content_type: file.type || null,
+            size_bytes: file.size || null,
+            uploaded_by: profile?.id || null
+          })
+
+        if (metadataError) {
+          throw metadataError
+        }
+      }
+
+      await loadAttachments()
     } catch (err) {
-      alert('Error uploading files: ' + err.message)
+      logger.error('Error uploading files:', err)
+      alert('Error uploading files: ' + (err.message || 'Unknown error'))
+    } finally {
       setUploading(false)
+      e.target.value = ''
     }
   }
 
   const handleDeleteAttachment = async (attachmentId) => {
     if (!confirm('Delete this attachment?')) return
+    const record = attachments.find((item) => item.attachment_id === attachmentId)
+    if (!record) return
 
     try {
-      // TODO: Delete from storage and DB
-      setAttachments(prev => prev.filter(a => a.id !== attachmentId))
+      const storageBucket = supabase.storage.from('contact-attachments')
+
+      if (record.file_path) {
+        const { error: removeError } = await storageBucket.remove([record.file_path])
+        if (removeError) {
+          throw removeError
+        }
+      }
+
+      const { error: deleteError } = await supabase
+        .from('contact_attachments')
+        .delete()
+        .eq('attachment_id', attachmentId)
+        .eq('contact_id', contact.contact_id)
+
+      if (deleteError) {
+        throw deleteError
+      }
+
+      setAttachments((prev) => prev.filter((item) => item.attachment_id !== attachmentId))
     } catch (err) {
-      alert('Error deleting attachment: ' + err.message)
+      logger.error('Error deleting attachment:', err)
+      alert('Error deleting attachment: ' + (err.message || 'Unknown error'))
     }
   }
 
@@ -111,14 +201,13 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
     if (!newComment.trim()) return
 
     try {
-      // TODO: Save comment to DB
       const comment = {
         id: Date.now(),
         text: newComment,
-        created_by: 'Current User', // TODO: Get from auth context
-        created_at: new Date().toISOString(),
+        created_by: profile?.email || 'Current User',
+        created_at: new Date().toISOString()
       }
-      setComments(prev => [comment, ...prev])
+      setComments((prev) => [comment, ...prev])
       setNewComment('')
     } catch (err) {
       alert('Error adding comment: ' + err.message)
@@ -270,9 +359,9 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
                 multiple
                 onChange={handleFileUpload}
                 style={{ display: 'none' }}
-                id="file-upload"
+                id="contact-detail-file-upload"
               />
-              <label htmlFor="file-upload" className="btn btn-primary">
+              <label htmlFor="contact-detail-file-upload" className="btn btn-primary">
                 {uploading ? '⏳ Uploading...' : '📎 Upload Files'}
               </label>
               <small style={{ marginLeft: '12px', color: '#64748b' }}>
@@ -280,7 +369,13 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
               </small>
             </div>
 
-            {attachments.length === 0 ? (
+            {loadingAttachments ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">⏳</div>
+                <h3>Loading attachments...</h3>
+                <p>Please wait while we fetch files</p>
+              </div>
+            ) : attachments.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">📎</div>
                 <h3>No Attachments</h3>
@@ -289,15 +384,26 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
             ) : (
               <div className="attachments-grid">
                 {attachments.map(attachment => (
-                  <div key={attachment.id} className="attachment-card">
+                  <div key={attachment.attachment_id} className="attachment-card">
                     <button
                       className="attachment-delete"
-                      onClick={() => handleDeleteAttachment(attachment.id)}
+                      onClick={() => handleDeleteAttachment(attachment.attachment_id)}
                     >
                       ✕
                     </button>
                     <div className="attachment-icon">📄</div>
-                    <div className="attachment-name">{attachment.name}</div>
+                    <a
+                      href={attachment.url || '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="attachment-name"
+                      style={{ color: '#1d4ed8', textDecoration: 'none' }}
+                    >
+                      {attachment.file_name}
+                    </a>
+                    <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px' }}>
+                      {formatFileSize(attachment.size_bytes || 0)}
+                    </div>
                     {attachment.description && (
                       <div style={{ 
                         fontSize: '12px', 
@@ -312,7 +418,7 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
                       </div>
                     )}
                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                      {new Date(attachment.uploaded_at).toLocaleDateString()}
+                      {attachment.uploaded_at ? new Date(attachment.uploaded_at).toLocaleString() : 'Unknown'}
                     </div>
                   </div>
                 ))}

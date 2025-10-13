@@ -12,6 +12,7 @@ A complete multi-tenant SaaS platform built with React, Supabase, and Stripe. Th
 - **Module Access Control**: Role-based access to different modules based on subscription tier
 - **Secure Backend**: Supabase Edge Functions for server-side operations
 - **Responsive UI**: Modern, gradient-themed interface with mobile support
+- **Contacts CRM Enhancements**: Upload resumes and documents per contact with secure Supabase storage and view a full status history timeline
 
 ## 📋 Prerequisites
 
@@ -94,6 +95,7 @@ supabase db push
 
 This will create:
 - **Tables**: tenants, profiles, subscriptions, payments, promo_codes, email_tokens, audit_logs
+- **CRM Tables**: contacts, contact_status_history, contact_attachments (for secure document metadata)
 - **RLS Policies**: Tenant isolation and security rules
 - **Indexes**: Performance optimizations
 - **Triggers**: Automatic timestamp updates

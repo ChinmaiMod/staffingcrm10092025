@@ -5,21 +5,8 @@
 DO $$
 DECLARE
   v_tenant_id uuid;
-  v_business_id uuid;
-  v_existing_business_id uuid;
-  v_status_initial uuid;
-  v_status_spoke uuid;
-  v_reason_training uuid;
-  v_reason_h1b uuid;
-  v_role_remote uuid;
-  v_role_hybrid uuid;
-  v_visa_h1b uuid;
-  v_visa_opt uuid;
-  v_job_java uuid;
-  v_job_rn uuid;
-  v_year_4_6 uuid;
-  v_year_7_9 uuid;
-  v_contact_id uuid;
+  v_business_id bigint;
+  v_contact_id bigint;
 BEGIN
   -- Ensure tenant exists for Intuites LLC
   SELECT tenant_id
@@ -43,77 +30,60 @@ BEGIN
     WHERE tenant_id = v_tenant_id;
   END IF;
 
-  -- Ensure default business exists
-  INSERT INTO businesses (
-    tenant_id,
-    business_name,
-    business_type,
-    description,
-    industry,
-    enabled_contact_types,
-    settings,
-    is_active,
-    is_default
-  ) VALUES (
-    v_tenant_id,
-    'Intuites LLC',
-    'GENERAL',
-    'Default business created during Intuites LLC data seeding',
-    'Staffing',
-    ARRAY['IT_CANDIDATE','HEALTHCARE_CANDIDATE','VENDOR_CLIENT','VENDOR_EMPANELMENT','EMPLOYEE_INDIA','EMPLOYEE_USA'],
-    jsonb_build_object('seeded_at', now(), 'seed_source', '023_seed_intuites_lookup_data.sql'),
-    true,
-    true
-  )
-  ON CONFLICT (tenant_id, business_name) DO UPDATE
-    SET business_type = EXCLUDED.business_type,
-        description = EXCLUDED.description,
-        industry = EXCLUDED.industry,
-        enabled_contact_types = EXCLUDED.enabled_contact_types,
-        settings = businesses.settings || EXCLUDED.settings,
-        is_active = true,
-        is_default = true,
-        updated_at = now()
-  RETURNING business_id INTO v_business_id;
+  -- Ensure business exists (legacy schema uses minimal columns)
+  SELECT id
+  INTO v_business_id
+  FROM businesses
+  WHERE tenant_id = v_tenant_id
+    AND lower(business_name) IN (lower('Intuites LLC'), lower('Intuites'))
+  ORDER BY created_at
+  LIMIT 1;
 
   IF v_business_id IS NULL THEN
-    SELECT business_id
-    INTO v_business_id
-    FROM businesses
-    WHERE tenant_id = v_tenant_id
-    ORDER BY is_default DESC, created_at
-    LIMIT 1;
+    INSERT INTO businesses (
+      tenant_id,
+      business_name,
+      business_type,
+      created_at,
+      updated_at
+    ) VALUES (
+      v_tenant_id,
+      'Intuites LLC',
+      'LLC',
+      now(),
+      now()
+    )
+    RETURNING id INTO v_business_id;
+  ELSE
+    UPDATE businesses
+    SET business_name = 'Intuites LLC',
+        business_type = COALESCE(business_type, 'LLC'),
+        updated_at = now()
+    WHERE id = v_business_id;
   END IF;
-
-  -- Make sure selected business is marked as default and active
-  UPDATE businesses
-  SET is_default = true,
-      is_active = true,
-      updated_at = now()
-  WHERE business_id = v_business_id;
 
   -- Update any legacy lookup rows without business_id
   UPDATE visa_status
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  UPDATE job_titles
+  UPDATE job_title
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  UPDATE reasons_for_contact
+  UPDATE reason_for_contact
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  UPDATE contact_statuses
+  UPDATE workflow_status
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  UPDATE role_types
+  UPDATE type_of_roles
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  UPDATE years_experience
+  UPDATE type_of_contact
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
@@ -121,147 +91,214 @@ BEGIN
   SET business_id = v_business_id
   WHERE tenant_id = v_tenant_id AND business_id IS NULL;
 
-  -- Copy global lookup data (tenant_id IS NULL) into Intuites tenant
-  WITH source AS (
-    SELECT DISTINCT code, label FROM visa_status WHERE tenant_id IS NULL
+  UPDATE years_of_experience
+  SET business_id = v_business_id
+  WHERE tenant_id = v_tenant_id AND business_id IS NULL;
+
+  -- Visa status values
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('F1'),
+      ('OPT'),
+      ('STEM OPT'),
+      ('H1B'),
+      ('H4'),
+      ('H4 EAD'),
+      ('GC EAD'),
+      ('L1B'),
+      ('L2S'),
+      ('B1/B2'),
+      ('J1'),
+      ('TN'),
+      ('E3'),
+      ('GC'),
+      ('USC')
+    ) AS x(value)
   )
-  INSERT INTO visa_status (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO visa_status (visa_status, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM visa_status vs
-    WHERE vs.tenant_id = v_tenant_id AND vs.code = s.code
+    SELECT 1
+    FROM visa_status vs
+    WHERE vs.tenant_id = v_tenant_id
+      AND lower(vs.visa_status) = lower(d.value)
   );
 
-  WITH source AS (
-    SELECT DISTINCT category, title FROM job_titles WHERE tenant_id IS NULL
+  -- Job titles by field
+  WITH desired AS (
+    SELECT field, job_title FROM (VALUES
+      ('IT', 'Java Back End Developer'),
+      ('IT', 'Java Full Stack Developer'),
+      ('IT', 'Dotnet Developer'),
+      ('IT', 'Python Developer'),
+      ('IT', 'Data Analyst'),
+      ('IT', 'AWS Data Engineer'),
+      ('IT', 'Azure Data Engineer'),
+      ('IT', 'GCP Data Engineer'),
+      ('IT', 'Big Data Developer'),
+      ('IT', 'Power BI Developer'),
+      ('IT', 'Qliksense Developer'),
+      ('IT', 'Tableau Developer'),
+      ('IT', 'Informatica Developer'),
+      ('IT', 'Talend Developer'),
+      ('IT', 'Abinitio Developer'),
+      ('IT', 'Oracle PL/SQL Developer'),
+      ('IT', 'Oracle Apex Developer'),
+      ('IT', 'Business Analyst'),
+      ('IT', 'Manual QA'),
+      ('IT', 'Automation QA'),
+      ('IT', 'ETL Tester'),
+      ('IT', 'iOS Developer'),
+      ('IT', 'Android Developer'),
+      ('IT', 'AWS DevOps Engineer'),
+      ('IT', 'Azure DevOps Engineer'),
+      ('IT', 'GCP DevOps Engineer'),
+      ('IT', 'Mainframe Developer'),
+      ('IT', 'Mainframe Architect'),
+      ('Healthcare', 'Licensed Practical Nurse (LPN)'),
+      ('Healthcare', 'Geriatric Nursing Assistant (GNA)'),
+      ('Healthcare', 'Registered Nurse (RN)'),
+      ('Healthcare', 'Respiratory Therapist (RRT)'),
+      ('Healthcare', 'Nurse Practitioner (NP)')
+    ) AS x(field, job_title)
   )
-  INSERT INTO job_titles (tenant_id, business_id, category, title)
-  SELECT v_tenant_id, v_business_id, s.category, s.title
-  FROM source s
+  INSERT INTO job_title (field, job_title, tenant_id, business_id)
+  SELECT d.field, d.job_title, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM job_titles jt
-    WHERE jt.tenant_id = v_tenant_id AND jt.category = s.category AND jt.title = s.title
+    SELECT 1
+    FROM job_title jt
+    WHERE jt.tenant_id = v_tenant_id
+      AND lower(jt.field) = lower(d.field)
+      AND lower(jt.job_title) = lower(d.job_title)
   );
 
-  WITH source AS (
-    SELECT DISTINCT code, label FROM reasons_for_contact WHERE tenant_id IS NULL
+  -- Reasons for contact
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('Training and Placement'),
+      ('Marketing and Placement'),
+      ('H1B Sponsorship'),
+      ('H1B Transfer'),
+      ('GC Processing')
+    ) AS x(value)
   )
-  INSERT INTO reasons_for_contact (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO reason_for_contact (reason_for_contact, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM reasons_for_contact rf
-    WHERE rf.tenant_id = v_tenant_id AND rf.code = s.code
+    SELECT 1
+    FROM reason_for_contact rf
+    WHERE rf.tenant_id = v_tenant_id
+      AND lower(rf.reason_for_contact) = lower(d.value)
   );
 
-  WITH source AS (
-    SELECT DISTINCT code, label FROM contact_statuses WHERE tenant_id IS NULL
+  -- Workflow statuses
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('Initial Contact'),
+      ('Spoke to Candidate'),
+      ('Resume Needs Preparation'),
+      ('Resume Prepared and Sent for Review'),
+      ('Assigned to Recruiter'),
+      ('Submitted to Client'),
+      ('Client Interview Scheduled'),
+      ('Offer Accepted'),
+      ('Offer Declined')
+    ) AS x(value)
   )
-  INSERT INTO contact_statuses (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO workflow_status (workflow_status, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM contact_statuses cs
-    WHERE cs.tenant_id = v_tenant_id AND cs.code = s.code
+    SELECT 1
+    FROM workflow_status ws
+    WHERE ws.tenant_id = v_tenant_id
+      AND lower(ws.workflow_status) = lower(d.value)
   );
 
-  WITH source AS (
-    SELECT DISTINCT code, label FROM role_types WHERE tenant_id IS NULL
+  -- Role preferences
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('Remote'),
+      ('Hybrid Local'),
+      ('Onsite Local'),
+      ('Open to Relocate')
+    ) AS x(value)
   )
-  INSERT INTO role_types (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO type_of_roles (type_of_roles, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM role_types rt
-    WHERE rt.tenant_id = v_tenant_id AND rt.code = s.code
+    SELECT 1
+    FROM type_of_roles tr
+    WHERE tr.tenant_id = v_tenant_id
+      AND lower(tr.type_of_roles) = lower(d.value)
   );
 
-  WITH source AS (
-    SELECT DISTINCT code, label FROM years_experience WHERE tenant_id IS NULL
+  -- Contact types
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('IT Candidate'),
+      ('Healthcare Candidate'),
+      ('Vendor Client'),
+      ('Vendor Empanelment'),
+      ('Employee - India'),
+      ('Employee - USA')
+    ) AS x(value)
   )
-  INSERT INTO years_experience (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO type_of_contact (type_of_contact, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM years_experience ye
-    WHERE ye.tenant_id = v_tenant_id AND ye.code = s.code
+    SELECT 1
+    FROM type_of_contact tc
+    WHERE tc.tenant_id = v_tenant_id
+      AND lower(tc.type_of_contact) = lower(d.value)
   );
 
-  WITH source AS (
-    SELECT DISTINCT code, label FROM referral_sources WHERE tenant_id IS NULL
+  -- Referral sources
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('Facebook'),
+      ('Google'),
+      ('Friend')
+    ) AS x(value)
   )
-  INSERT INTO referral_sources (tenant_id, business_id, code, label)
-  SELECT v_tenant_id, v_business_id, s.code, s.label
-  FROM source s
+  INSERT INTO referral_sources (referral_source, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
   WHERE NOT EXISTS (
-    SELECT 1 FROM referral_sources rs
-    WHERE rs.tenant_id = v_tenant_id AND rs.code = s.code
+    SELECT 1
+    FROM referral_sources rs
+    WHERE rs.tenant_id = v_tenant_id
+      AND lower(rs.referral_source) = lower(d.value)
   );
 
-  -- Fetch lookup IDs for sample contacts
-  SELECT status_id INTO v_status_initial
-  FROM contact_statuses
-  WHERE tenant_id = v_tenant_id AND code = 'INITIAL_CONTACT'
-  LIMIT 1;
-
-  SELECT status_id INTO v_status_spoke
-  FROM contact_statuses
-  WHERE tenant_id = v_tenant_id AND code = 'SPOKE_TO_CANDIDATE'
-  LIMIT 1;
-
-  SELECT reason_id INTO v_reason_training
-  FROM reasons_for_contact
-  WHERE tenant_id = v_tenant_id AND code = 'TRAINING_PLACEMENT'
-  LIMIT 1;
-
-  SELECT reason_id INTO v_reason_h1b
-  FROM reasons_for_contact
-  WHERE tenant_id = v_tenant_id AND code = 'H1B_SPONSORSHIP'
-  LIMIT 1;
-
-  SELECT role_type_id INTO v_role_remote
-  FROM role_types
-  WHERE tenant_id = v_tenant_id AND code = 'REMOTE'
-  LIMIT 1;
-
-  SELECT role_type_id INTO v_role_hybrid
-  FROM role_types
-  WHERE tenant_id = v_tenant_id AND code = 'HYBRID_LOCAL'
-  LIMIT 1;
-
-  SELECT visa_status_id INTO v_visa_h1b
-  FROM visa_status
-  WHERE tenant_id = v_tenant_id AND code = 'H1B'
-  LIMIT 1;
-
-  SELECT visa_status_id INTO v_visa_opt
-  FROM visa_status
-  WHERE tenant_id = v_tenant_id AND code = 'OPT'
-  LIMIT 1;
-
-  SELECT job_title_id INTO v_job_java
-  FROM job_titles
-  WHERE tenant_id = v_tenant_id AND title = 'Java Full Stack Developer'
-  LIMIT 1;
-
-  SELECT job_title_id INTO v_job_rn
-  FROM job_titles
-  WHERE tenant_id = v_tenant_id AND title = 'Registered nurse (RN)'
-  LIMIT 1;
-
-  SELECT years_experience_id INTO v_year_4_6
-  FROM years_experience
-  WHERE tenant_id = v_tenant_id AND code = '4_6'
-  LIMIT 1;
-
-  SELECT years_experience_id INTO v_year_7_9
-  FROM years_experience
-  WHERE tenant_id = v_tenant_id AND code = '7_9'
-  LIMIT 1;
+  -- Years of experience buckets
+  WITH desired AS (
+    SELECT value FROM (VALUES
+      ('0'),
+      ('1 to 3'),
+      ('4 to 6'),
+      ('7 to 9'),
+      ('10 -15'),
+      ('15+')
+    ) AS x(value)
+  )
+  INSERT INTO years_of_experience (years_of_experience, tenant_id, business_id)
+  SELECT d.value, v_tenant_id, v_business_id
+  FROM desired d
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM years_of_experience ye
+    WHERE ye.tenant_id = v_tenant_id
+      AND lower(ye.years_of_experience) = lower(d.value)
+  );
 
   -- Sample IT candidate contact
-  SELECT contact_id INTO v_contact_id
+  SELECT id INTO v_contact_id
   FROM contacts
   WHERE tenant_id = v_tenant_id AND lower(email) = lower('john.doe@intuites.com')
   LIMIT 1;
@@ -275,46 +312,53 @@ BEGIN
       last_name,
       email,
       phone,
-      status_id,
-      visa_status_id,
-      job_title_id,
-      years_experience_id,
+      workflow_status,
+      visa_status,
+      job_title,
+      years_of_experience,
+      reason_for_contact,
+      type_of_roles,
+      referral_source,
       remarks,
       created_at,
       updated_at
     ) VALUES (
       v_tenant_id,
       v_business_id,
-      'IT_CANDIDATE',
+      'IT Candidate',
       'John',
       'Doe',
       'john.doe@intuites.com',
       '+1 (555) 123-4567',
-      v_status_initial,
-      v_visa_h1b,
-      v_job_java,
-      v_year_4_6,
+      'Initial Contact',
+      'H1B',
+      'Java Full Stack Developer',
+      '4 to 6',
+  ARRAY['Training and Placement'],
+  ARRAY['Remote'],
+      'Google',
       'Interested in training and placement opportunities.',
       now() - interval '14 days',
       now() - interval '7 days'
-    )
-    RETURNING contact_id INTO v_contact_id;
-
-    IF v_reason_training IS NOT NULL THEN
-      INSERT INTO contact_reasons (contact_id, reason_id)
-      VALUES (v_contact_id, v_reason_training)
-      ON CONFLICT DO NOTHING;
-    END IF;
-
-    IF v_role_remote IS NOT NULL THEN
-      INSERT INTO contact_role_types (contact_id, role_type_id)
-      VALUES (v_contact_id, v_role_remote)
-      ON CONFLICT DO NOTHING;
-    END IF;
+    );
+  ELSE
+    UPDATE contacts
+    SET business_id = v_business_id,
+        contact_type = 'IT Candidate',
+        workflow_status = 'Initial Contact',
+        visa_status = 'H1B',
+        job_title = 'Java Full Stack Developer',
+        years_of_experience = '4 to 6',
+  reason_for_contact = ARRAY['Training and Placement'],
+  type_of_roles = ARRAY['Remote'],
+        referral_source = 'Google',
+        remarks = 'Interested in training and placement opportunities.',
+        updated_at = now()
+    WHERE id = v_contact_id;
   END IF;
 
   -- Sample healthcare candidate contact
-  SELECT contact_id INTO v_contact_id
+  SELECT id INTO v_contact_id
   FROM contacts
   WHERE tenant_id = v_tenant_id AND lower(email) = lower('jane.smith@intuites.com')
   LIMIT 1;
@@ -328,42 +372,49 @@ BEGIN
       last_name,
       email,
       phone,
-      status_id,
-      visa_status_id,
-      job_title_id,
-      years_experience_id,
+      workflow_status,
+      visa_status,
+      job_title,
+      years_of_experience,
+      reason_for_contact,
+      type_of_roles,
+      referral_source,
       remarks,
       created_at,
       updated_at
     ) VALUES (
       v_tenant_id,
       v_business_id,
-      'HEALTHCARE_CANDIDATE',
+      'Healthcare Candidate',
       'Jane',
       'Smith',
       'jane.smith@intuites.com',
       '+1 (555) 987-6543',
-      v_status_spoke,
-      v_visa_opt,
-      v_job_rn,
-      v_year_7_9,
+      'Spoke to Candidate',
+      'OPT',
+      'Registered Nurse (RN)',
+      '7 to 9',
+  ARRAY['H1B Sponsorship'],
+  ARRAY['Hybrid Local'],
+      'Facebook',
       'Ready for recruiter marketing, prefers hybrid roles.',
       now() - interval '9 days',
       now() - interval '2 days'
-    )
-    RETURNING contact_id INTO v_contact_id;
-
-    IF v_reason_h1b IS NOT NULL THEN
-      INSERT INTO contact_reasons (contact_id, reason_id)
-      VALUES (v_contact_id, v_reason_h1b)
-      ON CONFLICT DO NOTHING;
-    END IF;
-
-    IF v_role_hybrid IS NOT NULL THEN
-      INSERT INTO contact_role_types (contact_id, role_type_id)
-      VALUES (v_contact_id, v_role_hybrid)
-      ON CONFLICT DO NOTHING;
-    END IF;
+    );
+  ELSE
+    UPDATE contacts
+    SET business_id = v_business_id,
+        contact_type = 'Healthcare Candidate',
+        workflow_status = 'Spoke to Candidate',
+        visa_status = 'OPT',
+        job_title = 'Registered Nurse (RN)',
+        years_of_experience = '7 to 9',
+  reason_for_contact = ARRAY['H1B Sponsorship'],
+  type_of_roles = ARRAY['Hybrid Local'],
+        referral_source = 'Facebook',
+        remarks = 'Ready for recruiter marketing, prefers hybrid roles.',
+        updated_at = now()
+    WHERE id = v_contact_id;
   END IF;
 END
 $$;

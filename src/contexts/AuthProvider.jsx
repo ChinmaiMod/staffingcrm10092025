@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { requestPasswordReset } from '../api/edgeFunctions'
 import { logger } from '../utils/logger'
@@ -13,11 +13,63 @@ export const useAuth = () => {
   return context
 }
 
+const TENANT_STORAGE_KEY = 'crm::tenant_id'
+const PROFILE_STORAGE_KEY = 'crm::profile_cache'
+
+const safeParseJson = (value) => {
+  try {
+    return value ? JSON.parse(value) : null
+  } catch (error) {
+    logger.warn?.('Failed to parse profile cache', error)
+    return null
+  }
+}
+
+const getInitialProfile = () => {
+  if (typeof window === 'undefined') return null
+  const cachedProfile = safeParseJson(window.localStorage.getItem(PROFILE_STORAGE_KEY))
+  return cachedProfile || null
+}
+
+const getInitialTenantId = (initialProfile) => {
+  if (initialProfile?.tenant_id) return initialProfile.tenant_id
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(TENANT_STORAGE_KEY)
+}
+
+const persistTenantContext = (tenantId, profile) => {
+  if (typeof window === 'undefined') return
+  try {
+    if (tenantId) {
+      window.localStorage.setItem(TENANT_STORAGE_KEY, tenantId)
+    } else {
+      window.localStorage.removeItem(TENANT_STORAGE_KEY)
+    }
+
+    if (profile) {
+      window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile))
+    } else {
+      window.localStorage.removeItem(PROFILE_STORAGE_KEY)
+    }
+  } catch (error) {
+    logger.warn?.('Failed to persist tenant context', error)
+  }
+}
+
 export function AuthProvider({ children }) {
+  const initialState = useMemo(() => {
+    const profileFromCache = getInitialProfile()
+    return {
+      profile: profileFromCache,
+      tenantId: getInitialTenantId(profileFromCache),
+    }
+  }, [])
+
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState(initialState.profile)
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
+  const [tenantId, setTenantId] = useState(initialState.tenantId)
 
   useEffect(() => {
     // Track if this is the initial load to prevent duplicate profile fetches
@@ -53,6 +105,8 @@ export function AuthProvider({ children }) {
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
+        setTenantId(null)
+        persistTenantContext(null, null)
         setLoading(false)
       }
     })
@@ -70,9 +124,13 @@ export function AuthProvider({ children }) {
 
       if (error) throw error
       setProfile(data)
+      setTenantId(data?.tenant_id || null)
+      persistTenantContext(data?.tenant_id || null, data)
     } catch (error) {
       logger.error('Error fetching profile:', error)
       setProfile(null)
+      setTenantId(null)
+      persistTenantContext(null, null)
     } finally {
       setLoading(false)
     }
@@ -99,6 +157,8 @@ export function AuthProvider({ children }) {
     if (!error) {
       setUser(null)
       setProfile(null)
+      setTenantId(null)
+      persistTenantContext(null, null)
     }
     return { error }
   }
@@ -169,17 +229,26 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const valueTenantId = tenantId || profile?.tenant_id || null
+
+  const setTenantOverride = (nextTenantId) => {
+    setTenantId(nextTenantId)
+    persistTenantContext(nextTenantId, profile)
+  }
+
   const value = {
     user,
     profile,
     session,
     loading,
+    tenantId: valueTenantId,
     signUp,
     signIn,
     signOut,
     resetPassword,
     updatePassword,
     refreshProfile,
+    setTenantId: setTenantOverride,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

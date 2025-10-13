@@ -6,9 +6,71 @@ import { useTenant } from '../../../contexts/TenantProvider'
 import { supabase } from '../../../api/supabaseClient'
 import { applyAdvancedFilters, describeFilter, isFilterEmpty } from '../../../utils/filterEngine'
 import { logger } from '../../../utils/logger'
+import { createUniqueFileName } from '../../../utils/fileUtils'
 import ContactForm from './ContactForm'
 import ContactDetail from './ContactDetail'
 import AdvancedFilterBuilder from './AdvancedFilterBuilder'
+
+const CONTACT_TYPE_LABELS = {
+  it_candidate: 'IT Candidate',
+  healthcare_candidate: 'Healthcare Candidate',
+  vendor_client: 'Vendor Client',
+  empanelment_contact: 'Vendor Empanelment',
+  internal_india: 'Employee (India)',
+  internal_usa: 'Employee (USA)'
+}
+
+const CONTACT_TYPE_LABEL_TO_KEY = (() => {
+  const lookup = {
+    'vendor/client contact': 'vendor_client',
+    'vendor client': 'vendor_client',
+    'vendor_empanelment': 'empanelment_contact',
+    'vendor empanelment': 'empanelment_contact',
+    'internal hire (india)': 'internal_india',
+    'internal hire (usa)': 'internal_usa'
+  }
+
+  Object.entries(CONTACT_TYPE_LABELS).forEach(([key, label]) => {
+    const normalizedLabel = label.toLowerCase()
+    lookup[normalizedLabel] = key
+    lookup[key.toLowerCase()] = key
+    lookup[normalizedLabel.replace(/[^a-z0-9]+/g, '_')] = key
+  })
+
+  return lookup
+})()
+
+const mapContactTypeToDb = (key) => {
+  if (!key) return null
+  const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+  return CONTACT_TYPE_LABELS[normalizedKey] || CONTACT_TYPE_LABELS[key] || key
+}
+
+const mapContactTypeToKey = (value) => {
+  if (!value) return null
+  const normalized = value.toLowerCase()
+  const sanitized = normalized.replace(/[^a-z0-9]+/g, '_')
+  return (
+    CONTACT_TYPE_LABEL_TO_KEY[normalized] ||
+    CONTACT_TYPE_LABEL_TO_KEY[sanitized] ||
+    sanitized
+  )
+}
+
+const nullIfEmpty = (value) => {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  return value
+}
+
+const normalizeStringArray = (value) => {
+  if (!value) return null
+  const arrayValue = Array.isArray(value) ? value : [value]
+  const cleaned = arrayValue
+    .map((item) => (typeof item === 'string' ? item.trim() : item))
+    .filter(Boolean)
+  return cleaned.length > 0 ? cleaned : null
+}
 
 export default function ContactsManager() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -27,6 +89,8 @@ export default function ContactsManager() {
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false)
   const [bulkEmailData, setBulkEmailData] = useState({ subject: '', body: '' })
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [savingContact, setSavingContact] = useState(false)
+  const [defaultBusinessId, setDefaultBusinessId] = useState(null)
   
   // Advanced filter state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
@@ -47,8 +111,8 @@ export default function ContactsManager() {
     abortControllerRef.current = new AbortController()
 
     try {
-  setLoading(true)
-  setError(null)
+      setLoading(true)
+      setError(null)
 
       if (!tenant?.tenant_id) {
         logger.warn('No tenant available, skipping contact load')
@@ -91,8 +155,8 @@ export default function ContactsManager() {
       }
 
       const normalizedContacts = (data || []).map((contact) => {
-        const contactTypeRaw = contact.contact_type || null
-        const contactTypeKey = contactTypeRaw ? contactTypeRaw.toLowerCase() : null
+        const contactTypeKey = mapContactTypeToKey(contact.contact_type)
+        const contactTypeLabel = CONTACT_TYPE_LABELS[contactTypeKey] || contact.contact_type || null
 
         const reasons = Array.isArray(contact.reason_for_contact)
           ? contact.reason_for_contact.filter(Boolean)
@@ -108,11 +172,12 @@ export default function ContactsManager() {
 
         return {
           contact_id: contact.id,
+          business_id: contact.business_id || null,
           first_name: contact.first_name,
           last_name: contact.last_name,
           email: contact.email,
           phone: contact.phone,
-          contact_type: contactTypeRaw,
+          contact_type: contactTypeLabel,
           contact_type_key: contactTypeKey,
           status: contact.workflow_status || 'Unknown',
           status_code: contact.workflow_status || null,
@@ -151,11 +216,57 @@ export default function ContactsManager() {
         logger.log('loadContacts request was aborted')
         return
       }
-      
-  logger.error('Error loading contacts:', err)
-  setError(err.message || 'Failed to load contacts')
-  setContacts([])
-  setLoading(false)
+
+      logger.error('Error loading contacts:', err)
+      setError(err.message || 'Failed to load contacts')
+      setContacts([])
+      setLoading(false)
+    }
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    if (!tenant?.tenant_id) {
+      setDefaultBusinessId(null)
+      return
+    }
+
+    let isCancelled = false
+    const controller = new AbortController()
+
+    const fetchDefaultBusiness = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_id, is_default')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('is_default', { ascending: false })
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .abortSignal(controller.signal)
+
+        if (error) {
+          throw error
+        }
+
+        if (!isCancelled) {
+          setDefaultBusinessId(data?.[0]?.business_id || null)
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return
+        }
+        logger.error('Error fetching default business:', err)
+        if (!isCancelled) {
+          setDefaultBusinessId(null)
+        }
+      }
+    }
+
+    fetchDefaultBusiness()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
     }
   }, [tenant?.tenant_id])
 
@@ -195,7 +306,10 @@ export default function ContactsManager() {
   const handleEditContact = (contact) => {
     const editableContact = {
       ...contact,
-      contact_type: contact.contact_type_key || contact.contact_type?.toLowerCase() || 'it_candidate',
+      contact_type:
+        contact.contact_type_key ||
+        mapContactTypeToKey(contact.contact_type) ||
+        'it_candidate',
       visa_status: contact.visa_status,
       job_title: contact.job_title,
       years_experience: contact.years_experience,
@@ -204,7 +318,8 @@ export default function ContactsManager() {
       role_types: contact.role_types,
       country: contact.country,
       state: contact.state,
-      city: contact.city
+      city: contact.city,
+      business_id: contact.business_id || null
     }
 
     setSelectedContact(editableContact)
@@ -216,79 +331,184 @@ export default function ContactsManager() {
   }
 
   const handleSaveContact = async (contactData, attachments = []) => {
+    if (!tenant?.tenant_id) {
+      alert('Missing tenant context. Please refresh and try again.')
+      return
+    }
+
+    const {
+      statusChangeRemarks,
+      statusChanged,
+      status,
+      reasons_for_contact,
+      role_types,
+      years_experience,
+      referral_source,
+      ...formFields
+    } = contactData
+
+    const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
+
+    const payload = {
+      tenant_id: tenant.tenant_id,
+      business_id: businessId,
+      first_name: nullIfEmpty(formFields.first_name),
+      last_name: nullIfEmpty(formFields.last_name),
+      email: nullIfEmpty(formFields.email),
+      phone: nullIfEmpty(formFields.phone),
+      contact_type: mapContactTypeToDb(formFields.contact_type),
+      visa_status: nullIfEmpty(formFields.visa_status),
+      job_title: nullIfEmpty(formFields.job_title),
+      workflow_status: nullIfEmpty(status),
+      reason_for_contact: normalizeStringArray(reasons_for_contact),
+      type_of_roles: normalizeStringArray(role_types),
+      country: nullIfEmpty(formFields.country),
+      state: nullIfEmpty(formFields.state),
+      city: nullIfEmpty(formFields.city),
+      years_of_experience: nullIfEmpty(years_experience),
+      referral_source: nullIfEmpty(referral_source),
+      remarks: nullIfEmpty(formFields.remarks),
+      referred_by: nullIfEmpty(formFields.referred_by)
+    }
+
     try {
-      // TODO: Implement actual API call
-      // Extract status change information
-      const { statusChangeRemarks, statusChanged, ...contactFields } = contactData
-      
-      // if (selectedContact) {
-      //   // Update existing contact
-      //   await updateContact(selectedContact.contact_id, contactFields)
-      //   
-      //   // If status changed, save to status history
-      //   if (statusChanged && statusChangeRemarks) {
-      //     await supabase.from('contact_status_history').insert({
-      //       contact_id: selectedContact.contact_id,
-      //       old_status: selectedContact.status,
-      //       new_status: contactFields.status,
-      //       remarks: statusChangeRemarks,
-      //       changed_by: user.id
-      //     })
-      //   }
-      // } else {
-      //   const newContact = await createContact(contactFields)
-      //   
-      //   // For new contacts, create initial status history entry
-      //   if (statusChangeRemarks) {
-      //     await supabase.from('contact_status_history').insert({
-      //       contact_id: newContact.contact_id,
-      //       old_status: null,
-      //       new_status: contactFields.status,
-      //       remarks: statusChangeRemarks,
-      //       changed_by: user.id
-      //     })
-      //   }
-      //   
-      //   // Upload attachments if any
-      //   if (attachments.length > 0) {
-      //     for (const attachment of attachments) {
-      //       const formData = new FormData()
-      //       formData.append('file', attachment.file)
-      //       formData.append('contact_id', newContact.contact_id)
-      //       formData.append('description', attachment.description || '') // Include description
-      //       await uploadContactAttachment(formData)
-      //     }
-      //   }
-      // }
-      
-      logger.log('Saving contact with status history:', { 
-        contactData: contactFields,
-        statusChanged,
-        statusChangeRemarks,
-        attachments: attachments.map(a => ({ 
-          name: a.name, 
-          size: a.size, 
-          description: a.description 
-        }))
-      })
+      setSavingContact(true)
+      let contactId = selectedContact?.contact_id || null
+      let effectiveBusinessId = businessId
+
+      if (selectedContact?.contact_id) {
+        const { data, error } = await supabase
+          .from('contacts')
+          .update(payload)
+          .eq('id', selectedContact.contact_id)
+          .eq('tenant_id', tenant.tenant_id)
+          .select('id, business_id')
+
+        if (error) {
+          throw error
+        }
+        if (data && data.length > 0) {
+          contactId = data[0].id
+          effectiveBusinessId = data[0].business_id ?? effectiveBusinessId
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('contacts')
+          .insert([payload])
+          .select('id, business_id')
+          .single()
+
+        if (error) {
+          throw error
+        }
+        contactId = data?.id || null
+        effectiveBusinessId = data?.business_id ?? effectiveBusinessId
+      }
+
+      if (contactId && attachments.length > 0) {
+        const storageBucket = supabase.storage.from('contact-attachments')
+
+        for (const attachment of attachments) {
+          if (!attachment?.file) continue
+
+          const uniqueName = createUniqueFileName(attachment.name)
+          const storagePath = `${tenant.tenant_id}/${contactId}/${uniqueName}`
+
+          const { error: uploadError } = await storageBucket.upload(
+            storagePath,
+            attachment.file,
+            {
+              upsert: false,
+              contentType: attachment.file.type || 'application/octet-stream'
+            }
+          )
+
+          if (uploadError) {
+            throw uploadError
+          }
+
+          const { error: metadataError } = await supabase
+            .from('contact_attachments')
+            .insert({
+              contact_id: contactId,
+              tenant_id: tenant.tenant_id,
+              business_id: effectiveBusinessId,
+              file_name: attachment.name,
+              file_path: storagePath,
+              content_type: attachment.file.type || null,
+              size_bytes: attachment.size || null,
+              description: nullIfEmpty(attachment.description),
+              uploaded_by: profile?.id || null
+            })
+
+          if (metadataError) {
+            throw metadataError
+          }
+        }
+
+        attachments.forEach((attachment) => {
+          if (attachment?.preview) {
+            URL.revokeObjectURL(attachment.preview)
+          }
+        })
+      }
+
+      if (contactId && statusChanged && statusChangeRemarks) {
+        const { error: statusHistoryError } = await supabase
+          .from('contact_status_history')
+          .insert({
+            contact_id: contactId,
+            old_status: selectedContact?.status || null,
+            new_status: status,
+            notes: statusChangeRemarks,
+            changed_by: profile?.id || null
+          })
+
+        if (statusHistoryError) {
+          throw statusHistoryError
+        }
+      }
+
       setShowForm(false)
       setSelectedContact(null)
       await loadContacts()
     } catch (err) {
-      alert('Error saving contact: ' + err.message)
+      logger.error('Error saving contact:', err)
+      alert('Error saving contact: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSavingContact(false)
     }
   }
 
   const handleDeleteContact = async (contactId) => {
-    if (!confirm('Are you sure you want to delete this contact?')) return
-    
+    if (!tenant?.tenant_id) {
+      alert('Missing tenant context. Please refresh and try again.')
+      return
+    }
+
+    if (!confirm('Are you sure you want to delete this contact?')) {
+      return
+    }
+
     try {
-      // TODO: Implement actual API call
-      // await deleteContact(contactId)
-      logger.log('Deleting contact (mock flow):', contactId)
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contactId)
+        .eq('tenant_id', tenant.tenant_id)
+
+      if (error) {
+        throw error
+      }
+
+      if (selectedContact?.contact_id === contactId) {
+        setSelectedContact(null)
+      }
+
       await loadContacts()
     } catch (err) {
-      alert('Error deleting contact: ' + err.message)
+      logger.error('Error deleting contact:', err)
+      alert('Error deleting contact: ' + (err.message || 'Failed to delete contact'))
     }
   }
 
@@ -705,6 +925,7 @@ export default function ContactsManager() {
                 contact={selectedContact}
                 onSave={handleSaveContact}
                 onCancel={() => setShowForm(false)}
+                isSaving={savingContact}
               />
             </div>
           </div>

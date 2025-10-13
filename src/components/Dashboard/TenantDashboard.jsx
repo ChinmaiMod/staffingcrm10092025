@@ -8,6 +8,8 @@ export default function TenantDashboard() {
   const { tenant, subscription, getPlanName } = useTenant()
   const navigate = useNavigate()
 
+  const canManageTenantAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(profile?.role || '')
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
@@ -67,9 +69,11 @@ export default function TenantDashboard() {
           </div>
         </div>
 
-        {profile?.role === 'ADMIN' && (
+        {canManageTenantAdmin && (
           <div style={{ marginTop: 16 }}>
-            <button className="btn btn-outline" onClick={() => navigate('/tenant-admin')}>Tenant Admin</button>
+            <button className="btn btn-outline" onClick={() => navigate('/tenant-admin')}>
+              Tenant Owner &amp; Admin Tools
+            </button>
           </div>
         )}
 

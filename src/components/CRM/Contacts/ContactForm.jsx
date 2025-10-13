@@ -4,6 +4,7 @@ import { useTenant } from '../../../contexts/TenantProvider'
 import MultiSelect from '../common/MultiSelect'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
+import { formatFileSize } from '../../../utils/fileUtils'
 import { 
   validateEmail, 
   validatePhone, 
@@ -83,7 +84,7 @@ const YEARS_EXPERIENCE = ['0', '1 to 3', '4 to 6', '7 to 9', '10 -15', '15+']
 
 const REFERRAL_SOURCES = ['FB', 'Google', 'Friend']
 
-export default function ContactForm({ contact, onSave, onCancel }) {
+export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
   const [formData, setFormData] = useState({
     first_name: '',
@@ -291,14 +292,6 @@ export default function ContactForm({ contact, onSave, onCancel }) {
     })
   }
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-  }
-
   const validateForm = () => {
     const errors = {};
 
@@ -360,16 +353,17 @@ export default function ContactForm({ contact, onSave, onCancel }) {
     }
 
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault()
     
     // Validate form
-    if (!validateForm()) {
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
       // Scroll to first error
-      const firstErrorField = Object.keys(fieldErrors)[0];
+      const firstErrorField = Object.keys(errors)[0];
       const errorElement = document.getElementById(firstErrorField);
       if (errorElement) {
         errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -742,8 +736,8 @@ export default function ContactForm({ contact, onSave, onCancel }) {
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className="btn btn-primary">
-          {contact ? 'Update Contact' : 'Create Contact'}
+        <button type="submit" className="btn btn-primary" disabled={isSaving}>
+          {isSaving ? 'Saving...' : contact ? 'Update Contact' : 'Create Contact'}
         </button>
       </div>
 

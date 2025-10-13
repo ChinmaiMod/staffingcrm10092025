@@ -2,9 +2,17 @@ import { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import ReferenceTableEditor from './ReferenceTableEditor'
 import PipelineAdmin from '../Pipelines/PipelineAdmin'
+import BusinessesPage from './Businesses/BusinessesPage'
+import InternalStaffPage from './InternalStaff/InternalStaffPage'
+import UserRolesManagement from '../../DataAdministration/UserRoles/UserRolesManagement'
+import AssignUserRoles from '../../DataAdministration/UserRoles/AssignUserRoles'
 
 const REFERENCE_TABLES = [
+  { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
+  { id: 'assign_roles', label: 'Assign User Roles', icon: '🛡️', path: 'assign-roles' },
   { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: 'pipelines' },
+  { id: 'businesses', label: 'Businesses', icon: '🏢', path: 'businesses' },
+  { id: 'internal_staff', label: 'Internal Staff', icon: '👥', path: 'internal-staff' },
   { id: 'visa_status', label: 'Visa Statuses', icon: '🛂' },
   { id: 'job_titles_it', label: 'IT Job Titles', icon: '💼' },
   { id: 'job_titles_healthcare', label: 'Healthcare Job Titles', icon: '🏥' },
@@ -17,7 +25,6 @@ const REFERENCE_TABLES = [
   { id: 'years_experience', label: 'Years of Experience', icon: '⏳' },
   { id: 'referral_sources', label: 'Referral Sources', icon: '🔗' },
   { id: 'teams', label: 'Teams', icon: '👥' },
-  { id: 'employees', label: 'Employees', icon: '👤' },
 ]
 
 export default function DataAdministration() {
@@ -34,6 +41,10 @@ export default function DataAdministration() {
 
   return (
     <Routes>
+      <Route path="user-roles" element={<UserRolesManagement />} />
+      <Route path="assign-roles" element={<AssignUserRoles />} />
+      <Route path="businesses" element={<BusinessesPage />} />
+      <Route path="internal-staff" element={<InternalStaffPage />} />
       <Route path="pipelines" element={<PipelineAdmin />} />
       <Route path="/" element={
         <div>
