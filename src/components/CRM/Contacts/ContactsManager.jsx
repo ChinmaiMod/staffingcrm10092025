@@ -126,6 +126,7 @@ export default function ContactsManager() {
         .select(`
           id,
           tenant_id,
+          business_id,
           first_name,
           last_name,
           email,
@@ -711,9 +712,9 @@ export default function ContactsManager() {
             <option value="it_candidate">IT Candidate</option>
             <option value="healthcare_candidate">Healthcare Candidate</option>
             <option value="vendor_client">Vendor/Client</option>
-            <option value="vendor_empanelment">Vendor Empanelment</option>
-            <option value="employee_india">Employee (India)</option>
-            <option value="employee_usa">Employee (USA)</option>
+            <option value="empanelment_contact">Vendor Empanelment</option>
+            <option value="internal_india">Employee (India)</option>
+            <option value="internal_usa">Employee (USA)</option>
           </select>
           <select 
             value={filterStatus}
