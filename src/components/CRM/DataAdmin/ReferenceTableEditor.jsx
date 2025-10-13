@@ -53,6 +53,24 @@ const TABLE_CONFIG = {
     valueColumn: 'years_of_experience',
     orderBy: 'years_of_experience',
   },
+  countries: {
+    tableName: 'countries',
+    valueColumn: 'name',
+    primaryKeyCandidates: ['country_id'],
+    orderBy: 'name',
+  },
+  states: {
+    tableName: 'states',
+    valueColumn: 'name',
+    primaryKeyCandidates: ['state_id'],
+    orderBy: 'name',
+  },
+  cities: {
+    tableName: 'cities',
+    valueColumn: 'name',
+    primaryKeyCandidates: ['city_id'],
+    orderBy: 'name',
+  },
 }
 
 const MOCK_DATA = {
