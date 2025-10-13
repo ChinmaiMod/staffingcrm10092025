@@ -30,6 +30,9 @@ export default function BusinessesPage() {
   const [editingBusiness, setEditingBusiness] = useState(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [typeFilter, setTypeFilter] = useState('ALL')
 
   const canManageBusinesses = useMemo(() => {
     if (!profile?.role) return true
@@ -148,6 +151,31 @@ export default function BusinessesPage() {
     }
   }
 
+  const filteredBusinesses = useMemo(() => {
+    let results = businesses
+
+    if (statusFilter !== 'ALL') {
+      const activeStatus = statusFilter === 'ACTIVE'
+      results = results.filter((biz) => biz.is_active === activeStatus)
+    }
+
+    if (typeFilter !== 'ALL') {
+      results = results.filter((biz) => biz.business_type === typeFilter)
+    }
+
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase()
+      results = results.filter(
+        (biz) =>
+          biz.business_name?.toLowerCase().includes(search) ||
+          biz.description?.toLowerCase().includes(search) ||
+          biz.industry?.toLowerCase().includes(search)
+      )
+    }
+
+    return results
+  }, [businesses, statusFilter, typeFilter, searchTerm])
+
   const renderEmptyState = () => (
     <div className="empty-state">
       <div className="empty-state-icon">🏢</div>
@@ -177,6 +205,38 @@ export default function BusinessesPage() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="filters-bar">
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search by name, industry..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
+        >
+          <option value="ALL">All Types</option>
+          <option value="IT_STAFFING">IT Staffing</option>
+          <option value="HEALTHCARE_STAFFING">Healthcare Staffing</option>
+          <option value="GENERAL">General</option>
+          <option value="OTHER">Other</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '150px' }}
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
       </div>
 
       {error && (
@@ -218,50 +278,62 @@ export default function BusinessesPage() {
         </table>
       ) : businesses.length === 0 ? (
         renderEmptyState()
+      ) : filteredBusinesses.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🔍</div>
+          <h3>No Matching Businesses</h3>
+          <p>Try adjusting your search or filter criteria.</p>
+        </div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
               <th>Name</th>
               <th>Type</th>
-              <th>Default</th>
+              <th>Industry</th>
               <th>Status</th>
               <th>Updated</th>
-              {canManageBusinesses && <th style={{ width: '160px' }}>Actions</th>}
+              {canManageBusinesses && <th style={{ width: '180px' }}>Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {businesses.map((business) => (
+            {filteredBusinesses.map((business) => (
               <tr key={business.__identifier}>
                 <td>
-                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {business.business_name}
                     {business.is_default && (
-                      <span className="status-badge initial-contact" style={{ background: '#ede9fe', color: '#5b21b6' }}>
-                        Default
+                      <span className="status-badge" style={{ background: '#ede9fe', color: '#5b21b6', fontSize: '11px', padding: '3px 8px' }}>
+                        ★ Default
                       </span>
                     )}
                   </div>
                   {business.description && (
-                    <div style={{ color: '#64748b', fontSize: '13px', marginTop: '6px' }}>
+                    <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px', lineHeight: '1.4' }}>
                       {business.description}
                     </div>
                   )}
                 </td>
-                <td>{business.business_type?.replace(/_/g, ' ') || '—'}</td>
-                <td>{business.is_default ? 'Yes' : 'No'}</td>
+                <td>
+                  <span className="status-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                    {business.business_type?.replace(/_/g, ' ') || '—'}
+                  </span>
+                </td>
+                <td>{business.industry || '—'}</td>
                 <td>
                   <span
                     className={`status-badge ${business.is_active ? 'initial-contact' : ''}`}
-                    style={business.is_active ? undefined : { background: '#fee2e2', color: '#b91c1c' }}
+                    style={business.is_active ? { background: '#d1fae5', color: '#065f46' } : { background: '#fee2e2', color: '#991b1b' }}
                   >
-                    {business.is_active ? 'Active' : 'Inactive'}
+                    {business.is_active ? '● Active' : '● Inactive'}
                   </span>
                 </td>
-                <td>{business.updated_at ? new Date(business.updated_at).toLocaleString() : '—'}</td>
+                <td style={{ fontSize: '13px', color: '#64748b' }}>
+                  {business.updated_at ? new Date(business.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                </td>
                 {canManageBusinesses && (
                   <td>
-                    <div className="action-buttons">
+                    <div className="action-buttons" style={{ gap: '6px' }}>
                       <button className="btn btn-sm btn-primary" onClick={() => handleEditClick(business)}>
                         Edit
                       </button>
