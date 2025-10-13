@@ -179,8 +179,8 @@ export default function BusinessesPage() {
   const renderEmptyState = () => (
     <div className="empty-state">
       <div className="empty-state-icon">🏢</div>
-      <h3>No Businesses Found</h3>
-      <p>Create your first business to segment contacts, pipelines, and lookup data.</p>
+      <h3>No Businesses</h3>
+      <p>Add your first business to segment contacts, pipelines, and reference data.</p>
       {canManageBusinesses && (
         <button className="btn btn-primary" onClick={handleCreateClick}>
           + Add Business
@@ -192,52 +192,54 @@ export default function BusinessesPage() {
   return (
     <div className="data-table-container">
       <div className="table-header">
-        <div>
-          <h2>🏢 Businesses</h2>
-          <p style={{ margin: 0, color: '#64748b' }}>
-            Manage business entities for <strong>{tenant?.company_name || tenant?.tenant_id || 'your tenant'}</strong>
-          </p>
-        </div>
+        <h2>🏢 Businesses</h2>
         {canManageBusinesses && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-primary" onClick={handleCreateClick}>
-              + Add Business
-            </button>
-          </div>
+          <button className="btn btn-primary" onClick={handleCreateClick}>
+            + Add Business
+          </button>
         )}
       </div>
 
-      <div className="filters-bar">
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            placeholder="Search by name, industry..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {!formVisible && (
+        <div style={{ 
+          display: 'flex', 
+          gap: '12px', 
+          alignItems: 'center', 
+          marginBottom: '16px',
+          padding: '0 4px',
+          flexWrap: 'wrap'
+        }}>
+          <div className="search-box" style={{ flex: '1 1 300px' }}>
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Search by name, industry..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
+          >
+            <option value="ALL">All Types</option>
+            <option value="IT_STAFFING">IT Staffing</option>
+            <option value="HEALTHCARE_STAFFING">Healthcare Staffing</option>
+            <option value="GENERAL">General</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '150px' }}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </select>
         </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
-        >
-          <option value="ALL">All Types</option>
-          <option value="IT_STAFFING">IT Staffing</option>
-          <option value="HEALTHCARE_STAFFING">Healthcare Staffing</option>
-          <option value="GENERAL">General</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '150px' }}
-        >
-          <option value="ALL">All Statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-        </select>
-      </div>
+      )}
 
       {error && (
         <div className="alert alert-error" style={{ marginBottom: '16px' }}>
@@ -255,27 +257,9 @@ export default function BusinessesPage() {
       )}
 
       {loading ? (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Default</th>
-              <th>Status</th>
-              <th>Updated</th>
-              {canManageBusinesses && <th style={{ width: '160px' }}>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: BUSINESSES_SKELETON_ROWS }).map((_, index) => (
-              <tr key={index}>
-                <td colSpan={canManageBusinesses ? 6 : 5}>
-                  <div className="skeleton" style={{ height: '20px', margin: '6px 0' }}></div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+          <div className="loading">Loading businesses...</div>
+        </div>
       ) : businesses.length === 0 ? (
         renderEmptyState()
       ) : filteredBusinesses.length === 0 ? (
@@ -288,11 +272,11 @@ export default function BusinessesPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Industry</th>
-              <th>Status</th>
-              <th>Updated</th>
+              <th>Business Name</th>
+              <th style={{ width: '150px' }}>Type</th>
+              <th style={{ width: '150px' }}>Industry</th>
+              <th style={{ width: '120px' }}>Status</th>
+              <th style={{ width: '130px' }}>Last Updated</th>
               {canManageBusinesses && <th style={{ width: '180px' }}>Actions</th>}
             </tr>
           </thead>
@@ -300,16 +284,16 @@ export default function BusinessesPage() {
             {filteredBusinesses.map((business) => (
               <tr key={business.__identifier}>
                 <td>
-                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    {business.business_name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 500 }}>{business.business_name}</span>
                     {business.is_default && (
-                      <span className="status-badge" style={{ background: '#ede9fe', color: '#5b21b6', fontSize: '11px', padding: '3px 8px' }}>
+                      <span className="status-badge" style={{ background: '#ede9fe', color: '#5b21b6', fontSize: '11px', padding: '2px 6px' }}>
                         ★ Default
                       </span>
                     )}
                   </div>
                   {business.description && (
-                    <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px', lineHeight: '1.4' }}>
+                    <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px', lineHeight: '1.3' }}>
                       {business.description}
                     </div>
                   )}
@@ -333,17 +317,22 @@ export default function BusinessesPage() {
                 </td>
                 {canManageBusinesses && (
                   <td>
-                    <div className="action-buttons" style={{ gap: '6px' }}>
-                      <button className="btn btn-sm btn-primary" onClick={() => handleEditClick(business)}>
-                        Edit
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
+                      <button 
+                        className="btn btn-sm btn-secondary" 
+                        onClick={() => handleEditClick(business)}
+                        style={{ minWidth: '70px' }}
+                      >
+                        ✏️ Edit
                       </button>
                       <button
                         className="btn btn-sm btn-danger"
                         onClick={() => handleDeleteClick(business)}
                         disabled={business.is_default}
                         title={business.is_default ? 'Default business cannot be deleted' : undefined}
+                        style={{ minWidth: '70px' }}
                       >
-                        Delete
+                        🗑️ Delete
                       </button>
                     </div>
                   </td>
