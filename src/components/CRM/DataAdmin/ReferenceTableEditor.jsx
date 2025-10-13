@@ -48,6 +48,11 @@ const TABLE_CONFIG = {
     valueColumn: 'referral_source',
     orderBy: 'referral_source',
   },
+  years_experience: {
+    tableName: 'years_of_experience',
+    valueColumn: 'years_of_experience',
+    orderBy: 'years_of_experience',
+  },
 }
 
 const MOCK_DATA = {

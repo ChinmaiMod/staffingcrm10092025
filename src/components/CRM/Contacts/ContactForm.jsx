@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { supabase } from '../../../api/supabaseClient'
+import { useTenant } from '../../../contexts/TenantProvider'
 import MultiSelect from '../common/MultiSelect'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
@@ -82,6 +84,7 @@ const YEARS_EXPERIENCE = ['0', '1 to 3', '4 to 6', '7 to 9', '10 -15', '15+']
 const REFERRAL_SOURCES = ['FB', 'Google', 'Friend']
 
 export default function ContactForm({ contact, onSave, onCancel }) {
+  const { tenant } = useTenant()
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -108,12 +111,15 @@ export default function ContactForm({ contact, onSave, onCancel }) {
   const [availableJobTitles, setAvailableJobTitles] = useState(IT_JOB_TITLES)
   const [attachments, setAttachments] = useState([])
   const [fieldErrors, setFieldErrors] = useState({})
+  const [yearsExperienceOptions, setYearsExperienceOptions] = useState(YEARS_EXPERIENCE)
+  const [loadingYearsExperience, setLoadingYearsExperience] = useState(false)
   
   // Status change tracking
   const initialStatus = useRef(contact?.status || 'Initial Contact')
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState(null)
   const [statusChangeRemarks, setStatusChangeRemarks] = useState('')
+  const yearsExperienceAbortController = useRef(null)
 
   useEffect(() => {
     // Update states based on country
@@ -158,6 +164,59 @@ export default function ContactForm({ contact, onSave, onCancel }) {
       initialStatus.current = contact.status || 'Initial Contact'
     }
   }, [contact])
+
+  useEffect(() => {
+    if (!tenant?.tenant_id) {
+      setYearsExperienceOptions(YEARS_EXPERIENCE)
+      return
+    }
+
+    if (yearsExperienceAbortController.current) {
+      yearsExperienceAbortController.current.abort()
+    }
+
+    const controller = new AbortController()
+    yearsExperienceAbortController.current = controller
+
+    const loadYearsExperience = async () => {
+      try {
+        setLoadingYearsExperience(true)
+
+        const { data: yearsData, error } = await supabase
+          .from('years_of_experience')
+          .select('years_of_experience, business_id')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('business_id', { ascending: true, nullsFirst: true })
+          .order('years_of_experience', { ascending: true })
+          .abortSignal(controller.signal)
+
+        if (error) {
+          throw error
+        }
+
+        const deduped = Array.from(
+          new Set((yearsData || []).map((row) => row.years_of_experience).filter(Boolean))
+        )
+
+        setYearsExperienceOptions(deduped.length > 0 ? deduped : YEARS_EXPERIENCE)
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return
+        }
+        setYearsExperienceOptions(YEARS_EXPERIENCE)
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingYearsExperience(false)
+        }
+      }
+    }
+
+    loadYearsExperience()
+
+    return () => {
+      controller.abort()
+    }
+  }, [tenant?.tenant_id])
 
   const handleChange = (field, value) => {
     // Clear field error when user changes value
@@ -480,12 +539,16 @@ export default function ContactForm({ contact, onSave, onCancel }) {
               <select
                 value={formData.years_experience}
                 onChange={(e) => handleChange('years_experience', e.target.value)}
+                disabled={loadingYearsExperience && yearsExperienceOptions.length === 0}
               >
                 <option value="">Select...</option>
-                {YEARS_EXPERIENCE.map(exp => (
+                {yearsExperienceOptions.map(exp => (
                   <option key={exp} value={exp}>{exp}</option>
                 ))}
               </select>
+              {loadingYearsExperience && (
+                <small className="hint-text">Loading options...</small>
+              )}
             </div>
 
             <div className="form-group">
