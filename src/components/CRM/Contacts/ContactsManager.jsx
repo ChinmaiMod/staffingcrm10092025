@@ -60,7 +60,8 @@ export default function ContactsManager() {
       const { data, error: contactsError } = await supabase
         .from('contacts')
         .select(`
-          contact_id,
+          id,
+          tenant_id,
           first_name,
           last_name,
           email,
@@ -69,16 +70,17 @@ export default function ContactsManager() {
           created_at,
           updated_at,
           remarks,
-          visa_status:visa_status_id (code, label),
-          job_title:job_title_id (title, category),
-          status:status_id (code, label),
-          years_experience:years_experience_id (code, label),
-          referral_source:referral_source_id (code, label),
-          reasons:contact_reasons (reasons_for_contact (code, label)),
-          role_types:contact_role_types (role_types (code, label)),
-          country:country_id (name, code),
-          state:state_id (name, code),
-          city:city_id (name)
+          visa_status,
+          job_title,
+          reason_for_contact,
+          workflow_status,
+          type_of_roles,
+          country,
+          state,
+          city,
+          years_of_experience,
+          referral_source,
+          referred_by
         `)
         .eq('tenant_id', tenant.tenant_id)
         .order('created_at', { ascending: false })
@@ -89,38 +91,53 @@ export default function ContactsManager() {
       }
 
       const normalizedContacts = (data || []).map((contact) => {
-        const reasons = contact.reasons?.map((reason) => reason.reasons_for_contact?.label)?.filter(Boolean) || []
-        const roleTypes = contact.role_types?.map((role) => role.role_types?.label)?.filter(Boolean) || []
-
         const contactTypeRaw = contact.contact_type || null
         const contactTypeKey = contactTypeRaw ? contactTypeRaw.toLowerCase() : null
 
+        const reasons = Array.isArray(contact.reason_for_contact)
+          ? contact.reason_for_contact.filter(Boolean)
+          : contact.reason_for_contact
+          ? [contact.reason_for_contact]
+          : []
+
+        const roleTypes = Array.isArray(contact.type_of_roles)
+          ? contact.type_of_roles.filter(Boolean)
+          : contact.type_of_roles
+          ? [contact.type_of_roles]
+          : []
+
         return {
-          contact_id: contact.contact_id,
+          contact_id: contact.id,
           first_name: contact.first_name,
           last_name: contact.last_name,
           email: contact.email,
           phone: contact.phone,
           contact_type: contactTypeRaw,
           contact_type_key: contactTypeKey,
-          status: contact.status?.label || contact.status?.code || 'Unknown',
-          status_code: contact.status?.code || null,
-          visa_status: contact.visa_status?.label || contact.visa_status?.code || null,
-          visa_status_code: contact.visa_status?.code || null,
-          job_title: contact.job_title?.title || null,
-          job_title_category: contact.job_title?.category || null,
-          years_experience: contact.years_experience?.label || contact.years_experience?.code || null,
-          years_experience_code: contact.years_experience?.code || null,
-          referral_source: contact.referral_source?.label || contact.referral_source?.code || null,
-          referral_source_code: contact.referral_source?.code || null,
+          status: contact.workflow_status || 'Unknown',
+          status_code: contact.workflow_status || null,
+          visa_status: contact.visa_status || null,
+          visa_status_code: contact.visa_status || null,
+          job_title: contact.job_title || null,
+          job_title_category:
+            contactTypeKey === 'healthcare_candidate'
+              ? 'HEALTHCARE'
+              : contactTypeKey === 'it_candidate'
+              ? 'IT'
+              : null,
+          years_experience: contact.years_of_experience || null,
+          years_experience_code: contact.years_of_experience || null,
+          referral_source: contact.referral_source || null,
+          referral_source_code: contact.referral_source || null,
           reasons_for_contact: reasons,
           role_types: roleTypes,
           remarks: contact.remarks,
-          country: contact.country?.name || null,
-          country_code: contact.country?.code || null,
-          state: contact.state?.name || null,
-          state_code: contact.state?.code || null,
-          city: contact.city?.name || null,
+          country: contact.country || null,
+          country_code: contact.country || null,
+          state: contact.state || null,
+          state_code: contact.state || null,
+          city: contact.city || null,
+          referred_by: contact.referred_by || null,
           created_at: contact.created_at,
           updated_at: contact.updated_at
         }
