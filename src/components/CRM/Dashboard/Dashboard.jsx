@@ -1,46 +1,98 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../../api/supabaseClient'
+import { useTenant } from '../../../contexts/TenantProvider'
 
-// Mock data for demonstration - replace with actual API calls
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { tenant } = useTenant()
   const [stats, setStats] = useState({
     total: 0,
     thisWeek: 0,
     thisMonth: 0,
     byStatus: {}
   })
+  const [loading, setLoading] = useState(true)
 
   const [timeframe, setTimeframe] = useState('week') // 'week' or 'month'
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    setStats({
-      total: 247,
-      thisWeek: 18,
-      thisMonth: 65,
-      byStatus: {
-        week: {
-          'Initial Contact': 5,
-          'Spoke to candidate': 4,
-          'Resume needs to be prepared': 3,
-          'Resume prepared and sent for review': 2,
-          'Assigned to Recruiter': 2,
-          'Recruiter started marketing': 1,
-          'Placed into Job': 1,
-        },
-        month: {
-          'Initial Contact': 20,
-          'Spoke to candidate': 15,
-          'Resume needs to be prepared': 10,
-          'Resume prepared and sent for review': 8,
-          'Assigned to Recruiter': 5,
-          'Recruiter started marketing': 4,
-          'Placed into Job': 3,
-        }
+    const loadStats = async () => {
+      if (!tenant?.tenant_id) return
+
+      try {
+        setLoading(true)
+
+        // Get total contacts count
+        const { count: totalCount } = await supabase
+          .from('contacts')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.tenant_id)
+
+        // Get this week's contacts (last 7 days)
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        const { count: weekCount } = await supabase
+          .from('contacts')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.tenant_id)
+          .gte('created_at', weekAgo.toISOString())
+
+        // Get this month's contacts (last 30 days)
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 30)
+        const { count: monthCount } = await supabase
+          .from('contacts')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.tenant_id)
+          .gte('created_at', monthAgo.toISOString())
+
+        // Get contacts by status for this week
+        const { data: weekByStatus } = await supabase
+          .from('contacts')
+          .select('workflow_status')
+          .eq('tenant_id', tenant.tenant_id)
+          .gte('created_at', weekAgo.toISOString())
+
+        // Get contacts by status for this month
+        const { data: monthByStatus } = await supabase
+          .from('contacts')
+          .select('workflow_status')
+          .eq('tenant_id', tenant.tenant_id)
+          .gte('created_at', monthAgo.toISOString())
+
+        // Count by status for week
+        const weekStatusCounts = {}
+        weekByStatus?.forEach(contact => {
+          const status = contact.workflow_status || 'No Status'
+          weekStatusCounts[status] = (weekStatusCounts[status] || 0) + 1
+        })
+
+        // Count by status for month
+        const monthStatusCounts = {}
+        monthByStatus?.forEach(contact => {
+          const status = contact.workflow_status || 'No Status'
+          monthStatusCounts[status] = (monthStatusCounts[status] || 0) + 1
+        })
+
+        setStats({
+          total: totalCount || 0,
+          thisWeek: weekCount || 0,
+          thisMonth: monthCount || 0,
+          byStatus: {
+            week: weekStatusCounts,
+            month: monthStatusCounts
+          }
+        })
+      } catch (error) {
+        console.error('Error loading dashboard stats:', error)
+      } finally {
+        setLoading(false)
       }
-    })
-  }, [])
+    }
+
+    loadStats()
+  }, [tenant?.tenant_id])
 
   const statusColors = {
     'Initial Contact': '#3b82f6',
@@ -97,6 +149,14 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {loading && (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+          Loading dashboard statistics...
+        </div>
+      )}
+
+      {!loading && (
+        <>
       <div className="stats-grid">
         <div 
           className="stat-card" 
@@ -217,6 +277,8 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
