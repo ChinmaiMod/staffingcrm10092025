@@ -29,13 +29,13 @@ const AssignUserRoles = () => {
       .select(`
         *,
         user_role_assignments!user_role_assignments_user_id_fkey(
-          id,
+          assignment_id,
           valid_from,
           valid_until,
           user_roles(
             role_id,
             role_name,
-            role_level
+            hierarchy_level
           )
         )
       `)
@@ -259,23 +259,23 @@ const AssignUserRoles = () => {
         await supabase
           .from('role_business_access')
           .delete()
-          .eq('assignment_id', existingAssignment.id);
+          .eq('assignment_id', existingAssignment.assignment_id);
 
         await supabase
           .from('role_contact_type_access')
           .delete()
-          .eq('assignment_id', existingAssignment.id);
+          .eq('assignment_id', existingAssignment.assignment_id);
 
         await supabase
           .from('role_pipeline_access')
           .delete()
-          .eq('assignment_id', existingAssignment.id);
+          .eq('assignment_id', existingAssignment.assignment_id);
 
         // Delete the role assignment
         await supabase
           .from('user_role_assignments')
           .delete()
-          .eq('id', existingAssignment.id);
+          .eq('assignment_id', existingAssignment.assignment_id);
       }
 
       // Create new role assignment
@@ -296,7 +296,7 @@ const AssignUserRoles = () => {
       // Insert business access if applicable
       if (assignmentForm.business_ids.length > 0) {
         const businessAccess = assignmentForm.business_ids.map(bid => ({
-          assignment_id: newAssignment.id,
+          assignment_id: newAssignment.assignment_id,
           business_id: bid
         }));
 
@@ -310,7 +310,7 @@ const AssignUserRoles = () => {
       // Insert contact type access if applicable
       if (assignmentForm.contact_type_ids.length > 0) {
         const contactTypeAccess = assignmentForm.contact_type_ids.map(ctid => ({
-          assignment_id: newAssignment.id,
+          assignment_id: newAssignment.assignment_id,
           contact_type_id: ctid
         }));
 
@@ -324,7 +324,7 @@ const AssignUserRoles = () => {
       // Insert pipeline access if applicable
       if (assignmentForm.pipeline_ids.length > 0) {
         const pipelineAccess = assignmentForm.pipeline_ids.map(pid => ({
-          assignment_id: newAssignment.id,
+          assignment_id: newAssignment.assignment_id,
           pipeline_id: pid
         }));
 
@@ -362,23 +362,23 @@ const AssignUserRoles = () => {
       await supabase
         .from('role_business_access')
         .delete()
-        .eq('assignment_id', assignment.id);
+        .eq('assignment_id', assignment.assignment_id);
 
       await supabase
         .from('role_contact_type_access')
         .delete()
-        .eq('assignment_id', assignment.id);
+        .eq('assignment_id', assignment.assignment_id);
 
       await supabase
         .from('role_pipeline_access')
         .delete()
-        .eq('assignment_id', assignment.id);
+        .eq('assignment_id', assignment.assignment_id);
 
       // Delete role assignment
       const { error: deleteError } = await supabase
         .from('user_role_assignments')
         .delete()
-        .eq('id', assignment.id);
+        .eq('assignment_id', assignment.assignment_id);
 
       if (deleteError) throw deleteError;
 
