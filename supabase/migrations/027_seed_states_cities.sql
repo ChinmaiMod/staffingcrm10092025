@@ -1,8 +1,58 @@
--- ============================================
--- Seed core state and city reference data
--- ============================================
+-- Ensure lookup tables exist (idempotent)
+CREATE TABLE IF NOT EXISTS countries (
+  country_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code text NOT NULL,
+  name text NOT NULL
+);
 
--- Ensure countries exist (idempotent)
+CREATE TABLE IF NOT EXISTS states (
+  state_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  country_id uuid REFERENCES countries(country_id) ON DELETE CASCADE,
+  code text,
+  name text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cities (
+  city_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  state_id uuid REFERENCES states(state_id) ON DELETE CASCADE,
+  name text NOT NULL
+);
+
+-- Helpful indexes for lookups
+CREATE INDEX IF NOT EXISTS idx_countries_code ON countries (lower(code));
+CREATE INDEX IF NOT EXISTS idx_states_country ON states (country_id);
+CREATE INDEX IF NOT EXISTS idx_states_name ON states (lower(name));
+CREATE INDEX IF NOT EXISTS idx_cities_state ON cities (state_id);
+CREATE INDEX IF NOT EXISTS idx_cities_name ON cities (lower(name));
+
+-- Enable RLS if not already enabled
+ALTER TABLE countries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cities ENABLE ROW LEVEL SECURITY;
+
+-- Ensure global read access policies exist
+DO $$
+BEGIN
+  CREATE POLICY "refs_select_countries" ON countries FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY "refs_select_states" ON states FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY "refs_select_cities" ON cities FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
+-- Seed countries (idempotent)
 WITH country_rows AS (
   SELECT * FROM (
     VALUES
