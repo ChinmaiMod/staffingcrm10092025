@@ -42,26 +42,22 @@ function UserRolesManagement() {
   const [selectedMenuItems, setSelectedMenuItems] = useState([]);
 
   const loadRoles = useCallback(async () => {
-    if (!profile?.tenant_id) {
-      return;
-    }
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('tenant_id', profile.tenant_id)
         .order('role_level', { ascending: false });
 
       if (error) throw error;
       setRoles(data || []);
     } catch (err) {
       console.error('Error loading roles:', err);
-      setError('Failed to load roles');
+      setError('Failed to load roles: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [profile?.tenant_id]);
+  }, []);
 
   const loadMenuItems = useCallback(async () => {
     try {
@@ -79,13 +75,9 @@ function UserRolesManagement() {
   }, []);
 
   useEffect(() => {
-    if (!profile?.tenant_id) {
-      setLoading(false);
-      return;
-    }
     loadRoles();
     loadMenuItems();
-  }, [profile?.tenant_id, loadRoles, loadMenuItems]);
+  }, [loadRoles, loadMenuItems]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -203,11 +195,10 @@ function UserRolesManagement() {
           .eq('role_id', roleId);
       } else {
         // Create new role
-        const { data: newRole, error: insertError } = await supabase
+        const { data: newRole, error: insertError} = await supabase
           .from('user_roles')
           .insert([{
             ...formData,
-            tenant_id: profile.tenant_id,
             created_by: profile.id,
           }])
           .select()

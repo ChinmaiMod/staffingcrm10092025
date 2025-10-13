@@ -24,27 +24,18 @@ const AssignUserRoles = () => {
   });
 
   const loadUsers = useCallback(async (tenantId) => {
-    const { data, error } = await supabase
+    const { data, error} = await supabase
       .from('profiles')
       .select(`
         *,
-        user_role_assignments(
+        user_role_assignments!user_role_assignments_user_id_fkey(
           id,
           valid_from,
           valid_until,
           user_roles(
-            id,
+            role_id,
             role_name,
-            hierarchy_level
-          ),
-          role_business_access(
-            businesses(id, business_name)
-          ),
-          role_contact_type_access(
-            contact_types(id, type_name)
-          ),
-          role_pipeline_access(
-            pipelines(id, name)
+            role_level
           )
         )
       `)
@@ -98,7 +89,7 @@ const AssignUserRoles = () => {
           .from('profiles')
           .select(`
             *,
-            user_role_assignments!inner(
+            user_role_assignments!user_role_assignments_user_id_fkey!inner(
               user_roles(*)
             )
           `)
