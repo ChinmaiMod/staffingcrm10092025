@@ -39,8 +39,8 @@ serve(async (req) => {
       }
     })
 
-    const { userId, email, companyName, phoneNumber } = await req.json()
-    console.log('Request data:', { userId: !!userId, email: !!email, companyName, phoneNumber: !!phoneNumber })
+    const { userId, email, fullName, companyName, phoneNumber } = await req.json()
+    console.log('Request data:', { userId: !!userId, email: !!email, fullName: !!fullName, companyName, phoneNumber: !!phoneNumber })
 
     if (!userId || !email || !companyName) {
       throw new Error('Missing required fields: userId, email, companyName')
@@ -256,6 +256,7 @@ serve(async (req) => {
       .insert({
         id: userId,
         email: email.toLowerCase(),
+        full_name: fullName?.trim() || null,
         phone_number: phoneNumber || null,
         tenant_id: tenant.tenant_id,
         role: 'ADMIN',

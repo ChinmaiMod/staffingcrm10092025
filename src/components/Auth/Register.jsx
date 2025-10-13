@@ -18,6 +18,7 @@ export default function Register() {
   const { signUp } = useAuth()
   
   const [formData, setFormData] = useState({
+    fullName: '',
     email: '',
     company: '',
     phone: '',
@@ -32,6 +33,13 @@ export default function Register() {
 
   const validateForm = () => {
     const errors = {}
+    
+    // Validate full name
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Full name is required'
+    } else if (formData.fullName.trim().length < 2) {
+      errors.fullName = 'Name must be at least 2 characters'
+    }
     
     // Validate company name
     const companyValidation = validateCompanyName(formData.company)
@@ -117,6 +125,7 @@ export default function Register() {
             body: {
               userId: data.user.id,
               email: formData.email.trim(),
+              fullName: formData.fullName.trim(),
               companyName: formData.company.trim(),
               phoneNumber: formData.phone.trim() || null,
             },
@@ -247,6 +256,23 @@ export default function Register() {
         {success && <div className="alert alert-success">{success}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
+          <div className="form-group">
+            <label htmlFor="fullName">Full Name *</label>
+            <input
+              type="text"
+              id="fullName"
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
+              className={fieldErrors.fullName ? 'error' : ''}
+              placeholder="John Doe"
+              autoComplete="name"
+            />
+            {fieldErrors.fullName && (
+              <small className="error-text">{fieldErrors.fullName}</small>
+            )}
+          </div>
+
           <div className="form-group">
             <label htmlFor="company">Company Name *</label>
             <input
