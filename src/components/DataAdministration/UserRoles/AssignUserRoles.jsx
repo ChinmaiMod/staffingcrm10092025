@@ -35,7 +35,7 @@ const AssignUserRoles = () => {
           user_roles(
             role_id,
             role_name,
-            hierarchy_level
+            role_level
           )
         )
       `)
@@ -56,8 +56,8 @@ const AssignUserRoles = () => {
     const { data, error } = await supabase
       .from('user_roles')
       .select('*')
-      .lte('hierarchy_level', maxLevel)
-      .order('hierarchy_level');
+      .lte('role_level', maxLevel)
+      .order('role_level');
 
     if (error) throw error;
     setRoles(data || []);
@@ -113,7 +113,7 @@ const AssignUserRoles = () => {
         await loadUsers(profileData.tenant_id);
 
         // Load available roles (based on current user's level)
-        await loadRoles(userRole.hierarchy_level);
+        await loadRoles(userRole.role_level);
 
         // Load businesses for the tenant
         await loadBusinesses(profileData.tenant_id);
@@ -183,10 +183,10 @@ const AssignUserRoles = () => {
     setAssignmentForm(prev => ({ ...prev, role_id: roleId }));
 
     // Find the selected role
-    const selectedRole = roles.find(r => r.id === roleId);
+    const selectedRole = roles.find(r => r.role_id === roleId);
     
     // Reset business/contact type/pipeline scoping if role doesn't need it
-    if (selectedRole && selectedRole.hierarchy_level < 3) {
+    if (selectedRole && selectedRole.role_level < 3) {
       setAssignmentForm(prev => ({
         ...prev,
         business_ids: [],
@@ -229,10 +229,10 @@ const AssignUserRoles = () => {
         return;
       }
 
-      const selectedRole = roles.find(r => r.id === assignmentForm.role_id);
+      const selectedRole = roles.find(r => r.role_id === assignmentForm.role_id);
 
       // For Lead and Manager roles, require business selection
-      if (selectedRole.hierarchy_level >= 3 && selectedRole.hierarchy_level <= 4) {
+      if (selectedRole.role_level >= 3 && selectedRole.role_level <= 4) {
         if (assignmentForm.business_ids.length === 0) {
           setError('Please select at least one business for this role level');
           return;
@@ -420,8 +420,8 @@ const AssignUserRoles = () => {
     );
   }
 
-  const selectedRole = roles.find(r => r.id === assignmentForm.role_id);
-  const requiresBusinessScope = selectedRole && selectedRole.hierarchy_level >= 3 && selectedRole.hierarchy_level <= 4;
+  const selectedRole = roles.find(r => r.role_id === assignmentForm.role_id);
+  const requiresBusinessScope = selectedRole && selectedRole.role_level >= 3 && selectedRole.role_level <= 4;
 
   return (
     <div className="assign-user-roles">
@@ -474,14 +474,14 @@ const AssignUserRoles = () => {
                   <td>{user.email}</td>
                   <td>
                     {role ? (
-                      <span className={`role-badge ${getRoleLevelClass(role.hierarchy_level)}`}>
+                      <span className={`role-badge ${getRoleLevelClass(role.role_level)}`}>
                         {role.role_name}
                       </span>
                     ) : (
                       <span className="no-role">No Role Assigned</span>
                     )}
                   </td>
-                  <td>{role ? `Level ${role.hierarchy_level}` : '-'}</td>
+                  <td>{role ? `Level ${role.role_level}` : '-'}</td>
                   <td>{assignment ? formatDate(assignment.valid_from) : '-'}</td>
                   <td>{assignment ? formatDate(assignment.valid_until) : '-'}</td>
                   <td>
@@ -550,8 +550,8 @@ const AssignUserRoles = () => {
                     >
                       <option value="">Select a role...</option>
                       {roles.map(role => (
-                        <option key={role.id} value={role.id}>
-                          Level {role.hierarchy_level} - {role.role_name}
+                        <option key={role.role_id} value={role.role_id}>
+                          Level {role.role_level} - {role.role_name}
                         </option>
                       ))}
                     </select>
