@@ -8,6 +8,7 @@ import Register from './components/Auth/Register'
 import VerifyEmail from './components/Auth/VerifyEmail'
 import ForgotPassword from './components/Auth/ForgotPassword'
 import ResetPassword from './components/Auth/ResetPassword'
+import AcceptInvitation from './components/Auth/AcceptInvitation'
 
 // Billing Components
 import Plans from './components/Billing/Plans'
@@ -40,6 +41,7 @@ function App() {
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
           {/* Protected Routes */}
           <Route

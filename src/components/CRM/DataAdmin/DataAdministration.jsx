@@ -6,10 +6,12 @@ import BusinessesPage from './Businesses/BusinessesPage'
 import InternalStaffPage from './InternalStaff/InternalStaffPage'
 import UserRolesManagement from '../../DataAdministration/UserRoles/UserRolesManagement'
 import AssignUserRoles from '../../DataAdministration/UserRoles/AssignUserRoles'
+import InviteUsers from '../../DataAdministration/InviteUsers/InviteUsers'
 
 const REFERENCE_TABLES = [
   { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
   { id: 'assign_roles', label: 'Assign User Roles', icon: '🛡️', path: 'assign-roles' },
+  { id: 'invite_users', label: 'Invite Users', icon: '📧', path: 'invite-users' },
   { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: 'pipelines' },
   { id: 'businesses', label: 'Businesses', icon: '🏢', path: 'businesses' },
   { id: 'internal_staff', label: 'Internal Staff', icon: '👥', path: 'internal-staff' },
@@ -43,6 +45,7 @@ export default function DataAdministration() {
     <Routes>
       <Route path="user-roles" element={<UserRolesManagement />} />
       <Route path="assign-roles" element={<AssignUserRoles />} />
+      <Route path="invite-users" element={<InviteUsers />} />
       <Route path="businesses" element={<BusinessesPage />} />
       <Route path="internal-staff" element={<InternalStaffPage />} />
       <Route path="pipelines" element={<PipelineAdmin />} />
