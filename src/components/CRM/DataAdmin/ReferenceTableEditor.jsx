@@ -59,6 +59,10 @@ const TABLE_CONFIG = {
     primaryKeyCandidates: ['country_id'],
     orderBy: 'name',
     isGlobal: true, // No tenant or business filtering
+    hideIdColumn: true,
+    additionalColumns: [
+      { key: 'code', label: 'Code', width: '100px' }
+    ],
   },
   states: {
     tableName: 'states',
@@ -66,6 +70,13 @@ const TABLE_CONFIG = {
     primaryKeyCandidates: ['state_id'],
     orderBy: 'name',
     isGlobal: true, // No tenant or business filtering
+    hideIdColumn: true,
+    needsRelation: 'country', // Need to select country when adding
+    selectQuery: '*, countries(name, code)',
+    additionalColumns: [
+      { key: 'code', label: 'State Code', width: '120px' },
+      { key: 'country_name', label: 'Country', width: '150px', accessor: (item) => item.raw?.countries?.name }
+    ],
   },
   cities: {
     tableName: 'cities',
@@ -73,6 +84,13 @@ const TABLE_CONFIG = {
     primaryKeyCandidates: ['city_id'],
     orderBy: 'name',
     isGlobal: true, // No tenant or business filtering
+    hideIdColumn: true,
+    needsRelation: 'state', // Need to select state when adding
+    selectQuery: '*, states(name, code, countries(name, code))',
+    additionalColumns: [
+      { key: 'state_name', label: 'State', width: '150px', accessor: (item) => item.raw?.states?.name },
+      { key: 'country_name', label: 'Country', width: '150px', accessor: (item) => item.raw?.states?.countries?.name }
+    ],
   },
 }
 
@@ -142,6 +160,10 @@ export default function ReferenceTableEditor({ table }) {
   const [newItemValue, setNewItemValue] = useState('')
   const [error, setError] = useState('')
   const [fieldError, setFieldError] = useState('')
+  
+  // For global tables with relations (states need countries, cities need states)
+  const [relationData, setRelationData] = useState([])
+  const [selectedRelationId, setSelectedRelationId] = useState('')
 
   const canToggleStatus = useMemo(() => Boolean(tableConfig?.toggleField), [tableConfig])
 
@@ -176,6 +198,44 @@ export default function ReferenceTableEditor({ table }) {
     })
   }, [isSupabaseBacked, tenant?.tenant_id])
 
+  const loadRelationData = useCallback(async () => {
+    if (!tableConfig?.needsRelation) {
+      setRelationData([])
+      return
+    }
+
+    try {
+      let relationTable = ''
+      let selectFields = '*'
+      
+      if (tableConfig.needsRelation === 'country') {
+        relationTable = 'countries'
+        selectFields = 'country_id, name, code'
+      } else if (tableConfig.needsRelation === 'state') {
+        relationTable = 'states'
+        selectFields = 'state_id, name, code, countries(name)'
+      }
+
+      const { data, error: relationError } = await supabase
+        .from(relationTable)
+        .select(selectFields)
+        .order('name', { ascending: true })
+
+      if (relationError) throw relationError
+
+      setRelationData(data || [])
+      
+      // Auto-select first item if available
+      if (data && data.length > 0 && !selectedRelationId) {
+        const idField = tableConfig.needsRelation === 'country' ? 'country_id' : 'state_id'
+        setSelectedRelationId(data[0][idField])
+      }
+    } catch (err) {
+      console.error('Error loading relation data:', err)
+      setRelationData([])
+    }
+  }, [tableConfig?.needsRelation, selectedRelationId])
+
   const loadItems = useCallback(async () => {
     try {
       setLoading(true)
@@ -202,7 +262,7 @@ export default function ReferenceTableEditor({ table }) {
 
       let query = supabase
         .from(tableConfig.tableName)
-        .select('*')
+        .select(tableConfig.selectQuery || '*')
 
       // Only filter by tenant_id for non-global tables
       if (!tableConfig.isGlobal) {
@@ -242,6 +302,10 @@ export default function ReferenceTableEditor({ table }) {
   useEffect(() => {
     loadBusinesses()
   }, [loadBusinesses])
+
+  useEffect(() => {
+    loadRelationData()
+  }, [loadRelationData])
 
   useEffect(() => {
     loadItems()
@@ -303,6 +367,14 @@ export default function ReferenceTableEditor({ table }) {
         }
       }
 
+      // For global tables with relations, require relation selection
+      if (tableConfig.isGlobal && tableConfig.needsRelation) {
+        if (!selectedRelationId) {
+          setFieldError(`Please select a ${tableConfig.needsRelation} first`)
+          return
+        }
+      }
+
       const payload = {
         [tableConfig.valueColumn]: trimmedValue,
       }
@@ -311,6 +383,15 @@ export default function ReferenceTableEditor({ table }) {
       if (!tableConfig.isGlobal) {
         payload.tenant_id = tenant.tenant_id
         payload.business_id = selectedBusinessId
+      }
+
+      // Add relation ID for global tables (country_id for states, state_id for cities)
+      if (tableConfig.isGlobal && tableConfig.needsRelation) {
+        if (tableConfig.needsRelation === 'country') {
+          payload.country_id = selectedRelationId
+        } else if (tableConfig.needsRelation === 'state') {
+          payload.state_id = selectedRelationId
+        }
       }
 
       if (tableConfig.insertDefaults) {
@@ -517,6 +598,30 @@ export default function ReferenceTableEditor({ table }) {
               </label>
             </div>
           )}
+          {tableConfig?.needsRelation && relationData.length > 0 && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label style={{ fontSize: '14px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {tableConfig.needsRelation === 'country' ? 'Country' : 'State'}
+                <select
+                  value={selectedRelationId}
+                  onChange={(event) => setSelectedRelationId(event.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px' }}
+                >
+                  {relationData.map((item) => {
+                    const id = tableConfig.needsRelation === 'country' ? item.country_id : item.state_id
+                    const label = tableConfig.needsRelation === 'state' && item.countries
+                      ? `${item.name} (${item.countries.name})`
+                      : `${item.name}${item.code ? ` (${item.code})` : ''}`
+                    return (
+                      <option key={id} value={id}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <input
               type="text"
@@ -546,7 +651,7 @@ export default function ReferenceTableEditor({ table }) {
         </div>
       )}
 
-      {isSupabaseBacked && businesses.length === 0 ? (
+      {isSupabaseBacked && !tableConfig?.isGlobal && businesses.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🏢</div>
           <h3>No Businesses Found</h3>
@@ -562,9 +667,14 @@ export default function ReferenceTableEditor({ table }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: '60px' }}>ID</th>
-              {isSupabaseBacked && <th style={{ width: '180px' }}>Business</th>}
+              {!tableConfig?.hideIdColumn && <th style={{ width: '60px' }}>ID</th>}
+              {isSupabaseBacked && !tableConfig?.isGlobal && <th style={{ width: '180px' }}>Business</th>}
               <th>Value</th>
+              {tableConfig?.additionalColumns?.map((col) => (
+                <th key={col.key} style={{ width: col.width || 'auto' }}>
+                  {col.label}
+                </th>
+              ))}
               {canToggleStatus && <th style={{ width: '120px' }}>Status</th>}
               <th style={{ width: '200px' }}>Actions</th>
             </tr>
@@ -572,8 +682,8 @@ export default function ReferenceTableEditor({ table }) {
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
-                {isSupabaseBacked && (
+                {!tableConfig?.hideIdColumn && <td>{item.id}</td>}
+                {isSupabaseBacked && !tableConfig?.isGlobal && (
                   <td>{item.business_id ? (businessNameLookup[normalizeBusinessId(item.business_id)] || 'Unknown Business') : 'Global'}</td>
                 )}
                 <td>
@@ -592,6 +702,11 @@ export default function ReferenceTableEditor({ table }) {
                     </span>
                   )}
                 </td>
+                {tableConfig?.additionalColumns?.map((col) => (
+                  <td key={col.key}>
+                    {col.accessor ? col.accessor(item) : item.raw?.[col.key]}
+                  </td>
+                ))}
                 {canToggleStatus && (
                   <td>
                     <span className={`status-badge ${item.is_active === false ? '' : 'initial-contact'}`}>
