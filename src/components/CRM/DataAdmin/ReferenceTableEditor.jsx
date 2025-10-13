@@ -58,18 +58,21 @@ const TABLE_CONFIG = {
     valueColumn: 'name',
     primaryKeyCandidates: ['country_id'],
     orderBy: 'name',
+    isGlobal: true, // No tenant or business filtering
   },
   states: {
     tableName: 'states',
     valueColumn: 'name',
     primaryKeyCandidates: ['state_id'],
     orderBy: 'name',
+    isGlobal: true, // No tenant or business filtering
   },
   cities: {
     tableName: 'cities',
     valueColumn: 'name',
     primaryKeyCandidates: ['city_id'],
     orderBy: 'name',
+    isGlobal: true, // No tenant or business filtering
   },
 }
 
@@ -190,7 +193,8 @@ export default function ReferenceTableEditor({ table }) {
         return
       }
 
-      if (!tenant?.tenant_id) {
+      // Global tables don't require tenant context
+      if (!tableConfig.isGlobal && !tenant?.tenant_id) {
         setItems([])
         setLoading(false)
         return
@@ -199,7 +203,11 @@ export default function ReferenceTableEditor({ table }) {
       let query = supabase
         .from(tableConfig.tableName)
         .select('*')
-        .eq('tenant_id', tenant.tenant_id)
+
+      // Only filter by tenant_id for non-global tables
+      if (!tableConfig.isGlobal) {
+        query = query.eq('tenant_id', tenant.tenant_id)
+      }
 
       if (tableConfig.filters) {
         Object.entries(tableConfig.filters).forEach(([key, value]) => {
@@ -207,7 +215,8 @@ export default function ReferenceTableEditor({ table }) {
         })
       }
 
-      if (selectedBusinessId) {
+      // Only filter by business_id for non-global tables
+      if (!tableConfig.isGlobal && selectedBusinessId) {
         query = query.or(`business_id.eq.${selectedBusinessId},business_id.is.null`)
       }
 
@@ -281,20 +290,27 @@ export default function ReferenceTableEditor({ table }) {
         return
       }
 
-      if (!selectedBusinessId) {
-        setFieldError('Select a business before adding new values')
-        return
-      }
+      // For non-global tables, require business selection and tenant
+      if (!tableConfig.isGlobal) {
+        if (!selectedBusinessId) {
+          setFieldError('Select a business before adding new values')
+          return
+        }
 
-      if (!tenant?.tenant_id) {
-        setError('Tenant context unavailable. Please try again later.')
-        return
+        if (!tenant?.tenant_id) {
+          setError('Tenant context unavailable. Please try again later.')
+          return
+        }
       }
 
       const payload = {
-        tenant_id: tenant.tenant_id,
-        business_id: selectedBusinessId,
         [tableConfig.valueColumn]: trimmedValue,
+      }
+
+      // Only add tenant_id and business_id for non-global tables
+      if (!tableConfig.isGlobal) {
+        payload.tenant_id = tenant.tenant_id
+        payload.business_id = selectedBusinessId
       }
 
       if (tableConfig.insertDefaults) {
@@ -362,11 +378,17 @@ export default function ReferenceTableEditor({ table }) {
 
         const primaryKeyColumn = item.primaryKeyColumn || 'id'
 
-        const { error: updateError } = await supabase
+        let updateQuery = supabase
           .from(tableConfig.tableName)
           .update({ [tableConfig.valueColumn]: trimmedValue })
           .eq(primaryKeyColumn, item.id)
-          .eq('tenant_id', tenant?.tenant_id)
+
+        // Only filter by tenant_id for non-global tables
+        if (!tableConfig.isGlobal) {
+          updateQuery = updateQuery.eq('tenant_id', tenant?.tenant_id)
+        }
+
+        const { error: updateError } = await updateQuery
 
         if (updateError) {
           throw updateError
@@ -401,11 +423,17 @@ export default function ReferenceTableEditor({ table }) {
 
       const nextStatus = !item.is_active
 
-      const { error: toggleError } = await supabase
+      let toggleQuery = supabase
         .from(tableConfig.tableName)
         .update({ [tableConfig.toggleField]: nextStatus })
         .eq(item.primaryKeyColumn || 'id', item.id)
-        .eq('tenant_id', tenant?.tenant_id)
+
+      // Only filter by tenant_id for non-global tables
+      if (!tableConfig.isGlobal) {
+        toggleQuery = toggleQuery.eq('tenant_id', tenant?.tenant_id)
+      }
+
+      const { error: toggleError } = await toggleQuery
 
       if (toggleError) {
         throw toggleError
@@ -432,11 +460,17 @@ export default function ReferenceTableEditor({ table }) {
         return
       }
 
-      const { error: deleteError } = await supabase
+      let deleteQuery = supabase
         .from(tableConfig.tableName)
         .delete()
         .eq(item.primaryKeyColumn || 'id', item.id)
-        .eq('tenant_id', tenant?.tenant_id)
+
+      // Only filter by tenant_id for non-global tables
+      if (!tableConfig.isGlobal) {
+        deleteQuery = deleteQuery.eq('tenant_id', tenant?.tenant_id)
+      }
+
+      const { error: deleteError } = await deleteQuery
 
       if (deleteError) {
         throw deleteError
@@ -464,7 +498,7 @@ export default function ReferenceTableEditor({ table }) {
       <div className="table-header">
         <h2>{table.icon} {table.label}</h2>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexDirection: 'column' }}>
-          {isSupabaseBacked && (
+          {isSupabaseBacked && !tableConfig.isGlobal && (
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <label style={{ fontSize: '14px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 Business
