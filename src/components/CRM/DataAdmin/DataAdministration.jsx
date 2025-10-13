@@ -6,7 +6,7 @@ import BusinessesPage from './Businesses/BusinessesPage'
 import InternalStaffPage from './InternalStaff/InternalStaffPage'
 import UserRolesManagement from '../../DataAdministration/UserRoles/UserRolesManagement'
 import AssignUserRoles from '../../DataAdministration/UserRoles/AssignUserRoles'
-import InviteUsers from '../../DataAdministration/InviteUsers/InviteUsers'
+import InviteUsers from '../../DataAdministration/UserInvitations/InviteUsers'
 
 const REFERENCE_TABLES = [
   { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
