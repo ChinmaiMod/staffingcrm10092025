@@ -4,13 +4,18 @@ import { supabase } from '../../../../api/supabaseClient'
 import { useTenant } from '../../../../contexts/TenantProvider'
 import { useAuth } from '../../../../contexts/AuthProvider'
 
-const SKELETON_ROWS = 6
 const STATUS_FILTERS = [
   { value: 'ALL', label: 'All statuses' },
   { value: 'ACTIVE', label: 'Active' },
-  { value: 'ON_LEAVE', label: 'On leave' },
-  { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'ON_LEAVE', label: 'On Leave' },
+  { value: 'INACTIVE', label: 'Inactive' }
 ]
+
+const STATUS_BADGES = {
+  ACTIVE: { label: 'Active', tone: 'status-active' },
+  ON_LEAVE: { label: 'On Leave', tone: 'status-on-leave' },
+  INACTIVE: { label: 'Inactive', tone: 'status-inactive' }
+}
 
 const normalizeStaffRecord = (record) => {
   if (!record) return null
@@ -26,7 +31,7 @@ const normalizeStaffRecord = (record) => {
     business_name: business?.business_name || null,
     start_date: record.start_date || null,
     end_date: record.end_date || null,
-    is_billable: record.is_billable ?? false,
+    is_billable: record.is_billable ?? false
   }
 }
 
@@ -36,7 +41,7 @@ const normalizeBusiness = (business) => {
   return {
     id,
     name: business.business_name || 'Unnamed Business',
-    isDefault: business.is_default || false,
+    isDefault: business.is_default || false
   }
 }
 
@@ -75,21 +80,23 @@ export default function InternalStaffPage() {
       return
     }
 
-    const { data, error: fetchError } = await supabase
-      .from('businesses')
-      .select('business_id, business_name, is_default')
-      .eq('tenant_id', tenant.tenant_id)
-      .order('is_default', { ascending: false })
-      .order('business_name', { ascending: true })
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('businesses')
+        .select('business_id, business_name, is_default')
+        .eq('tenant_id', tenant.tenant_id)
+        .order('is_default', { ascending: false })
+        .order('business_name', { ascending: true })
 
-    if (fetchError) {
+      if (fetchError) throw fetchError
+
+      const mapped = (data || []).map(normalizeBusiness).filter(Boolean)
+      setBusinesses(mapped)
+    } catch (fetchError) {
       console.error('Failed to load businesses:', fetchError)
       setBusinesses([])
-      return
+      setError(fetchError.message || 'Unable to load businesses for staff assignment.')
     }
-
-    const mapped = (data || []).map(normalizeBusiness).filter(Boolean)
-    setBusinesses(mapped)
   }, [tenant?.tenant_id])
 
   const loadStaff = useCallback(async () => {
@@ -140,21 +147,19 @@ export default function InternalStaffPage() {
 
     if (businessFilter !== 'ALL') {
       results = results.filter((member) => {
-        if (!businessFilter) return !member.business_id
+        if (businessFilter === '') return !member.business_id
         return member.business_id === businessFilter
       })
     }
 
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase()
-      results = results.filter((member) => {
-        return (
-          member.fullName.toLowerCase().includes(term) ||
-          member.email?.toLowerCase().includes(term) ||
-          member.job_title?.toLowerCase().includes(term) ||
-          member.department?.toLowerCase().includes(term)
-        )
-      })
+      results = results.filter((member) =>
+        member.fullName.toLowerCase().includes(term) ||
+        member.email?.toLowerCase().includes(term) ||
+        member.job_title?.toLowerCase().includes(term) ||
+        member.department?.toLowerCase().includes(term)
+      )
     }
 
     return results
@@ -164,7 +169,6 @@ export default function InternalStaffPage() {
     setFormVisible(false)
     setEditingStaff(null)
     setSubmitting(false)
-    setError('')
   }
 
   const handleCreateClick = () => {
@@ -208,7 +212,7 @@ export default function InternalStaffPage() {
       ...formValues,
       tenant_id: tenant.tenant_id,
       updated_at: timestamp,
-      updated_by: profile?.id || null,
+      updated_by: profile?.id || null
     }
 
     if (!editingStaff) {
@@ -243,7 +247,7 @@ export default function InternalStaffPage() {
   }
 
   const renderEmptyState = () => (
-    <div className="crm-empty-state">
+    <div className="empty-state">
       <div className="empty-state-icon">👥</div>
       <h3>No internal staff yet</h3>
       <p>Add recruiters, leads, and other internal team members so you can assign work and track resources.</p>
@@ -256,174 +260,198 @@ export default function InternalStaffPage() {
   )
 
   return (
-    <div className="crm-page">
-      <div className="crm-header" style={{ marginBottom: '24px' }}>
+    <div className="data-table-container">
+      <div className="table-header">
         <div>
-          <h1 style={{ marginBottom: '4px' }}>Internal Staff</h1>
+          <h2>👥 Internal Staff</h2>
           <p style={{ margin: 0, color: '#64748b' }}>
-            Manage team members across businesses for tenant <strong>{tenant?.company_name || tenant?.tenant_id || '—'}</strong>
+            Manage team members for <strong>{tenant?.company_name || tenant?.tenant_id || 'your tenant'}</strong>
           </p>
         </div>
         {canManageStaff && (
-          <button className="btn btn-primary" onClick={handleCreateClick}>
-            + Add Team Member
-          </button>
+          <div className="table-actions">
+            <button className="btn btn-primary" onClick={handleCreateClick}>
+              + Add Team Member
+            </button>
+          </div>
         )}
       </div>
 
-      <div className="crm-card" style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="filters-bar">
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
           <input
             type="search"
             placeholder="Search by name, email, job title, or department"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            style={{ flex: '1 1 280px', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
           />
-
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-          >
-            {STATUS_FILTERS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={businessFilter}
-            onChange={(event) => setBusinessFilter(event.target.value)}
-            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-          >
-            <option value="ALL">All businesses</option>
-            <option value="">Global / Not assigned</option>
-            {businesses.map((business) => (
-              <option key={business.id} value={business.id}>
-                {business.name}
-              </option>
-            ))}
-          </select>
         </div>
+
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+        >
+          {STATUS_FILTERS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={businessFilter}
+          onChange={(event) => setBusinessFilter(event.target.value)}
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '200px' }}
+        >
+          <option value="ALL">All businesses</option>
+          <option value="">Global / Not Assigned</option>
+          {businesses.map((business) => (
+            <option key={business.id} value={business.id}>
+              {business.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && (
-        <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+        <div className="alert alert-error" style={{ margin: '16px 24px' }}>
           {error}
         </div>
       )}
 
       {formVisible && (
-        <InternalStaffForm
-          initialValues={editingStaff}
-          businesses={businesses}
-          onSubmit={handleFormSubmit}
-          onCancel={resetFormState}
-          submitting={submitting}
-        />
+        <div style={{ padding: '24px' }}>
+          <InternalStaffForm
+            initialValues={editingStaff}
+            businesses={businesses}
+            onSubmit={handleFormSubmit}
+            onCancel={resetFormState}
+            submitting={submitting}
+          />
+        </div>
       )}
 
       {loading ? (
-        <div className="crm-card">
-          <div className="table-responsive">
-            <table className="crm-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Business</th>
-                  <th>Status</th>
-                  <th>Job Title</th>
-                  <th>Dates</th>
-                  <th style={{ width: '160px' }}>Billable</th>
-                  {canManageStaff && <th style={{ width: '140px' }}>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
-                  <tr key={index}>
-                    <td colSpan={canManageStaff ? 8 : 7}>
-                      <div className="skeleton" style={{ height: '20px', margin: '6px 0' }}></div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Business</th>
+              <th>Status</th>
+              <th>Job Title</th>
+              <th>Department</th>
+              <th>Dates</th>
+              <th>Billable</th>
+              {canManageStaff && <th style={{ width: '160px' }}>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <tr key={index}>
+                <td colSpan={canManageStaff ? 9 : 8}>
+                  <div className="skeleton" style={{ height: '20px', margin: '6px 0' }}></div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : filteredStaff.length === 0 ? (
         renderEmptyState()
       ) : (
-        <div className="crm-card">
-          <div className="table-responsive">
-            <table className="crm-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Business</th>
-                  <th>Status</th>
-                  <th>Job Title</th>
-                  <th>Department</th>
-                  <th>Dates</th>
-                  <th>Billable</th>
-                  {canManageStaff && <th style={{ width: '140px' }}>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStaff.map((member) => {
-                  const business = member.business_id ? businessLookup[member.business_id] : null
-                  const businessName = business?.name || member.business_name || '—'
-                  const formattedStart = member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'
-                  const formattedEnd = member.end_date ? new Date(member.end_date).toLocaleDateString() : '—'
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Business</th>
+              <th>Status</th>
+              <th>Job Title</th>
+              <th>Department</th>
+              <th>Dates</th>
+              <th>Billable</th>
+              {canManageStaff && <th style={{ width: '160px' }}>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStaff.map((member) => {
+              const business = member.business_id ? businessLookup[member.business_id] : null
+              const businessName = business?.name || member.business_name || '—'
+              const formattedStart = member.start_date ? new Date(member.start_date).toLocaleDateString() : '—'
+              const formattedEnd = member.end_date ? new Date(member.end_date).toLocaleDateString() : '—'
+              const statusMeta = STATUS_BADGES[member.status] || STATUS_BADGES.INACTIVE
 
-                  return (
-                    <tr key={member.__identifier}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{member.fullName || '—'}</div>
-                        {member.phone && (
-                          <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>{member.phone}</div>
-                        )}
-                      </td>
-                      <td>
-                        <a href={`mailto:${member.email}`} style={{ color: '#2563eb' }}>{member.email}</a>
-                      </td>
-                      <td>{businessName}</td>
-                      <td>
-                        <span className={`status-badge ${member.status === 'ACTIVE' ? 'initial-contact' : member.status === 'ON_LEAVE' ? 'qualified' : ''}`}>
-                          {member.status === 'ACTIVE' ? 'Active' : member.status === 'ON_LEAVE' ? 'On Leave' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td>{member.job_title || '—'}</td>
-                      <td>{member.department || '—'}</td>
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span><strong>Start:</strong> {formattedStart}</span>
-                          <span><strong>End:</strong> {formattedEnd}</span>
-                        </div>
-                      </td>
-                      <td>{member.is_billable ? 'Yes' : 'No'}</td>
-                      {canManageStaff && (
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="btn btn-secondary" onClick={() => handleEditClick(member)}>
-                              Edit
-                            </button>
-                            <button className="btn btn-danger" onClick={() => handleDeleteClick(member)}>
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              return (
+                <tr key={member.__identifier}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{member.fullName || '—'}</div>
+                    {member.phone && (
+                      <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>{member.phone}</div>
+                    )}
+                  </td>
+                  <td>
+                    {member.email ? (
+                      <a href={`mailto:${member.email}`} style={{ color: '#2563eb' }}>
+                        {member.email}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td>
+                    {member.business_id ? (
+                      <span className="status-badge" style={{ background: '#e0f2fe', color: '#0c4a6e' }}>
+                        {businessName}
+                      </span>
+                    ) : (
+                      <span className="status-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                        Global
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`status-badge ${statusMeta.tone}`}>
+                      {statusMeta.label}
+                    </span>
+                  </td>
+                  <td>{member.job_title || '—'}</td>
+                  <td>{member.department || '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span><strong>Start:</strong> {formattedStart}</span>
+                      <span><strong>End:</strong> {formattedEnd}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span
+                      className="status-badge"
+                      style={member.is_billable
+                        ? { background: '#dcfce7', color: '#166534' }
+                        : { background: '#f1f5f9', color: '#475569' }
+                      }
+                    >
+                      {member.is_billable ? 'Billable' : 'Non-billable'}
+                    </span>
+                  </td>
+                  {canManageStaff && (
+                    <td>
+                      <div className="action-buttons">
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleEditClick(member)}>
+                          Edit
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClick(member)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   )

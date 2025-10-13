@@ -151,12 +151,36 @@ export default function InternalStaffForm({ initialValues, onSubmit, onCancel, s
   }
 
   return (
-    <div className="crm-card" style={{ marginBottom: '24px' }}>
-      <div className="crm-card-header">
-        <h2 style={{ margin: 0 }}>{initialValues ? 'Edit Team Member' : 'Add Team Member'}</h2>
-        <p style={{ margin: 0, color: '#64748b' }}>
-          Manage internal staff associated with your businesses
-        </p>
+    <div
+      style={{
+        marginBottom: '24px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '20px 24px',
+        background: '#ffffff',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div>
+          <h3 style={{ margin: 0 }}>{initialValues ? 'Edit Team Member' : 'Add Team Member'}</h3>
+          <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
+            Maintain recruiter, lead, and support staff across your businesses.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={disabled}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={handleSubmit}
+            disabled={disabled}
+          >
+            {submitting ? 'Saving...' : initialValues ? 'Save Changes' : 'Create Member'}
+          </button>
+        </div>
       </div>
 
       {formError && (
@@ -164,8 +188,7 @@ export default function InternalStaffForm({ initialValues, onSubmit, onCancel, s
           {formError}
         </div>
       )}
-
-      <form onSubmit={handleSubmit} className="form-grid" style={{ gap: '16px' }}>
+  <form onSubmit={handleSubmit} className="form-grid" style={{ gap: '16px', marginTop: '8px' }}>
         <div className="form-group">
           <label>First Name *</label>
           <input
@@ -319,8 +342,8 @@ export default function InternalStaffForm({ initialValues, onSubmit, onCancel, s
           {errors.notes && <small className="error-text">{errors.notes}</small>}
         </div>
 
-        <div className="form-group" style={{ alignSelf: 'center' }}>
-          <label className="checkbox">
+        <div className="form-group" style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center' }}>
+          <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             <input
               type="checkbox"
               name="is_billable"
@@ -330,15 +353,6 @@ export default function InternalStaffForm({ initialValues, onSubmit, onCancel, s
             />
             <span>Billable resource</span>
           </label>
-        </div>
-
-        <div className="form-actions" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={disabled}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={disabled}>
-            {submitting ? 'Saving...' : initialValues ? 'Save Changes' : 'Create Member'}
-          </button>
         </div>
       </form>
     </div>

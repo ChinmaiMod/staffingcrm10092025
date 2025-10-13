@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -85,12 +85,14 @@ export default function ContactsManager() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterTimeframe, setFilterTimeframe] = useState('all')
+  const [filterBusiness, setFilterBusiness] = useState('all')
   const [selectedContacts, setSelectedContacts] = useState([])
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false)
   const [bulkEmailData, setBulkEmailData] = useState({ subject: '', body: '' })
   const [sendingEmail, setSendingEmail] = useState(false)
   const [savingContact, setSavingContact] = useState(false)
   const [defaultBusinessId, setDefaultBusinessId] = useState(null)
+  const [businesses, setBusinesses] = useState([])
   
   // Advanced filter state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
@@ -145,7 +147,8 @@ export default function ContactsManager() {
           city,
           years_of_experience,
           referral_source,
-          referred_by
+          referred_by,
+          businesses:business_id ( business_id, business_name )
         `)
         .eq('tenant_id', tenant.tenant_id)
         .order('created_at', { ascending: false })
@@ -174,6 +177,7 @@ export default function ContactsManager() {
         return {
           contact_id: contact.id,
           business_id: contact.business_id || null,
+          business_name: contact.businesses?.business_name || null,
           first_name: contact.first_name,
           last_name: contact.last_name,
           email: contact.email,
@@ -272,6 +276,59 @@ export default function ContactsManager() {
   }, [tenant?.tenant_id])
 
   useEffect(() => {
+    if (!tenant?.tenant_id) {
+      setBusinesses([])
+      return
+    }
+
+    let isCancelled = false
+    const controller = new AbortController()
+
+    const loadBusinesses = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_id, business_name, is_default')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('is_default', { ascending: false })
+          .order('business_name', { ascending: true })
+          .abortSignal(controller.signal)
+
+        if (error) {
+          throw error
+        }
+
+        if (!isCancelled) {
+          setBusinesses(data || [])
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return
+        }
+        logger.error('Error loading businesses for contacts page:', err)
+        if (!isCancelled) {
+          setBusinesses([])
+        }
+      }
+    }
+
+    loadBusinesses()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [tenant?.tenant_id])
+
+  const businessLookup = useMemo(() => {
+    return (businesses || []).reduce((acc, biz) => {
+      if (!biz?.business_id) return acc
+      acc[biz.business_id] = biz.business_name
+      return acc
+    }, {})
+  }, [businesses])
+
+  useEffect(() => {
     // Apply filters from URL parameters
     const statusParam = searchParams.get('status')
     const timeframeParam = searchParams.get('timeframe')
@@ -311,6 +368,7 @@ export default function ContactsManager() {
         contact.contact_type_key ||
         mapContactTypeToKey(contact.contact_type) ||
         'it_candidate',
+      business_name: contact.business_name || null,
       visa_status: contact.visa_status,
       job_title: contact.job_title,
       years_experience: contact.years_experience,
@@ -604,7 +662,11 @@ export default function ContactsManager() {
     
     // Basic filters
     const matchesStatus = filterStatus === 'all' || contact.status === filterStatus
-  const matchesType = filterType === 'all' || contact.contact_type_key === filterType
+    const matchesType = filterType === 'all' || contact.contact_type_key === filterType
+    const matchesBusiness =
+      filterBusiness === 'all' ||
+      (filterBusiness === 'global' && !contact.business_id) ||
+      contact.business_id === filterBusiness
     
     // Timeframe filter (mock implementation - in production, filter by created_at date)
     let matchesTimeframe = true
@@ -625,7 +687,7 @@ export default function ContactsManager() {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesType && matchesTimeframe
+    return matchesSearch && matchesStatus && matchesType && matchesTimeframe && matchesBusiness
   })
 
   // Apply advanced filters if active
@@ -638,11 +700,18 @@ export default function ContactsManager() {
     setFilterStatus('all')
     setFilterType('all')
     setFilterTimeframe('all')
+    setFilterBusiness('all')
     setSearchParams({}) // Clear URL parameters
     handleClearAdvancedFilters() // Clear advanced filters
   }
 
-  const hasActiveFilters = searchTerm || filterStatus !== 'all' || filterType !== 'all' || filterTimeframe !== 'all' || isAdvancedFilterActive
+  const hasActiveFilters =
+    searchTerm ||
+    filterStatus !== 'all' ||
+    filterType !== 'all' ||
+    filterTimeframe !== 'all' ||
+    filterBusiness !== 'all' ||
+    isAdvancedFilterActive
 
   if (loading) {
     return <div className="loading">Loading contacts...</div>
@@ -651,7 +720,12 @@ export default function ContactsManager() {
   if (selectedContact && !showForm) {
     return (
       <ContactDetail
-        contact={selectedContact}
+        contact={{
+          ...selectedContact,
+          business_name:
+            selectedContact.business_name ||
+            (selectedContact.business_id ? businessLookup[selectedContact.business_id] : null)
+        }}
         onClose={() => setSelectedContact(null)}
         onEdit={handleEditContact}
         onDelete={handleDeleteContact}
@@ -677,7 +751,15 @@ export default function ContactsManager() {
             }}>
               🔍 Filters Active
               {filterStatus !== 'all' && <span>• Status: {filterStatus}</span>}
-              {filterTimeframe !== 'all' && <span>• {filterTimeframe === 'week' ? 'This Week' : 'This Month'}</span>}
+              {filterTimeframe !== 'all' && (
+                <span>• {filterTimeframe === 'week' ? 'This Week' : 'This Month'}</span>
+              )}
+              {filterBusiness !== 'all' && (
+                <span>
+                  • Business:{' '}
+                  {businessLookup[filterBusiness] || 'Global'}
+                </span>
+              )}
             </div>
           )}
           <button className="btn btn-primary" onClick={handleCreateContact}>
@@ -738,6 +820,19 @@ export default function ContactsManager() {
             <option value="all">All Time</option>
             <option value="week">This Week</option>
             <option value="month">This Month</option>
+          </select>
+          <select
+            value={filterBusiness}
+            onChange={(e) => setFilterBusiness(e.target.value)}
+            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
+          >
+            <option value="all">All Businesses</option>
+            <option value="global">Global (Unassigned)</option>
+            {businesses.map((biz) => (
+              <option key={biz.business_id} value={biz.business_id}>
+                {biz.business_name}
+              </option>
+            ))}
           </select>
           <button 
             className="btn btn-primary btn-sm"
@@ -836,6 +931,7 @@ export default function ContactsManager() {
               <th>Name</th>
               <th>Email</th>
               <th>Phone</th>
+              <th>Business</th>
               <th>Type</th>
               <th>Status</th>
               <th>Job Title</th>
@@ -878,6 +974,17 @@ export default function ContactsManager() {
                   </td>
                   <td>{contact.email}</td>
                   <td>{contact.phone}</td>
+                  <td>
+                    {contact.business_id ? (
+                      <span className="status-badge initial-contact" style={{ background: '#e0f2fe', color: '#0c4a6e' }}>
+                        {businessLookup[contact.business_id] || contact.business_name || 'Business'}
+                      </span>
+                    ) : (
+                      <span className="status-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                        Global
+                      </span>
+                    )}
+                  </td>
                   <td>{contact.contact_type?.replace(/_/g, ' ')}</td>
                   <td>
                     <span className="status-badge">{contact.status}</span>

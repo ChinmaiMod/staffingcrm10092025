@@ -32,7 +32,7 @@ export default function BusinessesPage() {
   const [error, setError] = useState('')
 
   const canManageBusinesses = useMemo(() => {
-    if (!profile?.role) return true // fallback until role-level enforcement is implemented
+    if (!profile?.role) return true
     const elevatedRoles = ['ADMIN', 'SUPER_ADMIN', 'CEO']
     return elevatedRoles.includes(profile.role)
   }, [profile?.role])
@@ -149,9 +149,10 @@ export default function BusinessesPage() {
   }
 
   const renderEmptyState = () => (
-    <div className="crm-empty-state">
-      <h3>No businesses found</h3>
-      <p>Create your first business to start segmenting contacts, pipelines, and lookups.</p>
+    <div className="empty-state">
+      <div className="empty-state-icon">🏢</div>
+      <h3>No Businesses Found</h3>
+      <p>Create your first business to segment contacts, pipelines, and lookup data.</p>
       {canManageBusinesses && (
         <button className="btn btn-primary" onClick={handleCreateClick}>
           + Add Business
@@ -161,23 +162,25 @@ export default function BusinessesPage() {
   )
 
   return (
-    <div className="crm-page">
-      <div className="crm-header" style={{ marginBottom: '24px' }}>
+    <div className="data-table-container">
+      <div className="table-header">
         <div>
-          <h1 style={{ marginBottom: '4px' }}>Businesses</h1>
+          <h2>🏢 Businesses</h2>
           <p style={{ margin: 0, color: '#64748b' }}>
-            Manage business entities for tenant <strong>{tenant?.company_name || tenant?.tenant_id || '—'}</strong>
+            Manage business entities for <strong>{tenant?.company_name || tenant?.tenant_id || 'your tenant'}</strong>
           </p>
         </div>
         {canManageBusinesses && (
-          <button className="btn btn-primary" onClick={handleCreateClick}>
-            + Add Business
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-primary" onClick={handleCreateClick}>
+              + Add Business
+            </button>
+          </div>
         )}
       </div>
 
       {error && (
-        <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+        <div className="alert alert-error" style={{ marginBottom: '16px' }}>
           {error}
         </div>
       )}
@@ -192,83 +195,91 @@ export default function BusinessesPage() {
       )}
 
       {loading ? (
-        <div className="crm-card">
-          <div className="table-responsive">
-            <table className="crm-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th style={{ width: '120px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: BUSINESSES_SKELETON_ROWS }).map((_, index) => (
-                  <tr key={index}>
-                    <td colSpan={4}>
-                      <div className="skeleton" style={{ height: '20px', margin: '6px 0' }}></div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Status</th>
+              <th>Updated</th>
+              {canManageBusinesses && <th style={{ width: '160px' }}>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: BUSINESSES_SKELETON_ROWS }).map((_, index) => (
+              <tr key={index}>
+                <td colSpan={canManageBusinesses ? 6 : 5}>
+                  <div className="skeleton" style={{ height: '20px', margin: '6px 0' }}></div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : businesses.length === 0 ? (
         renderEmptyState()
       ) : (
-        <div className="crm-card">
-          <div className="table-responsive">
-            <table className="crm-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Default</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                  {canManageBusinesses && <th style={{ width: '140px' }}>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {businesses.map((business) => (
-                  <tr key={business.__identifier}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{business.business_name}</div>
-                      {business.description && (
-                        <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-                          {business.description}
-                        </div>
-                      )}
-                    </td>
-                    <td>{business.business_type?.replace(/_/g, ' ') || '—'}</td>
-                    <td>{business.is_default ? 'Yes' : 'No'}</td>
-                    <td>{business.is_active ? 'Active' : 'Inactive'}</td>
-                    <td>{business.updated_at ? new Date(business.updated_at).toLocaleString() : '—'}</td>
-                    {canManageBusinesses && (
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-secondary" onClick={() => handleEditClick(business)}>
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-danger"
-                            onClick={() => handleDeleteClick(business)}
-                            disabled={business.is_default}
-                            title={business.is_default ? 'Default business cannot be deleted' : undefined}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Status</th>
+              <th>Updated</th>
+              {canManageBusinesses && <th style={{ width: '160px' }}>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {businesses.map((business) => (
+              <tr key={business.__identifier}>
+                <td>
+                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {business.business_name}
+                    {business.is_default && (
+                      <span className="status-badge initial-contact" style={{ background: '#ede9fe', color: '#5b21b6' }}>
+                        Default
+                      </span>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </div>
+                  {business.description && (
+                    <div style={{ color: '#64748b', fontSize: '13px', marginTop: '6px' }}>
+                      {business.description}
+                    </div>
+                  )}
+                </td>
+                <td>{business.business_type?.replace(/_/g, ' ') || '—'}</td>
+                <td>{business.is_default ? 'Yes' : 'No'}</td>
+                <td>
+                  <span
+                    className={`status-badge ${business.is_active ? 'initial-contact' : ''}`}
+                    style={business.is_active ? undefined : { background: '#fee2e2', color: '#b91c1c' }}
+                  >
+                    {business.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td>{business.updated_at ? new Date(business.updated_at).toLocaleString() : '—'}</td>
+                {canManageBusinesses && (
+                  <td>
+                    <div className="action-buttons">
+                      <button className="btn btn-sm btn-primary" onClick={() => handleEditClick(business)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDeleteClick(business)}
+                        disabled={business.is_default}
+                        title={business.is_default ? 'Default business cannot be deleted' : undefined}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )

@@ -263,6 +263,13 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
           <div className="modal-body">
             <div className="form-grid">
               <div className="form-group">
+                <label>Business</label>
+                <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                  {contact.business_name || 'Global'}
+                </div>
+              </div>
+
+              <div className="form-group">
                 <label>Email</label>
                 <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
                   {contact.email}

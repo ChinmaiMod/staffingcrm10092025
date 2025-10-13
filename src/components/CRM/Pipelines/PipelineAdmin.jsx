@@ -1,17 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useAuth } from '../../../contexts/AuthProvider'
+import { useTenant } from '../../../contexts/TenantProvider'
 import { validateTextField, handleSupabaseError, handleError } from '../../../utils/validators'
 import './PipelineAdmin.css'
 
 export default function PipelineAdmin() {
   const { user } = useAuth()
+  const { tenant } = useTenant()
   const [pipelines, setPipelines] = useState([])
   const [selectedPipeline, setSelectedPipeline] = useState(null)
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingBusinesses, setLoadingBusinesses] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [businessOptions, setBusinessOptions] = useState([])
   
   // Form states
   const [showPipelineForm, setShowPipelineForm] = useState(false)
@@ -28,7 +32,8 @@ export default function PipelineAdmin() {
     description: '',
     color: '#4F46E5',
     icon: '📊',
-    is_default: false
+    is_default: false,
+    business_id: ''
   })
   
   const [stageForm, setStageForm] = useState({
@@ -39,19 +44,38 @@ export default function PipelineAdmin() {
     is_final: false
   })
 
+  const businessLookup = useMemo(() => {
+    return (businessOptions || []).reduce((acc, business) => {
+      if (!business?.business_id) return acc
+      acc[business.business_id] = business.business_name
+      return acc
+    }, {})
+  }, [businessOptions])
+
   const fetchPipelines = useCallback(async () => {
+    if (!tenant?.tenant_id) {
+      setPipelines([])
+      setSelectedPipeline(null)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('pipelines')
         .select('*')
+        .eq('tenant_id', tenant.tenant_id)
         .order('display_order', { ascending: true })
       
       if (error) throw error
       
       setPipelines(data || [])
-      if (data && data.length > 0 && !selectedPipeline) {
-        setSelectedPipeline(data[0])
+      if (data && data.length > 0) {
+        const currentSelection = data.find((p) => p.pipeline_id === selectedPipeline?.pipeline_id)
+        setSelectedPipeline(currentSelection || data[0])
+      } else {
+        setSelectedPipeline(null)
       }
     } catch (err) {
       console.error('Error fetching pipelines:', err)
@@ -59,7 +83,55 @@ export default function PipelineAdmin() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPipeline])
+  }, [selectedPipeline?.pipeline_id, tenant?.tenant_id])
+
+  useEffect(() => {
+    if (!tenant?.tenant_id) {
+      setBusinessOptions([])
+      setLoadingBusinesses(false)
+      return
+    }
+
+    let isCancelled = false
+    const controller = new AbortController()
+
+    const loadBusinesses = async () => {
+      try {
+        setLoadingBusinesses(true)
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_id, business_name, is_default, is_active')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('is_default', { ascending: false })
+          .order('business_name', { ascending: true })
+          .abortSignal(controller.signal)
+
+        if (error) throw error
+
+        if (!isCancelled) {
+          setBusinessOptions(data || [])
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        console.error('Error loading businesses for pipelines:', err)
+        if (!isCancelled) {
+          setBusinessOptions([])
+          setError('Unable to load businesses. Please refresh and try again.')
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingBusinesses(false)
+        }
+      }
+    }
+
+    loadBusinesses()
+
+    return () => {
+      isCancelled = true
+      controller.abort()
+    }
+  }, [tenant?.tenant_id])
 
   useEffect(() => {
     fetchPipelines()
@@ -88,13 +160,20 @@ export default function PipelineAdmin() {
   }
 
   const handleCreatePipeline = () => {
+    if (businessOptions.length === 0) {
+      setError('Create a business before configuring pipelines.')
+      return
+    }
+    const defaultBusinessId = businessOptions.find((biz) => biz.is_default)?.business_id
+    const fallbackBusinessId = defaultBusinessId || businessOptions[0]?.business_id || ''
     setEditingPipeline(null)
     setPipelineForm({
       name: '',
       description: '',
       color: '#4F46E5',
       icon: '📊',
-      is_default: false
+      is_default: false,
+      business_id: fallbackBusinessId
     })
     setPipelineFieldErrors({})
     setError('')
@@ -109,7 +188,8 @@ export default function PipelineAdmin() {
       description: pipeline.description || '',
       color: pipeline.color || '#4F46E5',
       icon: pipeline.icon || '📊',
-      is_default: pipeline.is_default || false
+      is_default: pipeline.is_default || false,
+      business_id: pipeline.business_id || businessOptions[0]?.business_id || ''
     })
     setPipelineFieldErrors({})
     setError('')
@@ -162,6 +242,10 @@ export default function PipelineAdmin() {
       errors.color = 'Color must be a valid hex color (e.g., #4F46E5)'
     }
 
+    if (!pipelineForm.business_id) {
+      errors.business_id = 'Please select a business for this pipeline'
+    }
+
     setPipelineFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -170,6 +254,11 @@ export default function PipelineAdmin() {
     e.preventDefault()
     setError('')
     setSuccess('')
+    
+    if (!tenant?.tenant_id) {
+      setError('Missing tenant context. Please refresh and try again.')
+      return
+    }
     
     // Validate form
     if (!validatePipelineForm()) {
@@ -180,6 +269,7 @@ export default function PipelineAdmin() {
     try {
       const pipelineData = {
         ...pipelineForm,
+        tenant_id: tenant?.tenant_id,
         updated_by: user.id
       }
 
@@ -446,7 +536,12 @@ export default function PipelineAdmin() {
     <div className="pipeline-admin">
       <div className="pipeline-admin-header">
         <h1>Pipeline Administration</h1>
-        <button className="btn btn-primary" onClick={handleCreatePipeline}>
+        <button
+          className="btn btn-primary"
+          onClick={handleCreatePipeline}
+          disabled={businessOptions.length === 0}
+          title={businessOptions.length === 0 ? 'Add a business in Data Admin before creating pipelines' : undefined}
+        >
           + Create Pipeline
         </button>
       </div>
@@ -473,6 +568,11 @@ export default function PipelineAdmin() {
                     <div className="pipeline-name">
                       {pipeline.name}
                       {pipeline.is_default && <span className="badge">Default</span>}
+                      {pipeline.business_id && (
+                        <span className="badge badge-secondary">
+                          {businessLookup[pipeline.business_id] || 'Business' }
+                        </span>
+                      )}
                     </div>
                     <div className="pipeline-description">{pipeline.description}</div>
                   </div>
@@ -596,6 +696,37 @@ export default function PipelineAdmin() {
                 />
                 {pipelineFieldErrors.name && (
                   <small className="error-text">{pipelineFieldErrors.name}</small>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Business *</label>
+                {loadingBusinesses ? (
+                  <div className="skeleton" style={{ height: '36px', marginTop: '8px' }}></div>
+                ) : businessOptions.length === 0 ? (
+                  <div className="alert alert-warning">
+                    No businesses available. Create a business before configuring pipelines.
+                  </div>
+                ) : (
+                  <select
+                    value={pipelineForm.business_id}
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, business_id: e.target.value })
+                      setPipelineFieldErrors({ ...pipelineFieldErrors, business_id: '' })
+                    }}
+                    className={pipelineFieldErrors.business_id ? 'error' : ''}
+                    required
+                  >
+                    <option value="">Select a business...</option>
+                    {businessOptions.map((business) => (
+                      <option key={business.business_id} value={business.business_id}>
+                        {business.business_name}
+                        {!business.is_active ? ' (Inactive)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {pipelineFieldErrors.business_id && (
+                  <small className="error-text">{pipelineFieldErrors.business_id}</small>
                 )}
               </div>
               <div className="form-group">

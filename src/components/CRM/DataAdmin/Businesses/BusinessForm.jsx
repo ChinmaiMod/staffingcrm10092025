@@ -98,10 +98,22 @@ export default function BusinessForm({
   }
 
   return (
-    <div className="crm-card" style={{ marginBottom: '24px' }}>
-      <div className="crm-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0 }}>{title}</h2>
+    <div
+      style={{
+        marginBottom: '24px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '20px 24px',
+        background: '#ffffff',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>Complete the fields below to save your business settings.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={submitting}>
             Cancel
           </button>
@@ -110,14 +122,13 @@ export default function BusinessForm({
             type="submit"
             onClick={handleSubmit}
             disabled={submitting}
-            style={{ marginLeft: '8px' }}
           >
-            {submitting ? 'Saving...' : 'Save'}
+            {submitting ? 'Saving...' : 'Save Business'}
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="form-grid" style={{ marginTop: '16px' }}>
+      <form onSubmit={handleSubmit} className="form-grid" style={{ marginTop: '8px' }}>
         <div className="form-field">
           <label>Business Name *</label>
           <input
