@@ -33,7 +33,7 @@ const TeamMembersModal = ({ team, onClose }) => {
             first_name,
             last_name,
             email,
-            position
+            job_title
           )
         `)
         .eq('team_id', team.team_id)
@@ -52,21 +52,36 @@ const TeamMembersModal = ({ team, onClose }) => {
   };
 
   const loadAvailableStaff = async () => {
-    if (!tenant?.tenant_id) return;
+    if (!tenant?.tenant_id) {
+      console.log('No tenant_id available');
+      setError('No tenant ID found');
+      return;
+    }
     
     try {
+      console.log('Loading staff for tenant:', tenant.tenant_id);
+      
       const { data, error } = await supabase
         .from('internal_staff')
-        .select('staff_id, first_name, last_name, email, position')
+        .select('staff_id, first_name, last_name, email, job_title')
         .eq('tenant_id', tenant.tenant_id)
-        .eq('is_active', true)
+        .eq('status', 'ACTIVE')
         .order('first_name');
 
+      console.log('Staff query result:', { data, error });
+
       if (error) throw error;
-      setAvailableStaff(data || []);
+      
+      if (!data || data.length === 0) {
+        console.warn('No active staff found for tenant');
+        setError('No active staff members found. Please add staff in Data Administration → Internal Staff');
+      } else {
+        console.log(`Loaded ${data.length} staff members`);
+        setAvailableStaff(data || []);
+      }
     } catch (err) {
       console.error('Error loading staff:', err);
-      setError('Failed to load available staff');
+      setError(`Failed to load available staff: ${err.message}`);
     }
   };
 
@@ -212,7 +227,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                       <option value="">Select Staff Member</option>
                       {filteredAvailableStaff.map((staff) => (
                         <option key={staff.staff_id} value={staff.staff_id}>
-                          {staff.first_name} {staff.last_name} - {staff.position || 'N/A'}
+                          {staff.first_name} {staff.last_name}{staff.job_title ? ` - ${staff.job_title}` : ''}
                         </option>
                       ))}
                     </select>
