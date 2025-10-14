@@ -119,6 +119,12 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [yearsExperienceOptions, setYearsExperienceOptions] = useState(YEARS_EXPERIENCE)
   const [loadingYearsExperience, setLoadingYearsExperience] = useState(false)
   
+  // Team leads and recruiters
+  const [teamLeads, setTeamLeads] = useState([])
+  const [recruiters, setRecruiters] = useState([])
+  const [loadingTeamLeads, setLoadingTeamLeads] = useState(false)
+  const [loadingRecruiters, setLoadingRecruiters] = useState(false)
+  
   // Status change tracking
   const initialStatus = useRef(contact?.status || 'Initial Contact')
   const [showStatusModal, setShowStatusModal] = useState(false)
@@ -157,6 +163,20 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
     }
   }, [formData.state])
+
+  // Load team leads on mount
+  useEffect(() => {
+    if (tenant?.tenant_id) {
+      loadTeamLeads()
+    }
+  }, [tenant?.tenant_id])
+
+  // Load recruiters when team lead changes or on mount
+  useEffect(() => {
+    if (tenant?.tenant_id) {
+      loadRecruiters()
+    }
+  }, [tenant?.tenant_id, formData.recruiting_team_lead])
 
   useEffect(() => {
     // Update job titles based on contact type
@@ -322,6 +342,54 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       setAvailableCities([])
     } finally {
       setLoadingCities(false)
+    }
+  }
+
+  // Load team leads from internal staff
+  const loadTeamLeads = async () => {
+    if (!tenant?.tenant_id) return
+    
+    try {
+      setLoadingTeamLeads(true)
+      
+      const { data, error } = await supabase
+        .from('internal_staff')
+        .select('staff_id, first_name, last_name, email, job_title, department')
+        .eq('tenant_id', tenant.tenant_id)
+        .eq('status', 'ACTIVE')
+        .order('first_name')
+
+      if (error) throw error
+      setTeamLeads(data || [])
+    } catch (err) {
+      console.error('Error loading team leads:', err)
+      setTeamLeads([])
+    } finally {
+      setLoadingTeamLeads(false)
+    }
+  }
+
+  // Load recruiters from internal staff
+  const loadRecruiters = async () => {
+    if (!tenant?.tenant_id) return
+    
+    try {
+      setLoadingRecruiters(true)
+      
+      const { data, error } = await supabase
+        .from('internal_staff')
+        .select('staff_id, first_name, last_name, email, job_title, department')
+        .eq('tenant_id', tenant.tenant_id)
+        .eq('status', 'ACTIVE')
+        .order('first_name')
+
+      if (error) throw error
+      setRecruiters(data || [])
+    } catch (err) {
+      console.error('Error loading recruiters:', err)
+      setRecruiters([])
+    } finally {
+      setLoadingRecruiters(false)
     }
   }
 
@@ -705,25 +773,29 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         {showCandidateFields && (
           <>
             <div className="form-group">
-              <label>Recruiting Team Lead</label>
-              <input
-                type="text"
+              <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
+              <AutocompleteSelect
+                options={teamLeads.map(lead => 
+                  `${lead.first_name} ${lead.last_name}${lead.job_title ? ` - ${lead.job_title}` : ''}`
+                )}
                 value={formData.recruiting_team_lead}
-                onChange={(e) => handleChange('recruiting_team_lead', e.target.value)}
-                placeholder="Select from employees..."
+                onChange={(value) => handleChange('recruiting_team_lead', value)}
+                placeholder={loadingTeamLeads ? "Loading team leads..." : "Select recruiting team lead..."}
+                disabled={loadingTeamLeads}
               />
-              <small>TODO: Autocomplete from employees table</small>
             </div>
 
             <div className="form-group">
-              <label>Recruiter</label>
-              <input
-                type="text"
+              <label>Recruiter {loadingRecruiters && <small>(Loading...)</small>}</label>
+              <AutocompleteSelect
+                options={recruiters.map(rec => 
+                  `${rec.first_name} ${rec.last_name}${rec.job_title ? ` - ${rec.job_title}` : ''}`
+                )}
                 value={formData.recruiter}
-                onChange={(e) => handleChange('recruiter', e.target.value)}
-                placeholder="Select from employees..."
+                onChange={(value) => handleChange('recruiter', value)}
+                placeholder={loadingRecruiters ? "Loading recruiters..." : "Select recruiter..."}
+                disabled={loadingRecruiters}
               />
-              <small>TODO: Filter by team lead</small>
             </div>
           </>
         )}
