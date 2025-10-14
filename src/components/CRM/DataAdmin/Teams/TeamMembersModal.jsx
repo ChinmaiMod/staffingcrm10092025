@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../../../../contexts/AuthProvider';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../../../contexts/AuthProvider';
+import { useTenant } from '../../../../contexts/TenantProvider';
 import { supabase } from '../../../../api/supabaseClient';
 
 const TeamMembersModal = ({ team, onClose }) => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
+  const { tenant } = useTenant();
   const [members, setMembers] = useState([]);
   const [availableStaff, setAvailableStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,12 +13,13 @@ const TeamMembersModal = ({ team, onClose }) => {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedRole, setSelectedRole] = useState('RECRUITER');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    loadMembers();
-    loadAvailableStaff();
-  }, [team.team_id]);
+    if (team?.team_id && tenant?.tenant_id) {
+      loadMembers();
+      loadAvailableStaff();
+    }
+  }, [team?.team_id, tenant?.tenant_id]);
 
   const loadMembers = async () => {
     try {
@@ -49,10 +52,13 @@ const TeamMembersModal = ({ team, onClose }) => {
   };
 
   const loadAvailableStaff = async () => {
+    if (!tenant?.tenant_id) return;
+    
     try {
       const { data, error } = await supabase
         .from('internal_staff')
         .select('staff_id, first_name, last_name, email, position')
+        .eq('tenant_id', tenant.tenant_id)
         .eq('is_active', true)
         .order('first_name');
 
@@ -67,7 +73,6 @@ const TeamMembersModal = ({ team, onClose }) => {
   const handleAddMember = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     if (!selectedStaff) {
       setError('Please select a staff member');
@@ -81,7 +86,7 @@ const TeamMembersModal = ({ team, onClose }) => {
           team_id: team.team_id,
           staff_id: selectedStaff,
           role: selectedRole,
-          assigned_by: user.id,
+          assigned_by: user?.id,
           is_active: true
         }]);
 
@@ -92,12 +97,11 @@ const TeamMembersModal = ({ team, onClose }) => {
         throw error;
       }
 
-      setSuccess('Team member added successfully');
       setSelectedStaff('');
       setSelectedRole('RECRUITER');
       setShowAddForm(false);
-      loadMembers();
-      loadAvailableStaff();
+      await loadMembers();
+      await loadAvailableStaff();
     } catch (err) {
       console.error('Error adding team member:', err);
       setError(err.message || 'Failed to add team member');
@@ -105,7 +109,7 @@ const TeamMembersModal = ({ team, onClose }) => {
   };
 
   const handleRemoveMember = async (memberId, staffName) => {
-    if (!confirm(`Are you sure you want to remove ${staffName} from this team?`)) {
+    if (!window.confirm(`Are you sure you want to remove ${staffName} from this team?`)) {
       return;
     }
 
@@ -116,9 +120,8 @@ const TeamMembersModal = ({ team, onClose }) => {
         .eq('member_id', memberId);
 
       if (error) throw error;
-      setSuccess('Team member removed successfully');
-      loadMembers();
-      loadAvailableStaff();
+      await loadMembers();
+      await loadAvailableStaff();
     } catch (err) {
       console.error('Error removing team member:', err);
       setError('Failed to remove team member');
@@ -133,8 +136,7 @@ const TeamMembersModal = ({ team, onClose }) => {
         .eq('member_id', memberId);
 
       if (error) throw error;
-      setSuccess(`Updated ${staffName}'s role to ${newRole}`);
-      loadMembers();
+      await loadMembers();
     } catch (err) {
       console.error('Error updating role:', err);
       setError('Failed to update role');
@@ -176,12 +178,6 @@ const TeamMembersModal = ({ team, onClose }) => {
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-              {success}
             </div>
           )}
 
