@@ -108,7 +108,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     ...contact
   })
 
-  const [availableStates, setAvailableStates] = useState(USA_STATES)
+  const [availableStates, setAvailableStates] = useState([])
+  const [availableCities, setAvailableCities] = useState([])
+  const [countries, setCountries] = useState([])
+  const [loadingStates, setLoadingStates] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
   const [availableJobTitles, setAvailableJobTitles] = useState(IT_JOB_TITLES)
   const [attachments, setAttachments] = useState([])
   const [fieldErrors, setFieldErrors] = useState({})
@@ -122,10 +126,37 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [statusChangeRemarks, setStatusChangeRemarks] = useState('')
   const yearsExperienceAbortController = useRef(null)
 
+  // Load countries on mount
   useEffect(() => {
-    // Update states based on country
-    setAvailableStates(formData.country === 'USA' ? USA_STATES : INDIA_STATES)
+    loadCountries()
+  }, [])
+
+  // Load states when country changes
+  useEffect(() => {
+    if (formData.country) {
+      loadStates(formData.country)
+    } else {
+      setAvailableStates([])
+      setAvailableCities([])
+      // Only reset if country was actually changed (not initial load)
+      if (contact && contact.country !== formData.country) {
+        setFormData(prev => ({ ...prev, state: '', city: '' }))
+      }
+    }
   }, [formData.country])
+
+  // Load cities when state changes
+  useEffect(() => {
+    if (formData.state) {
+      loadCities(formData.state)
+    } else {
+      setAvailableCities([])
+      // Only reset if state was actually changed (not initial load)
+      if (contact && contact.state !== formData.state) {
+        setFormData(prev => ({ ...prev, city: '' }))
+      }
+    }
+  }, [formData.state])
 
   useEffect(() => {
     // Update job titles based on contact type
@@ -218,6 +249,81 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       controller.abort()
     }
   }, [tenant?.tenant_id])
+
+  // Load countries from database
+  const loadCountries = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('countries')
+        .select('country_id, code, name')
+        .order('name')
+
+      if (error) throw error
+      setCountries(data || [])
+    } catch (err) {
+      console.error('Error loading countries:', err)
+      setCountries([{ code: 'USA', name: 'USA' }, { code: 'IN', name: 'India' }])
+    }
+  }
+
+  // Load states for selected country
+  const loadStates = async (countryName) => {
+    try {
+      setLoadingStates(true)
+      
+      const { data: countryData, error: countryError } = await supabase
+        .from('countries')
+        .select('country_id')
+        .eq('name', countryName)
+        .single()
+
+      if (countryError) throw countryError
+
+      const { data, error } = await supabase
+        .from('states')
+        .select('state_id, code, name')
+        .eq('country_id', countryData.country_id)
+        .order('name')
+
+      if (error) throw error
+      setAvailableStates(data?.map(s => s.name) || [])
+    } catch (err) {
+      console.error('Error loading states:', err)
+      // Fallback to hardcoded lists
+      setAvailableStates(countryName === 'USA' ? USA_STATES : INDIA_STATES)
+    } finally {
+      setLoadingStates(false)
+    }
+  }
+
+  // Load cities for selected state
+  const loadCities = async (stateName) => {
+    try {
+      setLoadingCities(true)
+      
+      const { data: stateData, error: stateError } = await supabase
+        .from('states')
+        .select('state_id')
+        .eq('name', stateName)
+        .single()
+
+      if (stateError) throw stateError
+
+      const { data, error } = await supabase
+        .from('cities')
+        .select('city_id, name')
+        .eq('state_id', stateData.state_id)
+        .order('name')
+
+      if (error) throw error
+      setAvailableCities(data?.map(c => c.name) || [])
+    } catch (err) {
+      console.error('Error loading cities:', err)
+      setAvailableCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
 
   const handleChange = (field, value) => {
     // Clear field error when user changes value
@@ -567,35 +673,33 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             value={formData.country}
             onChange={(e) => handleChange('country', e.target.value)}
           >
-            {COUNTRIES.map(country => (
-              <option key={country} value={country}>{country}</option>
+            <option value="">Select Country...</option>
+            {countries.map(country => (
+              <option key={country.code} value={country.name}>{country.name}</option>
             ))}
           </select>
         </div>
 
         <div className="form-group">
-          <label>State</label>
+          <label>State {loadingStates && <small>(Loading...)</small>}</label>
           <AutocompleteSelect
             options={availableStates}
             value={formData.state}
             onChange={(value) => handleChange('state', value)}
-            placeholder="Select or type state..."
+            placeholder={formData.country ? "Select or type state..." : "Select country first..."}
+            disabled={!formData.country || loadingStates}
           />
         </div>
 
         <div className="form-group">
-          <label>City</label>
-          <input
-            id="city"
-            type="text"
+          <label>City {loadingCities && <small>(Loading...)</small>}</label>
+          <AutocompleteSelect
+            options={availableCities}
             value={formData.city}
-            onChange={(e) => handleChange('city', e.target.value)}
-            className={fieldErrors.city ? 'error' : ''}
-            placeholder="Enter city..."
+            onChange={(value) => handleChange('city', value)}
+            placeholder={formData.state ? "Select or type city..." : "Select state first..."}
+            disabled={!formData.state || loadingCities}
           />
-          {fieldErrors.city && (
-            <small className="error-text">{fieldErrors.city}</small>
-          )}
         </div>
 
         {showCandidateFields && (
@@ -627,11 +731,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
       {/* Remarks */}
       <div className="form-group" style={{ marginTop: '16px' }}>
-        <label>Remarks / Comments</label>
+        <label>Remarks / Comments (Optional)</label>
         <textarea
           value={formData.remarks}
           onChange={(e) => handleChange('remarks', e.target.value)}
-          placeholder="Add any additional notes..."
+          placeholder="Add any additional notes or comments (optional)..."
           rows="4"
         />
       </div>
