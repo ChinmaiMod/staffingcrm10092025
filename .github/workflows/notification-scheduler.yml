@@ -1,0 +1,44 @@
+name: Scheduled Notifications Processor
+
+# Runs every hour to check and send scheduled notifications
+on:
+  schedule:
+    # Runs at minute 0 of every hour
+    - cron: '0 * * * *'
+  
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  process-notifications:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Send scheduled notifications
+        run: |
+          echo "Triggering scheduled notifications at $(date)"
+          
+          # Call the sendScheduledNotifications edge function
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/sendScheduledNotifications")
+          
+          # Extract HTTP status code and body
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          
+          echo "Response: $BODY"
+          echo "HTTP Status: $HTTP_CODE"
+          
+          # Check if request was successful
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Notifications processed successfully"
+          else
+            echo "❌ Failed to process notifications (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+      
+      - name: Log completion
+        if: always()
+        run: echo "Notification check completed at $(date)"
