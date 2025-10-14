@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../../../api/supabaseClient'
+import { useTenant } from '../../../contexts/TenantProvider'
+import { useAuth } from '../../../contexts/AuthProvider'
 
 export default function EmailTemplates() {
+  const { tenant } = useTenant()
+  const { user } = useAuth()
   const [templates, setTemplates] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     subject: '',
@@ -12,66 +20,120 @@ export default function EmailTemplates() {
   })
 
   useEffect(() => {
-    loadTemplates()
-  }, [])
+    if (tenant?.tenant_id) {
+      loadTemplates()
+    }
+  }, [tenant?.tenant_id])
 
   const loadTemplates = async () => {
-    // TODO: Load from API
-    setTemplates([
-      {
-        id: 1,
-        name: 'Welcome Template',
-        subject: 'Welcome to our Staffing Services',
-        body: 'Dear {{first_name}},\n\nThank you for contacting us...',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        name: 'Resume Ready Template',
-        subject: 'Your Resume is Ready for Review',
-        body: 'Hi {{first_name}},\n\nYour resume has been prepared...',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      },
-    ])
+    try {
+      setLoading(true)
+      setError('')
+      
+      const { data, error: fetchError } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('tenant_id', tenant.tenant_id)
+        .order('created_at', { ascending: false })
+
+      if (fetchError) throw fetchError
+      
+      setTemplates(data || [])
+    } catch (err) {
+      console.error('Error loading templates:', err)
+      setError('Failed to load templates: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCreate = () => {
     setSelectedTemplate(null)
     setFormData({ name: '', subject: '', body: '', is_active: true })
     setShowForm(true)
+    setError('')
+    setSuccess('')
   }
 
   const handleEdit = (template) => {
     setSelectedTemplate(template)
     setFormData({
       name: template.name,
-      subject: template.subject,
-      body: template.body,
-      is_active: template.is_active,
+      subject: template.subject || '',
+      body: template.body_text || '',
+      is_active: template.is_active !== false,
     })
     setShowForm(true)
+    setError('')
+    setSuccess('')
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+    setSuccess('')
+    
     try {
-      // TODO: API call
+      const payload = {
+        tenant_id: tenant.tenant_id,
+        name: formData.name,
+        subject: formData.subject,
+        body_text: formData.body,
+        body_html: formData.body.replace(/\n/g, '<br>'), // Simple conversion
+        created_by: user?.id,
+      }
+
+      if (selectedTemplate) {
+        // Update existing template
+        const { error: updateError } = await supabase
+          .from('email_templates')
+          .update(payload)
+          .eq('template_id', selectedTemplate.template_id)
+          .eq('tenant_id', tenant.tenant_id)
+
+        if (updateError) throw updateError
+        setSuccess('Template updated successfully!')
+      } else {
+        // Create new template
+        const { error: insertError } = await supabase
+          .from('email_templates')
+          .insert([payload])
+
+        if (insertError) throw insertError
+        setSuccess('Template created successfully!')
+      }
+
       setShowForm(false)
       loadTemplates()
+      
+      setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
-      alert('Error saving template: ' + err.message)
+      console.error('Error saving template:', err)
+      setError('Error saving template: ' + err.message)
     }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this template?')) return
+    if (!confirm('Delete this template? This action cannot be undone.')) return
+    
     try {
-      // TODO: API call
-      setTemplates(prev => prev.filter(t => t.id !== id))
+      setError('')
+      
+      const { error: deleteError } = await supabase
+        .from('email_templates')
+        .delete()
+        .eq('template_id', id)
+        .eq('tenant_id', tenant.tenant_id)
+
+      if (deleteError) throw deleteError
+
+      setSuccess('Template deleted successfully!')
+      loadTemplates()
+      
+      setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
-      alert('Error deleting: ' + err.message)
+      console.error('Error deleting template:', err)
+      setError('Error deleting: ' + err.message)
     }
   }
 
@@ -84,15 +146,32 @@ export default function EmailTemplates() {
         </button>
       </div>
 
+      {error && (
+        <div className="alert alert-error" style={{ margin: '20px' }}>
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="alert alert-success" style={{ margin: '20px' }}>
+          {success}
+        </div>
+      )}
+
       <div className="data-table-container">
         <div className="table-header">
           <h2>Available Templates</h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-            Use variables: {`{{first_name}}, {{last_name}}, {{email}}, {{status}}`}
+            Use placeholders: {`{first_name}, {last_name}, {email}, {phone}, {business_name}, {status}`}
           </p>
         </div>
 
-        {templates.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+            <div className="spinner"></div>
+            <p>Loading templates...</p>
+          </div>
+        ) : templates.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📧</div>
             <h3>No Email Templates</h3>
@@ -106,7 +185,7 @@ export default function EmailTemplates() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
               {templates.map(template => (
                 <div
-                  key={template.id}
+                  key={template.template_id}
                   style={{
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
@@ -125,13 +204,10 @@ export default function EmailTemplates() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
                     <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>{template.name}</h3>
-                    <span className={`status-badge ${template.is_active ? 'initial-contact' : ''}`}>
-                      {template.is_active ? 'Active' : 'Inactive'}
-                    </span>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
                     <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>Subject:</div>
-                    <div style={{ fontSize: '14px', color: '#334155', fontWeight: 500 }}>{template.subject}</div>
+                    <div style={{ fontSize: '14px', color: '#334155', fontWeight: 500 }}>{template.subject || 'No subject'}</div>
                   </div>
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>Body Preview:</div>
@@ -143,14 +219,14 @@ export default function EmailTemplates() {
                       overflow: 'hidden',
                       lineHeight: '1.5',
                     }}>
-                      {template.body.substring(0, 120)}...
+                      {(template.body_text || '').substring(0, 120)}...
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn btn-sm btn-primary" onClick={() => handleEdit(template)}>
                       Edit
                     </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(template.id)}>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(template.template_id)}>
                       Delete
                     </button>
                   </div>
@@ -192,10 +268,10 @@ export default function EmailTemplates() {
                     type="text"
                     value={formData.subject}
                     onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-                    placeholder="e.g., Welcome {{first_name}}"
+                    placeholder="e.g., Welcome {first_name}"
                     required
                   />
-                  <small>Use variables: {`{{first_name}}, {{last_name}}, {{email}}, {{status}}`}</small>
+                  <small>Use placeholders: {`{first_name}, {last_name}, {email}, {phone}, {business_name}, {status}`}</small>
                 </div>
 
                 <div className="form-group">
@@ -203,11 +279,11 @@ export default function EmailTemplates() {
                   <textarea
                     value={formData.body}
                     onChange={(e) => setFormData(prev => ({ ...prev, body: e.target.value }))}
-                    placeholder={'Dear {{first_name}},\n\nYour message here...\n\nBest regards,\nYour Team'}
+                    placeholder={'Dear {first_name},\n\nYour message here...\n\nBest regards,\nYour Team'}
                     rows="10"
                     required
                   />
-                  <small>Supports plain text and variables</small>
+                  <small>Supports plain text and placeholders</small>
                 </div>
 
                 <div className="form-group">

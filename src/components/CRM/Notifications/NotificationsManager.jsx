@@ -8,12 +8,14 @@ export default function NotificationsManager() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [businesses, setBusinesses] = useState([])
+  const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [formData, setFormData] = useState({
     name: '',
+    template_id: '',
     subject: '',
     body: '',
     recipient_type: 'CONTACTS',
@@ -33,6 +35,7 @@ export default function NotificationsManager() {
     if (tenant?.tenant_id) {
       loadNotifications()
       loadBusinesses()
+      loadTemplates()
     }
   }, [tenant?.tenant_id])
 
@@ -71,6 +74,41 @@ export default function NotificationsManager() {
     }
   }
 
+  const loadTemplates = async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('tenant_id', tenant.tenant_id)
+        .order('name', { ascending: true })
+
+      if (fetchError) throw fetchError
+      setTemplates(data || [])
+    } catch (err) {
+      console.error('Error loading templates:', err)
+    }
+  }
+
+  const handleTemplateChange = (template_id) => {
+    const selectedTemplate = templates.find(t => t.template_id === template_id)
+    
+    if (selectedTemplate) {
+      setFormData(prev => ({
+        ...prev,
+        template_id: template_id,
+        subject: selectedTemplate.subject || '',
+        body: selectedTemplate.body_text || ''
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        template_id: '',
+        subject: '',
+        body: ''
+      }))
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -81,6 +119,7 @@ export default function NotificationsManager() {
       const payload = {
         tenant_id: tenant.tenant_id,
         name: formData.name,
+        template_id: formData.template_id || null,
         subject: formData.subject,
         body: formData.body,
         recipient_type: formData.recipient_type,
@@ -136,6 +175,7 @@ export default function NotificationsManager() {
   const resetForm = () => {
     setFormData({
       name: '',
+      template_id: '',
       subject: '',
       body: '',
       recipient_type: 'CONTACTS',
@@ -395,16 +435,34 @@ export default function NotificationsManager() {
                   </div>
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label>Email Template (Optional)</label>
+                    <select
+                      value={formData.template_id}
+                      onChange={(e) => handleTemplateChange(e.target.value)}
+                    >
+                      <option value="">-- No Template (Enter Manually) --</option>
+                      {templates.map(template => (
+                        <option key={template.template_id} value={template.template_id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: '#64748b', fontSize: '12px' }}>
+                      Select a template to auto-fill subject and body, or leave empty to enter manually
+                    </small>
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label>Email Subject *</label>
                     <input
                       type="text"
                       value={formData.subject}
                       onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-                      placeholder="e.g., Hello {name}! Time for your check-in"
+                      placeholder="e.g., Hello {first_name}! Time for your check-in"
                       required
                     />
                     <small style={{ color: '#64748b', fontSize: '12px' }}>
-                      Use {'{name}'}, {'{first_name}'}, or {'{last_name}'} for personalization
+                      Use {'{first_name}'}, {'{last_name}'}, {'{email}'}, {'{phone}'}, {'{business_name}'}, {'{status}'} for personalization
                     </small>
                   </div>
 
@@ -419,7 +477,7 @@ export default function NotificationsManager() {
                       style={{ fontFamily: 'inherit', resize: 'vertical' }}
                     />
                     <small style={{ color: '#64748b', fontSize: '12px' }}>
-                      Supports {'{name}'}, {'{first_name}'}, {'{last_name}'} placeholders
+                      Supports {'{first_name}'}, {'{last_name}'}, {'{email}'}, {'{phone}'}, {'{business_name}'}, {'{status}'} placeholders
                     </small>
                   </div>
 

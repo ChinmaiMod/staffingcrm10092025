@@ -9,8 +9,27 @@ const corsHeaders = {
 interface Recipient {
   email: string
   name: string
+  first_name?: string
+  last_name?: string
+  phone?: string
+  business_name?: string
+  status?: string
   id?: string
   source: 'CONTACTS' | 'INTERNAL_STAFF' | 'CUSTOM'
+}
+
+// Placeholder replacement function
+function replacePlaceholders(text: string, recipient: Recipient): string {
+  if (!text) return ''
+  
+  return text
+    .replace(/{first_name}/g, recipient.first_name || '')
+    .replace(/{last_name}/g, recipient.last_name || '')
+    .replace(/{name}/g, recipient.name || '')
+    .replace(/{email}/g, recipient.email || '')
+    .replace(/{phone}/g, recipient.phone || '')
+    .replace(/{business_name}/g, recipient.business_name || '')
+    .replace(/{status}/g, recipient.status || '')
 }
 
 serve(async (req) => {
@@ -54,13 +73,30 @@ serve(async (req) => {
     for (const notification of notifications) {
       try {
         const recipients: Recipient[] = []
+        
+        // Fetch template if template_id is provided
+        let emailSubject = notification.subject
+        let emailBody = notification.body
+        
+        if (notification.template_id) {
+          const { data: template, error: templateError } = await supabaseAdmin
+            .from('email_templates')
+            .select('subject, body_text')
+            .eq('template_id', notification.template_id)
+            .single()
+          
+          if (!templateError && template) {
+            emailSubject = template.subject || notification.subject
+            emailBody = template.body_text || notification.body
+          }
+        }
 
         // Fetch recipients based on type
         if (notification.recipient_type === 'CONTACTS') {
           const filters = notification.recipient_filters || {}
           let query = supabaseAdmin
             .from('contacts')
-            .select('contact_id, email, first_name, last_name, contact_type, workflow_status, business_id')
+            .select('id, email, first_name, last_name, phone, contact_type, workflow_status, business_id')
             .eq('tenant_id', notification.tenant_id)
             .not('email', 'is', null)
 
@@ -82,11 +118,33 @@ serve(async (req) => {
           const { data: contacts, error: contactsError } = await query
 
           if (!contactsError && contacts) {
+            // Get business names for contacts
+            const businessIds = [...new Set(contacts.map(c => c.business_id).filter(Boolean))]
+            const businessMap = {}
+            
+            if (businessIds.length > 0) {
+              const { data: businesses } = await supabaseAdmin
+                .from('businesses')
+                .select('business_id, business_name')
+                .in('business_id', businessIds)
+              
+              if (businesses) {
+                businesses.forEach(b => {
+                  businessMap[b.business_id] = b.business_name
+                })
+              }
+            }
+
             contacts.forEach(contact => {
               recipients.push({
                 email: contact.email,
                 name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-                id: contact.contact_id,
+                first_name: contact.first_name || '',
+                last_name: contact.last_name || '',
+                phone: contact.phone || '',
+                business_name: businessMap[contact.business_id] || '',
+                status: contact.workflow_status || '',
+                id: contact.id,
                 source: 'CONTACTS'
               })
             })
@@ -94,7 +152,7 @@ serve(async (req) => {
         } else if (notification.recipient_type === 'INTERNAL_STAFF') {
           let query = supabaseAdmin
             .from('internal_staff')
-            .select('staff_id, email, first_name, last_name, business_id, employment_status')
+            .select('staff_id, email, first_name, last_name, phone, job_title, business_id, status')
             .eq('tenant_id', notification.tenant_id)
             .not('email', 'is', null)
 
@@ -106,10 +164,32 @@ serve(async (req) => {
           const { data: staff, error: staffError } = await query
 
           if (!staffError && staff) {
+            // Get business names for staff
+            const businessIds = [...new Set(staff.map(s => s.business_id).filter(Boolean))]
+            const businessMap = {}
+            
+            if (businessIds.length > 0) {
+              const { data: businesses } = await supabaseAdmin
+                .from('businesses')
+                .select('business_id, business_name')
+                .in('business_id', businessIds)
+              
+              if (businesses) {
+                businesses.forEach(b => {
+                  businessMap[b.business_id] = b.business_name
+                })
+              }
+            }
+
             staff.forEach(member => {
               recipients.push({
                 email: member.email,
                 name: `${member.first_name || ''} ${member.last_name || ''}`.trim(),
+                first_name: member.first_name || '',
+                last_name: member.last_name || '',
+                phone: member.phone || '',
+                business_name: businessMap[member.business_id] || '',
+                status: member.status || '',
                 id: member.staff_id,
                 source: 'INTERNAL_STAFF'
               })
@@ -120,6 +200,11 @@ serve(async (req) => {
             recipients.push({
               email: email,
               name: email.split('@')[0],
+              first_name: email.split('@')[0],
+              last_name: '',
+              phone: '',
+              business_name: '',
+              status: '',
               source: 'CUSTOM'
             })
           })
@@ -136,15 +221,9 @@ serve(async (req) => {
 
         for (const recipient of recipients) {
           try {
-            // Personalize the message
-            let personalizedBody = notification.body
-              .replace(/{first_name}/g, recipient.name.split(' ')[0] || '')
-              .replace(/{last_name}/g, recipient.name.split(' ').slice(1).join(' ') || '')
-              .replace(/{name}/g, recipient.name)
-
-            let personalizedSubject = notification.subject
-              .replace(/{first_name}/g, recipient.name.split(' ')[0] || '')
-              .replace(/{name}/g, recipient.name)
+            // Personalize the message using the placeholder replacement function
+            const personalizedBody = replacePlaceholders(emailBody, recipient)
+            const personalizedSubject = replacePlaceholders(emailSubject, recipient)
 
             // Send email via Resend
             const emailData = {
