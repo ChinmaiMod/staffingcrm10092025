@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BusinessForm from './BusinessForm'
 import { supabase } from '../../../../api/supabaseClient'
 import { useTenant } from '../../../../contexts/TenantProvider'
@@ -22,6 +23,7 @@ const normalizeBusiness = (business) => {
 }
 
 export default function BusinessesPage() {
+  const navigate = useNavigate()
   const { tenant } = useTenant()
   const { profile } = useAuth()
   const [businesses, setBusinesses] = useState([])
@@ -191,6 +193,22 @@ export default function BusinessesPage() {
 
   return (
     <div className="data-table-container">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="table-header">
         <h2>🏢 Businesses</h2>
         {canManageBusinesses && (

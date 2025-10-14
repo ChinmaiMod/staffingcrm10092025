@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../api/supabaseClient';
 import './AssignUserRoles.css';
 
 const AssignUserRoles = () => {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [users, setUsers] = useState([]);
@@ -425,6 +427,22 @@ const AssignUserRoles = () => {
 
   return (
     <div className="assign-user-roles">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="page-header">
         <div>
           <h1>Assign User Roles</h1>

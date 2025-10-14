@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../api/supabaseClient'
 import { useAuth } from '../../../contexts/AuthProvider'
 import { useTenant } from '../../../contexts/TenantProvider'
@@ -6,6 +7,7 @@ import { validateTextField, handleSupabaseError, handleError } from '../../../ut
 import './PipelineAdmin.css'
 
 export default function PipelineAdmin() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { tenant } = useTenant()
   const [pipelines, setPipelines] = useState([])
@@ -534,6 +536,22 @@ export default function PipelineAdmin() {
 
   return (
     <div className="pipeline-admin">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="pipeline-admin-header">
         <h1>Pipeline Administration</h1>
         <button

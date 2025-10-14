@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../api/supabaseClient'
 import { useTenant } from '../../../contexts/TenantProvider'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -6,6 +7,7 @@ import { validateEmail } from '../../../utils/validators'
 import './InviteUsers.css'
 
 export default function InviteUsers() {
+  const navigate = useNavigate()
   const { tenant } = useTenant()
   const { profile } = useAuth()
   const [invitations, setInvitations] = useState([])
@@ -237,6 +239,22 @@ export default function InviteUsers() {
 
   return (
     <div className="invite-users">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="page-header">
         <div>
           <h1>👥 Invite Users</h1>

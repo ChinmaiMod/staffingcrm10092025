@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../api/supabaseClient';
 import { useAuth } from '../../../contexts/AuthProvider';
 import './UserRolesManagement.css';
@@ -9,6 +10,7 @@ import './UserRolesManagement.css';
  * Allows creation and management of user roles with granular permissions
  */
 function UserRolesManagement() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const [roles, setRoles] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -361,6 +363,22 @@ function UserRolesManagement() {
 
   return (
     <div className="user-roles-management">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="page-header">
         <div>
           <h1>🔐 User Roles Management</h1>

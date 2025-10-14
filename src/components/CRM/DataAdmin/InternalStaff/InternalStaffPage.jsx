@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import InternalStaffForm from './InternalStaffForm'
 import { supabase } from '../../../../api/supabaseClient'
 import { useTenant } from '../../../../contexts/TenantProvider'
@@ -46,6 +47,7 @@ const normalizeBusiness = (business) => {
 }
 
 export default function InternalStaffPage() {
+  const navigate = useNavigate()
   const { tenant } = useTenant()
   const { profile } = useAuth()
 
@@ -261,6 +263,22 @@ export default function InternalStaffPage() {
 
   return (
     <div className="data-table-container">
+      <div style={{ marginBottom: '16px' }}>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/crm/data-admin')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '14px',
+            padding: '8px 16px'
+          }}
+        >
+          ← Back to All Tables
+        </button>
+      </div>
+      
       <div className="table-header">
         <div>
           <h2>👥 Internal Staff</h2>
