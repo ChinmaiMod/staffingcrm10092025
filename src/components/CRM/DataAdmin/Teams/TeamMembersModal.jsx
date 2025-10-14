@@ -12,6 +12,7 @@ const TeamMembersModal = ({ team, onClose }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedRole, setSelectedRole] = useState('RECRUITER');
+  const [selectedLead, setSelectedLead] = useState(''); // For linking recruiter to lead
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -95,16 +96,31 @@ const TeamMembersModal = ({ team, onClose }) => {
       return;
     }
 
+    // Validation: Recruiters should have a lead (but not required for flexibility)
+    // No validation needed for leads (manager is optional) or managers
+
     try {
+      const payload = {
+        team_id: team.team_id,
+        staff_id: selectedStaff,
+        role: selectedRole,
+        assigned_by: user?.id,
+        is_active: true
+      };
+
+      // Set reports_to_member_id based on role
+      if (selectedRole === 'RECRUITER' && selectedLead) {
+        // Recruiter reports to a lead
+        payload.reports_to_member_id = selectedLead;
+      } else if (selectedRole === 'LEAD' && selectedLead) {
+        // Lead reports to a manager
+        payload.reports_to_member_id = selectedLead;
+      }
+      // Managers have no reports_to_member_id (remains NULL)
+
       const { error } = await supabase
         .from('team_members')
-        .insert([{
-          team_id: team.team_id,
-          staff_id: selectedStaff,
-          role: selectedRole,
-          assigned_by: user?.id,
-          is_active: true
-        }]);
+        .insert([payload]);
 
       if (error) {
         if (error.code === '23505') {
@@ -115,6 +131,7 @@ const TeamMembersModal = ({ team, onClose }) => {
 
       setSelectedStaff('');
       setSelectedRole('RECRUITER');
+      setSelectedLead('');
       setShowAddForm(false);
       await loadMembers();
       await loadAvailableStaff();
@@ -164,6 +181,7 @@ const TeamMembersModal = ({ team, onClose }) => {
     staff => !assignedStaffIds.includes(staff.staff_id)
   );
 
+  const managers = members.filter(m => m.role === 'MANAGER');
   const leads = members.filter(m => m.role === 'LEAD');
   const recruiters = members.filter(m => m.role === 'RECRUITER');
 
@@ -300,7 +318,13 @@ const TeamMembersModal = ({ team, onClose }) => {
                     <select
                       required
                       value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedRole(e.target.value);
+                        // Reset selected lead/manager when changing role
+                        if (e.target.value === 'MANAGER') {
+                          setSelectedLead('');
+                        }
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px 14px',
@@ -311,8 +335,71 @@ const TeamMembersModal = ({ team, onClose }) => {
                     >
                       <option value="RECRUITER">Recruiter</option>
                       <option value="LEAD">Lead</option>
+                      <option value="MANAGER">Manager</option>
                     </select>
                   </div>
+
+                  {/* Show lead selector when adding a recruiter */}
+                  {selectedRole === 'RECRUITER' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '6px', color: '#374151' }}>
+                        Reports To (Lead) <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        required
+                        value={selectedLead}
+                        onChange={(e) => setSelectedLead(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Select Team Lead</option>
+                        {leads.map((member) => (
+                          <option key={member.member_id} value={member.member_id}>
+                            {member.staff.first_name} {member.staff.last_name}
+                            {member.staff.job_title ? ` - ${member.staff.job_title}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {leads.length === 0 && (
+                        <small style={{ display: 'block', color: '#ef4444', marginTop: '4px' }}>
+                          Please add a team lead first before adding recruiters
+                        </small>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Show manager selector when adding a lead */}
+                  {selectedRole === 'LEAD' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '6px', color: '#374151' }}>
+                        Reports To (Manager) <span style={{ color: '#9ca3af' }}>(Optional)</span>
+                      </label>
+                      <select
+                        value={selectedLead}
+                        onChange={(e) => setSelectedLead(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">No Manager (Independent Lead)</option>
+                        {managers.map((member) => (
+                          <option key={member.member_id} value={member.member_id}>
+                            {member.staff.first_name} {member.staff.last_name}
+                            {member.staff.job_title ? ` - ${member.staff.job_title}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -325,6 +412,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                       setShowAddForm(false);
                       setSelectedStaff('');
                       setSelectedRole('RECRUITER');
+                      setSelectedLead('');
                       setError('');
                     }}
                     className="btn btn-secondary"
@@ -356,6 +444,98 @@ const TeamMembersModal = ({ team, onClose }) => {
             </div>
           ) : (
             <div>
+              {/* Managers */}
+              {managers.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: '#7c3aed',
+                      borderRadius: '50%',
+                      marginRight: '8px'
+                    }}></span>
+                    Managers ({managers.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {managers.map((member) => (
+                      <div
+                        key={member.member_id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          backgroundColor: '#faf5ff',
+                          border: '1px solid #e9d5ff',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '15px', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
+                            {member.staff?.first_name} {member.staff?.last_name}
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>
+                            {member.staff?.job_title && <span>{member.staff.job_title}</span>}
+                            {member.staff?.department && member.staff?.job_title && <span> • </span>}
+                            {member.staff?.department && <span>{member.staff.department}</span>}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                            {member.staff?.email}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            backgroundColor: '#7c3aed',
+                            color: 'white',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            borderRadius: '12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Manager
+                          </span>
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleUpdateRole(member.member_id, e.target.value)}
+                            style={{
+                              padding: '6px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              backgroundColor: 'white'
+                            }}
+                          >
+                            <option value="MANAGER">Manager</option>
+                            <option value="LEAD">Lead</option>
+                            <option value="RECRUITER">Recruiter</option>
+                          </select>
+                          <button
+                            onClick={() => handleRemoveMember(
+                              member.member_id,
+                              `${member.staff?.first_name} ${member.staff?.last_name}`
+                            )}
+                            className="btn btn-sm btn-danger"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Team Leads */}
               {leads.length > 0 && (
                 <div style={{ marginBottom: '24px' }}>
@@ -428,6 +608,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                               backgroundColor: 'white'
                             }}
                           >
+                            <option value="MANAGER">Manager</option>
                             <option value="LEAD">Lead</option>
                             <option value="RECRUITER">Recruiter</option>
                           </select>
@@ -519,8 +700,9 @@ const TeamMembersModal = ({ team, onClose }) => {
                               backgroundColor: 'white'
                             }}
                           >
-                            <option value="RECRUITER">Recruiter</option>
+                            <option value="MANAGER">Manager</option>
                             <option value="LEAD">Lead</option>
+                            <option value="RECRUITER">Recruiter</option>
                           </select>
                           <button
                             onClick={() => handleRemoveMember(

@@ -174,7 +174,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   // Load recruiters when team lead changes or on mount
   useEffect(() => {
     if (tenant?.tenant_id) {
-      loadRecruiters()
+      // Pass the selected team lead name to filter recruiters
+      loadRecruiters(formData.recruiting_team_lead)
     }
   }, [tenant?.tenant_id, formData.recruiting_team_lead])
 
@@ -345,22 +346,44 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
   }
 
-  // Load team leads from internal staff
+  // Load team leads from team_members table (staff with LEAD role)
   const loadTeamLeads = async () => {
     if (!tenant?.tenant_id) return
     
     try {
       setLoadingTeamLeads(true)
       
+      // Get staff who are team leads (role='LEAD' in team_members)
       const { data, error } = await supabase
-        .from('internal_staff')
-        .select('staff_id, first_name, last_name, email, job_title, department')
-        .eq('tenant_id', tenant.tenant_id)
-        .eq('status', 'ACTIVE')
-        .order('first_name')
+        .from('team_members')
+        .select(`
+          staff:internal_staff(
+            staff_id,
+            first_name,
+            last_name,
+            email,
+            job_title,
+            department
+          )
+        `)
+        .eq('role', 'LEAD')
+        .eq('is_active', true)
 
       if (error) throw error
-      setTeamLeads(data || [])
+      
+      // Extract unique staff (in case someone is a lead on multiple teams)
+      const staffMap = new Map()
+      data?.forEach(member => {
+        if (member.staff && !staffMap.has(member.staff.staff_id)) {
+          staffMap.set(member.staff.staff_id, member.staff)
+        }
+      })
+      
+      const uniqueLeads = Array.from(staffMap.values()).sort((a, b) => 
+        a.first_name.localeCompare(b.first_name)
+      )
+      
+      setTeamLeads(uniqueLeads)
     } catch (err) {
       console.error('Error loading team leads:', err)
       setTeamLeads([])
@@ -369,22 +392,79 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
   }
 
-  // Load recruiters from internal staff
-  const loadRecruiters = async () => {
+  // Load recruiters from team_members table (staff with RECRUITER role)
+  // Optionally filtered by selected team lead
+  const loadRecruiters = async (selectedLeadName = null) => {
     if (!tenant?.tenant_id) return
     
     try {
       setLoadingRecruiters(true)
       
-      const { data, error } = await supabase
-        .from('internal_staff')
-        .select('staff_id, first_name, last_name, email, job_title, department')
-        .eq('tenant_id', tenant.tenant_id)
-        .eq('status', 'ACTIVE')
-        .order('first_name')
+      // If a team lead is selected, find their member_id(s) first
+      let leadMemberIds = []
+      if (selectedLeadName) {
+        // Parse the lead name from "FirstName LastName - JobTitle" format
+        const leadNameParts = selectedLeadName.split(' - ')[0].trim().split(' ')
+        const firstName = leadNameParts[0]
+        const lastName = leadNameParts.slice(1).join(' ')
+        
+        // Find the lead's member_id(s)
+        const { data: leadData, error: leadError } = await supabase
+          .from('team_members')
+          .select(`
+            member_id,
+            staff:internal_staff!inner(first_name, last_name)
+          `)
+          .eq('role', 'LEAD')
+          .eq('is_active', true)
+          .eq('staff.first_name', firstName)
+          .eq('staff.last_name', lastName)
+        
+        if (!leadError && leadData) {
+          leadMemberIds = leadData.map(m => m.member_id)
+        }
+      }
+      
+      // Build query for recruiters
+      let query = supabase
+        .from('team_members')
+        .select(`
+          member_id,
+          reports_to_member_id,
+          staff:internal_staff(
+            staff_id,
+            first_name,
+            last_name,
+            email,
+            job_title,
+            department
+          )
+        `)
+        .eq('role', 'RECRUITER')
+        .eq('is_active', true)
+      
+      // If lead is selected, filter by reports_to_member_id
+      if (leadMemberIds.length > 0) {
+        query = query.in('reports_to_member_id', leadMemberIds)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
-      setRecruiters(data || [])
+      
+      // Extract unique staff (in case someone is a recruiter on multiple teams)
+      const staffMap = new Map()
+      data?.forEach(member => {
+        if (member.staff && !staffMap.has(member.staff.staff_id)) {
+          staffMap.set(member.staff.staff_id, member.staff)
+        }
+      })
+      
+      const uniqueRecruiters = Array.from(staffMap.values()).sort((a, b) => 
+        a.first_name.localeCompare(b.first_name)
+      )
+      
+      setRecruiters(uniqueRecruiters)
     } catch (err) {
       console.error('Error loading recruiters:', err)
       setRecruiters([])
