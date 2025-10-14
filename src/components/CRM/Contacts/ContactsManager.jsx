@@ -93,6 +93,7 @@ export default function ContactsManager() {
   const [savingContact, setSavingContact] = useState(false)
   const [defaultBusinessId, setDefaultBusinessId] = useState(null)
   const [businesses, setBusinesses] = useState([])
+  const [selectedNewContactBusiness, setSelectedNewContactBusiness] = useState('all')
   
   // Advanced filter state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
@@ -300,6 +301,11 @@ export default function ContactsManager() {
 
         if (!isCancelled) {
           setBusinesses(data || [])
+          // Set default business if available
+          const defaultBiz = data?.find(b => b.is_default)
+          if (defaultBiz) {
+            setSelectedNewContactBusiness(defaultBiz.business_id)
+          }
         }
       } catch (err) {
         if (err.name === 'AbortError') {
@@ -357,7 +363,11 @@ export default function ContactsManager() {
   }, [searchParams, loadContacts, tenant?.tenant_id, profile?.id])
 
   const handleCreateContact = () => {
-    setSelectedContact(null)
+    // Pre-fill business if one is selected
+    const initialContact = selectedNewContactBusiness !== 'all' 
+      ? { business_id: selectedNewContactBusiness }
+      : null
+    setSelectedContact(initialContact)
     setShowForm(true)
   }
 
@@ -762,9 +772,32 @@ export default function ContactsManager() {
               )}
             </div>
           )}
-          <button className="btn btn-primary" onClick={handleCreateContact}>
-            + New Contact
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <select
+              value={selectedNewContactBusiness}
+              onChange={(e) => setSelectedNewContactBusiness(e.target.value)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                fontSize: '14px',
+                minWidth: '200px',
+                background: 'white',
+                color: '#475569'
+              }}
+            >
+              <option value="all">Select Business...</option>
+              {businesses.map((business) => (
+                <option key={business.business_id} value={business.business_id}>
+                  {business.business_name}
+                  {business.is_default ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-primary" onClick={handleCreateContact}>
+              + New Contact
+            </button>
+          </div>
         </div>
       </div>
 
@@ -985,7 +1018,11 @@ export default function ContactsManager() {
                       </span>
                     )}
                   </td>
-                  <td>{contact.contact_type?.replace(/_/g, ' ')}</td>
+                  <td>
+                    <span className="status-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                      {contact.contact_type?.replace(/_/g, ' ')}
+                    </span>
+                  </td>
                   <td>
                     <span className="status-badge">{contact.status}</span>
                   </td>
