@@ -33,12 +33,13 @@ const TeamMembersModal = ({ team, onClose }) => {
             first_name,
             last_name,
             email,
-            job_title
+            job_title,
+            department
           )
         `)
         .eq('team_id', team.team_id)
         .eq('is_active', true)
-        .order('role', { ascending: false }) // LEAD first, then RECRUITER
+        .order('role', { ascending: false })
         .order('assigned_at');
 
       if (error) throw error;
@@ -63,7 +64,7 @@ const TeamMembersModal = ({ team, onClose }) => {
       
       const { data, error } = await supabase
         .from('internal_staff')
-        .select('staff_id, first_name, last_name, email, job_title')
+        .select('staff_id, first_name, last_name, email, job_title, department')
         .eq('tenant_id', tenant.tenant_id)
         .eq('status', 'ACTIVE')
         .order('first_name');
@@ -106,7 +107,7 @@ const TeamMembersModal = ({ team, onClose }) => {
         }]);
 
       if (error) {
-        if (error.code === '23505') { // Unique constraint violation
+        if (error.code === '23505') {
           throw new Error('This staff member is already assigned to this team');
         }
         throw error;
@@ -124,7 +125,7 @@ const TeamMembersModal = ({ team, onClose }) => {
   };
 
   const handleRemoveMember = async (memberId, staffName) => {
-    if (!window.confirm(`Are you sure you want to remove ${staffName} from this team?`)) {
+    if (!window.confirm(`Remove ${staffName} from this team?`)) {
       return;
     }
 
@@ -143,7 +144,7 @@ const TeamMembersModal = ({ team, onClose }) => {
     }
   };
 
-  const handleUpdateRole = async (memberId, newRole, staffName) => {
+  const handleUpdateRole = async (memberId, newRole) => {
     try {
       const { error } = await supabase
         .from('team_members')
@@ -158,71 +159,130 @@ const TeamMembersModal = ({ team, onClose }) => {
     }
   };
 
-  // Filter out staff already in the team
   const assignedStaffIds = members.map(m => m.staff_id);
   const filteredAvailableStaff = availableStaff.filter(
     staff => !assignedStaffIds.includes(staff.staff_id)
   );
 
-  // Group members by role for better display
   const leads = members.filter(m => m.role === 'LEAD');
   const recruiters = members.filter(m => m.role === 'RECRUITER');
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          width: '100%',
+          maxWidth: '900px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-semibold text-gray-800">
-              Team Members - {team.team_name}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        <div style={{
+          padding: '24px',
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#111827', margin: 0 }}>
+              Team Members
+            </h2>
+            <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>
+              {team.team_name}
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              padding: '4px',
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: '#fee2e2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              color: '#991b1b',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}>
               {error}
             </div>
           )}
 
-          {/* Add Member Button */}
-          {!showAddForm && (
-            <div className="mb-6">
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                + Add Team Member
-              </button>
-            </div>
-          )}
-
-          {/* Add Member Form */}
-          {showAddForm && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="text-lg font-semibold mb-4">Add Team Member</h4>
+          {/* Add Member Button/Form */}
+          {!showAddForm ? (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="btn btn-primary"
+              style={{ marginBottom: '24px' }}
+            >
+              + Add Team Member
+            </button>
+          ) : (
+            <div style={{
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '20px',
+              marginBottom: '24px'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>
+                Add Team Member
+              </h3>
               <form onSubmit={handleAddMember}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Staff Member *
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '6px', color: '#374151' }}>
+                      Staff Member <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <select
                       required
                       value={selectedStaff}
                       onChange={(e) => setSelectedStaff(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
                     >
                       <option value="">Select Staff Member</option>
                       {filteredAvailableStaff.map((staff) => (
@@ -234,14 +294,20 @@ const TeamMembersModal = ({ team, onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Role *
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '6px', color: '#374151' }}>
+                      Role <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <select
                       required
                       value={selectedRole}
                       onChange={(e) => setSelectedRole(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
                     >
                       <option value="RECRUITER">Recruiter</option>
                       <option value="LEAD">Lead</option>
@@ -249,11 +315,8 @@ const TeamMembersModal = ({ team, onClose }) => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 mt-4">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="submit" className="btn btn-primary">
                     Add Member
                   </button>
                   <button
@@ -264,7 +327,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                       setSelectedRole('RECRUITER');
                       setError('');
                     }}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                    className="btn btn-secondary"
                   >
                     Cancel
                   </button>
@@ -275,49 +338,95 @@ const TeamMembersModal = ({ team, onClose }) => {
 
           {/* Members List */}
           {loading ? (
-            <div className="text-center py-8 text-gray-600">Loading members...</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+              Loading members...
+            </div>
           ) : members.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No team members yet. Click "Add Team Member" to get started.
+            <div style={{
+              textAlign: 'center',
+              padding: '40px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              border: '2px dashed #e5e7eb'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>👥</div>
+              <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
+                No team members yet. Click "Add Team Member" to get started.
+              </p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div>
               {/* Team Leads */}
               {leads.length > 0 && (
-                <div>
-                  <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                    <span className="inline-block w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: '#2563eb',
+                      borderRadius: '50%',
+                      marginRight: '8px'
+                    }}></span>
                     Team Leads ({leads.length})
                   </h4>
-                  <div className="space-y-2">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leads.map((member) => (
                       <div
                         key={member.member_id}
-                        className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          backgroundColor: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '8px'
+                        }}
                       >
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '15px', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
                             {member.staff?.first_name} {member.staff?.last_name}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {member.staff?.position || 'N/A'} • {member.staff?.email}
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>
+                            {member.staff?.job_title && <span>{member.staff.job_title}</span>}
+                            {member.staff?.department && member.staff?.job_title && <span> • </span>}
+                            {member.staff?.department && <span>{member.staff.department}</span>}
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Added: {new Date(member.assigned_at).toLocaleDateString()}
+                          <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                            {member.staff?.email}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-full">
-                            LEAD
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            backgroundColor: '#2563eb',
+                            color: 'white',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            borderRadius: '12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Lead
                           </span>
                           <select
                             value={member.role}
-                            onChange={(e) => handleUpdateRole(
-                              member.member_id, 
-                              e.target.value,
-                              `${member.staff?.first_name} ${member.staff?.last_name}`
-                            )}
-                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            onChange={(e) => handleUpdateRole(member.member_id, e.target.value)}
+                            style={{
+                              padding: '6px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              backgroundColor: 'white'
+                            }}
                           >
                             <option value="LEAD">Lead</option>
                             <option value="RECRUITER">Recruiter</option>
@@ -327,7 +436,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                               member.member_id,
                               `${member.staff?.first_name} ${member.staff?.last_name}`
                             )}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            className="btn btn-sm btn-danger"
                           >
                             Remove
                           </button>
@@ -341,39 +450,74 @@ const TeamMembersModal = ({ team, onClose }) => {
               {/* Recruiters */}
               {recruiters.length > 0 && (
                 <div>
-                  <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                    <span className="inline-block w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+                  <h4 style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: '#059669',
+                      borderRadius: '50%',
+                      marginRight: '8px'
+                    }}></span>
                     Recruiters ({recruiters.length})
                   </h4>
-                  <div className="space-y-2">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {recruiters.map((member) => (
                       <div
                         key={member.member_id}
-                        className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
                       >
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '15px', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
                             {member.staff?.first_name} {member.staff?.last_name}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {member.staff?.position || 'N/A'} • {member.staff?.email}
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>
+                            {member.staff?.job_title && <span>{member.staff.job_title}</span>}
+                            {member.staff?.department && member.staff?.job_title && <span> • </span>}
+                            {member.staff?.department && <span>{member.staff.department}</span>}
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Added: {new Date(member.assigned_at).toLocaleDateString()}
+                          <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                            {member.staff?.email}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded-full">
-                            RECRUITER
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            borderRadius: '12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Recruiter
                           </span>
                           <select
                             value={member.role}
-                            onChange={(e) => handleUpdateRole(
-                              member.member_id, 
-                              e.target.value,
-                              `${member.staff?.first_name} ${member.staff?.last_name}`
-                            )}
-                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            onChange={(e) => handleUpdateRole(member.member_id, e.target.value)}
+                            style={{
+                              padding: '6px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              backgroundColor: 'white'
+                            }}
                           >
                             <option value="RECRUITER">Recruiter</option>
                             <option value="LEAD">Lead</option>
@@ -383,7 +527,7 @@ const TeamMembersModal = ({ team, onClose }) => {
                               member.member_id,
                               `${member.staff?.first_name} ${member.staff?.last_name}`
                             )}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            className="btn btn-sm btn-danger"
                           >
                             Remove
                           </button>
@@ -398,18 +542,23 @@ const TeamMembersModal = ({ team, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              Total Members: {members.length} ({leads.length} Lead{leads.length !== 1 ? 's' : ''}, {recruiters.length} Recruiter{recruiters.length !== 1 ? 's' : ''})
-            </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-            >
-              Close
-            </button>
+        <div style={{
+          padding: '16px 24px',
+          borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#f9fafb',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            <strong>Total Members: {members.length}</strong>
+            {members.length > 0 && (
+              <span> ({leads.length} {leads.length === 1 ? 'Lead' : 'Leads'}, {recruiters.length} {recruiters.length === 1 ? 'Recruiter' : 'Recruiters'})</span>
+            )}
           </div>
+          <button onClick={onClose} className="btn btn-secondary">
+            Close
+          </button>
         </div>
       </div>
     </div>
