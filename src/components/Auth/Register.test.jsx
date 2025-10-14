@@ -103,6 +103,7 @@ describe('Register Component', () => {
       authValue: { signUp: mockSignUp, loading: false },
     })
 
+    await user.type(screen.getByLabelText(/full name/i), 'John Doe')
     await user.type(screen.getByLabelText(/email/i), 'newuser@example.com')
     await user.type(screen.getByLabelText(/company name/i), 'Test Company')
     await user.type(screen.getByLabelText(/phone number/i), '1234567890')
@@ -117,7 +118,9 @@ describe('Register Component', () => {
       )
       expect(mockInvoke).toHaveBeenCalledWith('createTenantAndProfile', expect.objectContaining({
         body: expect.objectContaining({
+          userId: '123',
           email: 'newuser@example.com',
+          fullName: 'John Doe',
           companyName: 'Test Company',
           phoneNumber: '1234567890',
         })
@@ -137,6 +140,7 @@ describe('Register Component', () => {
       authValue: { signUp: mockSignUp, loading: false },
     })
 
+    await user.type(screen.getByLabelText(/full name/i), 'Jane Doe')
     await user.type(screen.getByLabelText(/email/i), 'existing@example.com')
     await user.type(screen.getByLabelText(/company name/i), 'Test Company')
     await user.type(screen.getByLabelText(/^password/i), 'Password123!')

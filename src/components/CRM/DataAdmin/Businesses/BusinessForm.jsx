@@ -103,18 +103,33 @@ export default function BusinessForm({
         marginBottom: '24px',
         border: '1px solid #e2e8f0',
         borderRadius: '12px',
-        padding: '20px 24px',
+        padding: '28px',
         background: '#ffffff',
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
+        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start', 
+        marginBottom: '28px',
+        paddingBottom: '20px',
+        borderBottom: '1px solid #f1f5f9'
+      }}>
         <div>
-          <h3 style={{ margin: 0 }}>{title}</h3>
-          <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>Complete the fields below to save your business settings.</p>
+          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#0f172a' }}>{title}</h3>
+          <p style={{ margin: '6px 0 0 0', color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>
+            Complete the fields below to save your business settings.
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={submitting}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className="btn btn-secondary" 
+            type="button" 
+            onClick={onCancel} 
+            disabled={submitting}
+            style={{ minWidth: '90px' }}
+          >
             Cancel
           </button>
           <button
@@ -122,94 +137,257 @@ export default function BusinessForm({
             type="submit"
             onClick={handleSubmit}
             disabled={submitting}
+            style={{ minWidth: '120px' }}
           >
             {submitting ? 'Saving...' : 'Save Business'}
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="form-grid" style={{ marginTop: '8px' }}>
-        <div className="form-field">
-          <label>Business Name *</label>
-          <input
-            type="text"
-            value={formState.business_name}
-            onChange={(event) => handleChange('business_name', event.target.value)}
-            placeholder="e.g., Intuites IT Staffing"
-          />
-          {errors.business_name && <p className="form-error">{errors.business_name}</p>}
+      <form onSubmit={handleSubmit}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '24px',
+          marginBottom: '24px'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#334155' }}>
+              Business Name <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={formState.business_name}
+              onChange={(event) => handleChange('business_name', event.target.value)}
+              placeholder="e.g., Intuites IT Staffing"
+              style={{
+                padding: '10px 14px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                transition: 'all 0.2s',
+                background: 'white',
+                color: '#1e293b'
+              }}
+            />
+            {errors.business_name && (
+              <p style={{ color: '#ef4444', fontSize: '13px', margin: 0 }}>
+                {errors.business_name}
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#334155' }}>
+              Business Type <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <select
+              value={formState.business_type}
+              onChange={(event) => handleChange('business_type', event.target.value)}
+              style={{
+                padding: '10px 14px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                transition: 'all 0.2s',
+                background: 'white',
+                color: '#1e293b',
+                cursor: 'pointer'
+              }}
+            >
+              {BUSINESS_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+            {errors.business_type && (
+              <p style={{ color: '#ef4444', fontSize: '13px', margin: 0 }}>
+                {errors.business_type}
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#334155' }}>
+              Industry
+            </label>
+            <input
+              type="text"
+              value={formState.industry}
+              onChange={(event) => handleChange('industry', event.target.value)}
+              placeholder="e.g., Technology, Healthcare"
+              style={{
+                padding: '10px 14px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                transition: 'all 0.2s',
+                background: 'white',
+                color: '#1e293b'
+              }}
+            />
+          </div>
         </div>
 
-        <div className="form-field">
-          <label>Business Type *</label>
-          <select
-            value={formState.business_type}
-            onChange={(event) => handleChange('business_type', event.target.value)}
-          >
-            {BUSINESS_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          {errors.business_type && <p className="form-error">{errors.business_type}</p>}
-        </div>
-
-        <div className="form-field">
-          <label>Industry</label>
-          <input
-            type="text"
-            value={formState.industry}
-            onChange={(event) => handleChange('industry', event.target.value)}
-            placeholder="e.g., Technology, Healthcare"
-          />
-        </div>
-
-        <div className="form-field" style={{ gridColumn: 'span 2' }}>
-          <label>Description</label>
+        <div style={{ marginBottom: '28px' }}>
+          <label style={{ 
+            fontSize: '14px', 
+            fontWeight: 500, 
+            color: '#334155',
+            display: 'block',
+            marginBottom: '8px'
+          }}>
+            Description
+          </label>
           <textarea
             rows={3}
             value={formState.description}
             onChange={(event) => handleChange('description', event.target.value)}
             placeholder="Short description of this business context"
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '14px',
+              transition: 'all 0.2s',
+              background: 'white',
+              color: '#1e293b',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              lineHeight: '1.5'
+            }}
           />
         </div>
 
-        <div className="form-field" style={{ gridColumn: 'span 2' }}>
-          <label>Enabled Contact Types</label>
-          <div className="checkbox-group">
+        <div style={{ 
+          marginBottom: '28px',
+          padding: '20px',
+          background: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <label style={{ 
+            fontSize: '14px', 
+            fontWeight: 500, 
+            color: '#334155',
+            display: 'block',
+            marginBottom: '14px'
+          }}>
+            Enabled Contact Types
+          </label>
+          <div style={{ 
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '12px'
+          }}>
             {CONTACT_TYPES.map((type) => (
-              <label key={type.value} className="checkbox-item">
+              <label 
+                key={type.value}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontSize: '14px',
+                  color: '#475569'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1'
+                  e.currentTarget.style.background = '#ffffff'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0'
+                  e.currentTarget.style.background = 'white'
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={formState.enabled_contact_types.includes(type.value)}
                   onChange={() => handleContactTypeToggle(type.value)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer',
+                    accentColor: '#3b82f6'
+                  }}
                 />
-                <span>{type.label}</span>
+                <span style={{ flex: 1, userSelect: 'none' }}>{type.label}</span>
               </label>
             ))}
           </div>
         </div>
 
-        <div className="form-field">
-          <label className="checkbox-item">
+        <div style={{ 
+          display: 'flex',
+          gap: '24px',
+          padding: '20px',
+          background: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 14px',
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#475569',
+              flex: 1
+            }}
+          >
             <input
               type="checkbox"
               checked={formState.is_active}
               onChange={handleCheckboxToggle('is_active')}
+              style={{
+                width: '18px',
+                height: '18px',
+                cursor: 'pointer',
+                accentColor: '#10b981'
+              }}
             />
-            <span>Active</span>
+            <span style={{ userSelect: 'none' }}>Active</span>
           </label>
-        </div>
 
-        <div className="form-field">
-          <label className="checkbox-item">
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 14px',
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#475569',
+              flex: 1
+            }}
+          >
             <input
               type="checkbox"
               checked={formState.is_default}
               onChange={handleCheckboxToggle('is_default')}
+              style={{
+                width: '18px',
+                height: '18px',
+                cursor: 'pointer',
+                accentColor: '#8b5cf6'
+              }}
             />
-            <span>Set as default business</span>
+            <span style={{ userSelect: 'none' }}>Set as default business</span>
           </label>
         </div>
       </form>

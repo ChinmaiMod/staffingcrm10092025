@@ -59,9 +59,7 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
   })
 
-  it.skip('should allow access when user has required role', () => {
-    // Note: Role-based authorization is not currently implemented in ProtectedRoute
-    // This functionality may be added in the future
+  it('should allow access when user has required role', () => {
     const authValue = {
       loading: false,
       user: { id: '123', email: 'test@example.com' },
@@ -73,9 +71,7 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
   })
 
-  it.skip('should show unauthorized message when user lacks required role', () => {
-    // Note: Role-based authorization is not currently implemented in ProtectedRoute
-    // This functionality may be added in the future
+  it('should show unauthorized message when user lacks required role', () => {
     const authValue = {
       loading: false,
       user: { id: '123', email: 'test@example.com' },
@@ -84,17 +80,16 @@ describe('ProtectedRoute Component', () => {
     
     renderProtectedRoute(authValue, 'admin')
     
-    expect(screen.getByText(/not authorized/i)).toBeInTheDocument()
+    expect(screen.getByText(/access denied/i)).toBeInTheDocument()
+    expect(screen.getByText(/don't have permission/i)).toBeInTheDocument()
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 
-  it.skip('should allow super_admin to access any role-protected route', () => {
-    // Note: Role-based authorization is not currently implemented in ProtectedRoute
-    // This functionality may be added in the future
+  it('should allow super_admin to access any role-protected route', () => {
     const authValue = {
       loading: false,
       user: { id: '123', email: 'test@example.com' },
-      profile: { id: '123', role: 'super_admin' },
+      profile: { id: '123', role: 'SUPER_ADMIN' },
     }
     
     renderProtectedRoute(authValue, 'admin')
@@ -102,9 +97,7 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
   })
 
-  it.skip('should show unauthorized for user role trying to access admin route', () => {
-    // Note: Role-based authorization is not currently implemented in ProtectedRoute
-    // This functionality may be added in the future
+  it('should show unauthorized for user role trying to access admin route', () => {
     const authValue = {
       loading: false,
       user: { id: '123', email: 'test@example.com' },
@@ -113,6 +106,7 @@ describe('ProtectedRoute Component', () => {
     
     renderProtectedRoute(authValue, 'admin')
     
-    expect(screen.getByText(/not authorized/i)).toBeInTheDocument()
+    expect(screen.getByText(/access denied/i)).toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 })
