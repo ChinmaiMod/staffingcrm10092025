@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getResendConfig } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,8 @@ interface BulkEmailRequest {
   recipients: EmailRecipient[]
   subject: string
   body: string
+  businessId?: string  // Add business ID for custom API key
+  tenantId?: string    // Add tenant ID
   useTemplate?: boolean
 }
 
@@ -25,14 +28,8 @@ serve(async (req) => {
   }
 
   try {
-    // Get Resend API key from environment
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-    if (!RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY not configured')
-    }
-
     // Parse request body
-    const { recipients, subject, body, useTemplate = false }: BulkEmailRequest = await req.json()
+    const { recipients, subject, body, businessId, tenantId, useTemplate = false }: BulkEmailRequest = await req.json()
 
     if (!recipients || recipients.length === 0) {
       return new Response(
@@ -64,6 +61,13 @@ serve(async (req) => {
       )
     }
 
+    // Get Resend configuration (business-specific or system default)
+    const resendConfig = await getResendConfig(businessId || null, tenantId || null)
+    
+    if (!resendConfig.apiKey) {
+      throw new Error('No Resend API key configured')
+    }
+
     // Send emails using Resend API
     const emailPromises = recipients.map(async (recipient) => {
       // Personalize the message with recipient data
@@ -73,7 +77,9 @@ serve(async (req) => {
         .replace(/{name}/g, recipient.name)
 
       const emailData = {
-        from: 'noreply@yourdomain.com', // TODO: Configure your verified domain
+        from: resendConfig.fromName 
+          ? `${resendConfig.fromName} <${resendConfig.fromEmail}>`
+          : resendConfig.fromEmail,
         to: [recipient.email],
         subject: subject,
         html: `
@@ -87,7 +93,7 @@ serve(async (req) => {
               ${personalizedBody.replace(/\n/g, '<br>')}
               <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
               <p style="font-size: 12px; color: #666;">
-                This email was sent from Staffing CRM
+                This email was sent from ${resendConfig.fromName}
               </p>
             </body>
           </html>
@@ -99,7 +105,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Authorization': `Bearer ${resendConfig.apiKey}`,
         },
         body: JSON.stringify(emailData),
       })
