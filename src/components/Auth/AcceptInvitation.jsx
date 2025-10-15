@@ -133,13 +133,29 @@ export default function AcceptInvitation() {
           email: invitation.email.toLowerCase(),
           full_name: invitation.invited_user_name,
           tenant_id: invitation.tenant_id,
-          role: 'USER', // Default role, can be changed by admin
-          status: 'PENDING' // Will be ACTIVE after email verification
+          role: 'USER', // Legacy role field
+          status: 'ACTIVE' // Set to ACTIVE since user completed signup
         })
 
       if (profileError) {
         console.error('Profile creation error:', profileError)
         throw new Error('Failed to create user profile')
+      }
+
+      // Assign READ_ONLY role (role_id = 1) as default for invited users
+      const { error: roleError } = await supabase
+        .from('user_role_assignments')
+        .insert({
+          user_id: authData.user.id,
+          role_id: 1, // READ_ONLY role
+          tenant_id: invitation.tenant_id,
+          assigned_by: invitation.invited_by,
+          is_active: true
+        })
+
+      if (roleError) {
+        console.error('Role assignment error:', roleError)
+        // Don't throw - user is created, admin can assign role later
       }
 
       // Mark invitation as accepted
@@ -166,12 +182,12 @@ export default function AcceptInvitation() {
         })
 
       setSuccess(
-        'Account created successfully! Please check your email to verify your account, then you can log in.'
+        'Account created successfully! You have been assigned READ_ONLY access. An admin can upgrade your permissions if needed. Redirecting to login...'
       )
 
       setTimeout(() => {
         navigate('/login')
-      }, 3000)
+      }, 4000)
     } catch (err) {
       console.error('Error accepting invitation:', err)
       setError(err.message || 'Failed to create account. Please try again.')

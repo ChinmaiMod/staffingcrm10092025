@@ -117,15 +117,17 @@ serve(async (req) => {
       throw new Error(`Failed to create invitation: ${inviteError.message}`)
     }
 
-    // Get Resend API key
+    // Get Resend API key - try business-specific first, then fall back to system default
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
+    
     if (!RESEND_API_KEY) {
       console.error('RESEND_API_KEY not configured - invitation created but email not sent')
       // Continue without sending email - invitation still saved in database
     }
 
-    // Build invitation URL
-    const invitationUrl = `${supabaseUrl.replace('https://', 'https://').replace('.supabase.co', '.vercel.app')}/accept-invitation?token=${token}`
+    // Build invitation URL using configured frontend URL
+    const invitationUrl = `${FRONTEND_URL}/accept-invitation?token=${token}`
     
     console.log('Invitation created:', {
       id: invitation.id,
@@ -137,8 +139,11 @@ serve(async (req) => {
     // Send email using Resend API
     if (RESEND_API_KEY) {
       try {
+        const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'no-reply@staffingcrm.app'
+        const FROM_NAME = Deno.env.get('FROM_NAME') || 'Staffing CRM'
+        
         const emailData = {
-          from: 'Staffing CRM <noreply@yourdomain.com>', // TODO: Configure your verified domain
+          from: `${FROM_NAME} <${FROM_EMAIL}>`,
           to: [email],
           subject: `You're invited to join ${tenant.company_name} on Staffing CRM`,
           html: `
