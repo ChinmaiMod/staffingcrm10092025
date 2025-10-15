@@ -852,31 +852,39 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
         {showCandidateFields && (
           <>
-            <div className="form-group">
-              <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
-              <AutocompleteSelect
-                options={teamLeads.map(lead => 
-                  `${lead.first_name} ${lead.last_name}${lead.job_title ? ` - ${lead.job_title}` : ''}`
-                )}
-                value={formData.recruiting_team_lead}
-                onChange={(value) => handleChange('recruiting_team_lead', value)}
-                placeholder={loadingTeamLeads ? "Loading team leads..." : "Select recruiting team lead..."}
-                disabled={loadingTeamLeads}
-              />
-            </div>
+            {/* Show recruiting team lead and recruiter fields only for specific statuses */}
+            {(formData.status === 'Assigned to Recruiter' || 
+              formData.status === 'Recruiter started marketing' || 
+              formData.status === 'Placed into Job' ||
+              formData.status === 'Exclusive roles only') && (
+              <>
+                <div className="form-group">
+                  <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
+                  <AutocompleteSelect
+                    options={teamLeads.map(lead => 
+                      `${lead.first_name} ${lead.last_name}${lead.job_title ? ` - ${lead.job_title}` : ''}`
+                    )}
+                    value={formData.recruiting_team_lead}
+                    onChange={(value) => handleChange('recruiting_team_lead', value)}
+                    placeholder={loadingTeamLeads ? "Loading team leads..." : "Select recruiting team lead..."}
+                    disabled={loadingTeamLeads}
+                  />
+                </div>
 
-            <div className="form-group">
-              <label>Recruiter {loadingRecruiters && <small>(Loading...)</small>}</label>
-              <AutocompleteSelect
-                options={recruiters.map(rec => 
-                  `${rec.first_name} ${rec.last_name}${rec.job_title ? ` - ${rec.job_title}` : ''}`
-                )}
-                value={formData.recruiter}
-                onChange={(value) => handleChange('recruiter', value)}
-                placeholder={loadingRecruiters ? "Loading recruiters..." : "Select recruiter..."}
-                disabled={loadingRecruiters}
-              />
-            </div>
+                <div className="form-group">
+                  <label>Recruiter {loadingRecruiters && <small>(Loading...)</small>}</label>
+                  <AutocompleteSelect
+                    options={recruiters.map(rec => 
+                      `${rec.first_name} ${rec.last_name}${rec.job_title ? ` - ${rec.job_title}` : ''}`
+                    )}
+                    value={formData.recruiter}
+                    onChange={(value) => handleChange('recruiter', value)}
+                    placeholder={loadingRecruiters ? "Loading recruiters..." : "Select recruiter..."}
+                    disabled={loadingRecruiters}
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

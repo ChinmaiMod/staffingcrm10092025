@@ -11,12 +11,10 @@ export default function StatusChangeModal({
   const [error, setError] = useState('')
 
   const handleSubmit = () => {
-    if (!remarks.trim()) {
-      setError('Remarks are required when changing status')
-      return
-    }
-    if (remarks.trim().length < 10) {
-      setError('Please provide more detailed remarks (at least 10 characters)')
+    // Remarks are now optional - allow submission with or without remarks
+    // If remarks are provided, they should be at least 10 characters
+    if (remarks.trim() && remarks.trim().length < 10) {
+      setError('If provided, remarks should be at least 10 characters')
       return
     }
     onConfirm(remarks)
@@ -54,11 +52,11 @@ export default function StatusChangeModal({
           </div>
 
           <div className="form-group">
-            <label className="required-label">
-              Remarks <span className="required">*</span>
+            <label className="optional-label">
+              Remarks (Optional)
             </label>
             <p className="field-hint">
-              Please explain the reason for this status change (minimum 10 characters)
+              You may provide a reason for this status change (minimum 10 characters if provided)
             </p>
             <textarea
               value={remarks}
@@ -71,14 +69,16 @@ export default function StatusChangeModal({
               className={error ? 'error' : ''}
             />
             {error && <div className="error-message">{error}</div>}
-            <div className="char-count">
-              {remarks.length} characters {remarks.length < 10 && `(${10 - remarks.length} more needed)`}
-            </div>
+            {remarks.length > 0 && (
+              <div className="char-count">
+                {remarks.length} characters {remarks.length < 10 && `(${10 - remarks.length} more needed)`}
+              </div>
+            )}
           </div>
 
           <div className="info-box">
-            <strong>Note:</strong> This remark will be permanently saved in the contact&apos;s status history 
-            and cannot be edited later. Make sure to provide clear and complete information.
+            <strong>Note:</strong> If you provide remarks, they will be permanently saved in the contact&apos;s status history 
+            and cannot be edited later.
           </div>
         </div>
 
@@ -89,7 +89,7 @@ export default function StatusChangeModal({
           <button 
             className="btn btn-primary" 
             onClick={handleSubmit}
-            disabled={!remarks.trim() || remarks.trim().length < 10}
+            disabled={remarks.trim() && remarks.trim().length < 10}
           >
             Confirm Status Change
           </button>
@@ -203,7 +203,8 @@ export default function StatusChangeModal({
           margin-bottom: 20px;
         }
 
-        .required-label {
+        .required-label,
+        .optional-label {
           display: block;
           margin-bottom: 8px;
           font-weight: 500;
