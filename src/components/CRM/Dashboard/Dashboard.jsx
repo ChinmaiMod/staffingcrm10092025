@@ -13,8 +13,33 @@ export default function Dashboard() {
     byStatus: {}
   })
   const [loading, setLoading] = useState(true)
+  const [businesses, setBusinesses] = useState([])
+  const [selectedBusiness, setSelectedBusiness] = useState('all') // 'all' or business_id
 
   const [timeframe, setTimeframe] = useState('week') // 'week' or 'month'
+
+  // Load businesses
+  useEffect(() => {
+    const loadBusinesses = async () => {
+      if (!tenant?.tenant_id) return
+
+      try {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_id, business_name')
+          .eq('tenant_id', tenant.tenant_id)
+          .eq('is_active', true)
+          .order('business_name')
+
+        if (error) throw error
+        setBusinesses(data || [])
+      } catch (error) {
+        console.error('Error loading businesses:', error)
+      }
+    }
+
+    loadBusinesses()
+  }, [tenant?.tenant_id])
 
   useEffect(() => {
     const loadStats = async () => {
@@ -23,43 +48,77 @@ export default function Dashboard() {
       try {
         setLoading(true)
 
-        // Get total contacts count
-        const { count: totalCount } = await supabase
+        // Build base query with tenant filter
+        let baseQuery = supabase
           .from('contacts')
           .select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenant.tenant_id)
+
+        // Add business filter if specific business is selected
+        if (selectedBusiness !== 'all') {
+          baseQuery = baseQuery.eq('business_id', selectedBusiness)
+        }
+
+        // Get total contacts count
+        const { count: totalCount } = await baseQuery
 
         // Get this week's contacts (last 7 days)
         const weekAgo = new Date()
         weekAgo.setDate(weekAgo.getDate() - 7)
-        const { count: weekCount } = await supabase
+        
+        let weekQuery = supabase
           .from('contacts')
           .select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', weekAgo.toISOString())
+
+        if (selectedBusiness !== 'all') {
+          weekQuery = weekQuery.eq('business_id', selectedBusiness)
+        }
+
+        const { count: weekCount } = await weekQuery
 
         // Get this month's contacts (last 30 days)
         const monthAgo = new Date()
         monthAgo.setDate(monthAgo.getDate() - 30)
-        const { count: monthCount } = await supabase
+        
+        let monthQuery = supabase
           .from('contacts')
           .select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', monthAgo.toISOString())
 
+        if (selectedBusiness !== 'all') {
+          monthQuery = monthQuery.eq('business_id', selectedBusiness)
+        }
+
+        const { count: monthCount } = await monthQuery
+
         // Get contacts by status for this week
-        const { data: weekByStatus } = await supabase
+        let weekStatusQuery = supabase
           .from('contacts')
           .select('workflow_status')
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', weekAgo.toISOString())
 
+        if (selectedBusiness !== 'all') {
+          weekStatusQuery = weekStatusQuery.eq('business_id', selectedBusiness)
+        }
+
+        const { data: weekByStatus } = await weekStatusQuery
+
         // Get contacts by status for this month
-        const { data: monthByStatus } = await supabase
+        let monthStatusQuery = supabase
           .from('contacts')
           .select('workflow_status')
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', monthAgo.toISOString())
+
+        if (selectedBusiness !== 'all') {
+          monthStatusQuery = monthStatusQuery.eq('business_id', selectedBusiness)
+        }
+
+        const { data: monthByStatus } = await monthStatusQuery
 
         // Count by status for week
         const weekStatusCounts = {}
@@ -92,7 +151,7 @@ export default function Dashboard() {
     }
 
     loadStats()
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, selectedBusiness])
 
   const statusColors = {
     'Initial Contact': '#3b82f6',
@@ -112,6 +171,11 @@ export default function Dashboard() {
   const handleStatClick = (filterType) => {
     const params = new URLSearchParams()
     
+    // Add business filter if specific business is selected
+    if (selectedBusiness !== 'all') {
+      params.set('business', selectedBusiness)
+    }
+    
     if (filterType === 'week') {
       params.set('timeframe', 'week')
     } else if (filterType === 'month') {
@@ -124,6 +188,12 @@ export default function Dashboard() {
 
   const handleStatusClick = (status) => {
     const params = new URLSearchParams()
+    
+    // Add business filter if specific business is selected
+    if (selectedBusiness !== 'all') {
+      params.set('business', selectedBusiness)
+    }
+    
     params.set('status', status)
     params.set('timeframe', timeframe)
     navigate(`/crm/contacts?${params.toString()}`)
@@ -134,6 +204,23 @@ export default function Dashboard() {
       <div className="crm-header">
         <h1>Dashboard</h1>
         <div className="crm-header-actions">
+          <select 
+            className="btn btn-secondary"
+            value={selectedBusiness}
+            onChange={(e) => setSelectedBusiness(e.target.value)}
+            style={{ 
+              marginRight: '10px',
+              minWidth: '200px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All Businesses</option>
+            {businesses.map(business => (
+              <option key={business.business_id} value={business.business_id}>
+                {business.business_name}
+              </option>
+            ))}
+          </select>
           <button 
             className={`btn ${timeframe === 'week' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setTimeframe('week')}
