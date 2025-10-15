@@ -107,7 +107,8 @@ serve(async (req) => {
         status: 'SENT',
         message: message || null,
         invited_by: invitedBy,
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single()

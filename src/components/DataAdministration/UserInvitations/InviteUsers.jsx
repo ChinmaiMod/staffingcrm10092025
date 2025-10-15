@@ -160,7 +160,8 @@ export default function InviteUsers() {
         'resendUserInvitation',
         {
           body: {
-            invitationId: invitation.id
+            invitationId: invitation.id,
+            invitedBy: profile.id
           }
         }
       )
