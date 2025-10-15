@@ -890,7 +890,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       </div>
 
       {/* Remarks */}
-      <div className="form-group" style={{ marginTop: '16px' }}>
+      <div className="form-group" style={{ marginTop: '8px' }}>
         <label>Remarks / Comments (Optional)</label>
         <textarea
           value={formData.remarks}
@@ -901,7 +901,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       </div>
 
       {/* Attachments */}
-      <div className="form-group" style={{ marginTop: '20px' }}>
+      <div className="form-group" style={{ marginTop: '12px' }}>
         <label>Attachments (Resume, Documents, etc.)</label>
         <div className="attachment-upload-area">
           <input
@@ -996,7 +996,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       </div>
 
       {/* Actions */}
-      <div className="modal-footer" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
+      <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           Cancel
         </button>
