@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getResendConfigForDomain } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,20 +112,27 @@ serve(async (req) => {
       throw new Error(`Failed to update invitation: ${updateError.message}`)
     }
 
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
-
     const invitationUrl = `${FRONTEND_URL}/accept-invitation?token=${token}`
 
-    if (RESEND_API_KEY) {
-      try {
-        const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'no-reply@staffingcrm.app'
-        const FROM_NAME = Deno.env.get('FROM_NAME') || 'Staffing CRM'
+    const emailDomain = invitation.email.split('@')[1]?.toLowerCase() ?? null
+    const resendConfigLookup = await getResendConfigForDomain(emailDomain, invitation.tenant_id)
+    const resendConfig = resendConfigLookup.config
 
+    console.log('Resend configuration (resendUserInvitation):', {
+      emailDomain,
+      businessId: resendConfigLookup.businessId,
+      businessName: resendConfigLookup.businessName,
+      fromEmailDomain: resendConfigLookup.fromEmailDomain,
+      hasApiKey: Boolean(resendConfig.apiKey)
+    })
+
+    if (resendConfig.apiKey) {
+      try {
         const subject = `Reminder: You're invited to join ${tenant.company_name} on Staffing CRM`
 
         const emailData = {
-          from: `${FROM_NAME} <${FROM_EMAIL}>`,
+          from: `${resendConfig.fromName} <${resendConfig.fromEmail}>`,
           to: [invitation.email],
           subject,
           html: `
@@ -175,7 +183,7 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${RESEND_API_KEY}`
+            Authorization: `Bearer ${resendConfig.apiKey}`
           },
           body: JSON.stringify(emailData)
         })
@@ -193,7 +201,7 @@ serve(async (req) => {
         // Continue - the invitation is still valid with refreshed token
       }
     } else {
-      console.log('Resend email skipped - RESEND_API_KEY not configured. Invitation URL:', invitationUrl)
+      console.log('Resend email skipped - Resend configuration missing. Invitation URL:', invitationUrl)
     }
 
     await supabase.from('audit_logs').insert({
@@ -204,7 +212,8 @@ serve(async (req) => {
       resource_id: invitationId,
       details: {
         invited_email: invitation.email,
-        invited_name: invitation.invited_user_name
+        invited_name: invitation.invited_user_name,
+        resend_business: resendConfigLookup.businessName || null
       }
     })
 

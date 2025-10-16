@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getResendConfigForDomain } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,13 +119,24 @@ serve(async (req) => {
       throw new Error(`Failed to create invitation: ${inviteError.message}`)
     }
 
-    // Get Resend API key - try business-specific first, then fall back to system default
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
-    
-    if (!RESEND_API_KEY) {
-      console.error('RESEND_API_KEY not configured - invitation created but email not sent')
-      // Continue without sending email - invitation still saved in database
+    const emailDomain = email.split('@')[1]?.toLowerCase() ?? null
+
+    const resendConfigLookup = await getResendConfigForDomain(emailDomain, tenantId)
+    const resendConfig = resendConfigLookup.config
+
+    console.log('Resend configuration lookup result:', {
+      emailDomain,
+      businessId: resendConfigLookup.businessId,
+      businessName: resendConfigLookup.businessName,
+      fromEmailDomain: resendConfigLookup.fromEmailDomain,
+      hasApiKey: Boolean(resendConfig.apiKey)
+    })
+
+    if (!resendConfig.apiKey) {
+      console.error(
+        `No Resend API key configured for domain ${emailDomain || 'unknown'} - invitation created but email not sent`
+      )
     }
 
     // Build invitation URL using configured frontend URL
@@ -134,17 +146,15 @@ serve(async (req) => {
       id: invitation.id,
       email: email,
       url: invitationUrl,
-      expiresAt: expiresAt
+      expiresAt: expiresAt,
+      resendBusiness: resendConfigLookup.businessName || null
     })
 
     // Send email using Resend API
-    if (RESEND_API_KEY) {
+    if (resendConfig.apiKey) {
       try {
-        const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'no-reply@staffingcrm.app'
-        const FROM_NAME = Deno.env.get('FROM_NAME') || 'Staffing CRM'
-        
         const emailData = {
-          from: `${FROM_NAME} <${FROM_EMAIL}>`,
+          from: `${resendConfig.fromName} <${resendConfig.fromEmail}>`,
           to: [email],
           subject: `You're invited to join ${tenant.company_name} on Staffing CRM`,
           html: `
@@ -212,7 +222,7 @@ If you didn't expect this invitation, you can safely ignore this email.`,
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Authorization': `Bearer ${resendConfig.apiKey}`,
           },
           body: JSON.stringify(emailData),
         })
@@ -231,7 +241,7 @@ If you didn't expect this invitation, you can safely ignore this email.`,
         // Admin can manually share the link or resend
       }
     } else {
-      console.log('Email not sent - RESEND_API_KEY not configured. Invitation URL:', invitationUrl)
+      console.log('Email not sent - Resend configuration missing. Invitation URL:', invitationUrl)
     }
 
     // Create audit log
@@ -245,7 +255,8 @@ If you didn't expect this invitation, you can safely ignore this email.`,
         resource_id: invitation.id,
         details: {
           invited_email: email,
-          invited_name: fullName
+          invited_name: fullName,
+          resend_business: resendConfigLookup.businessName || null
         }
       })
 
