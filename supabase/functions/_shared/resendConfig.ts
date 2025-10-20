@@ -39,12 +39,17 @@ interface BusinessDomainMapping {
   } | null
 }
 
+const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL')
+const RESEND_FROM_NAME = Deno.env.get('RESEND_FROM_NAME')
+
 const DEFAULT_FROM_EMAIL =
+  RESEND_FROM_EMAIL ||
   Deno.env.get('DEFAULT_FROM_EMAIL') ||
   Deno.env.get('FROM_EMAIL') ||
   'no-reply@staffingcrm.app'
 
 const DEFAULT_FROM_NAME =
+  RESEND_FROM_NAME ||
   Deno.env.get('DEFAULT_FROM_NAME') ||
   Deno.env.get('FROM_NAME') ||
   'Staffing CRM'
@@ -152,7 +157,7 @@ function domainMatches(domain: string, candidate: string): boolean {
 function mapTenantConfig(config: TenantResendConfig): ResendConfig {
   return {
     apiKey: config.resend_api_key,
-    fromEmail: config.from_email,
+    fromEmail: config.from_email || DEFAULT_FROM_EMAIL,
     fromName: config.from_name || DEFAULT_FROM_NAME
   }
 }
