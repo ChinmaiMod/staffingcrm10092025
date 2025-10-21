@@ -185,17 +185,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
   // Load states when country changes
   useEffect(() => {
-    if (formData.country) {
-      loadStates(formData.country)
+    if (formData.country_id && typeof formData.country_id === 'object') {
+      loadStates(formData.country_id.name)
     } else {
       setAvailableStates([])
       setAvailableCities([])
       // Only reset if country was actually changed (not initial load)
-      if (contact && contact.country !== formData.country) {
-        setFormData(prev => ({ ...prev, state: '', city: '' }))
+      if (contact && contact.country_id !== formData.country_id) {
+        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
       }
     }
-  }, [formData.country])
+  }, [formData.country_id])
 
   // Load cities when state changes
   useEffect(() => {
