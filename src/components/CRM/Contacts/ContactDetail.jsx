@@ -344,8 +344,8 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
 
               <div className="form-group">
                 <label>Status</label>
-                <div style={{ padding: '10px' }}>
-                  <span className="status-badge">{lookupValues.workflow_status || contact.status || 'Unknown'}</span>
+                <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                  {lookupValues.workflow_status || contact.status || 'Unknown'}
                 </div>
               </div>
 
