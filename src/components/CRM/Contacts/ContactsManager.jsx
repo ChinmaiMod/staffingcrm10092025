@@ -73,55 +73,35 @@ const normalizeStringArray = (value) => {
 }
 
 export default function ContactsManager() {
-  // Lookup cache for contact list rendering
-  const [lookupCache, setLookupCache] = useState({})
+  // Lookup maps for contact list rendering
+  const [lookupMaps, setLookupMaps] = useState({})
 
-  // Fetch lookup values for all contacts in the list
+  // Batch fetch all lookup tables once
   useEffect(() => {
-    async function fetchLookups() {
-      const cache = {};
-      for (const contact of contacts) {
-        if (contact.visa_status_id && !cache[`visa_status_${contact.visa_status_id}`]) {
-          const { data } = await supabase.from('visa_status').select('visa_status').eq('id', contact.visa_status_id).single();
-          cache[`visa_status_${contact.visa_status_id}`] = data?.visa_status || '';
-        }
-        if (contact.job_title_id && !cache[`job_title_${contact.job_title_id}`]) {
-          const { data } = await supabase.from('job_title').select('job_title').eq('id', contact.job_title_id).single();
-          cache[`job_title_${contact.job_title_id}`] = data?.job_title || '';
-        }
-        if (contact.type_of_roles_id && !cache[`type_of_roles_${contact.type_of_roles_id}`]) {
-          const { data } = await supabase.from('type_of_roles').select('type_of_roles').eq('id', contact.type_of_roles_id).single();
-          cache[`type_of_roles_${contact.type_of_roles_id}`] = data?.type_of_roles || '';
-        }
-        if (contact.country_id && !cache[`country_${contact.country_id}`]) {
-          const { data } = await supabase.from('countries').select('name').eq('country_id', contact.country_id).single();
-          cache[`country_${contact.country_id}`] = data?.name || '';
-        }
-        if (contact.state_id && !cache[`state_${contact.state_id}`]) {
-          const { data } = await supabase.from('states').select('name').eq('state_id', contact.state_id).single();
-          cache[`state_${contact.state_id}`] = data?.name || '';
-        }
-        if (contact.city_id && !cache[`city_${contact.city_id}`]) {
-          const { data } = await supabase.from('cities').select('name').eq('city_id', contact.city_id).single();
-          cache[`city_${contact.city_id}`] = data?.name || '';
-        }
-        if (contact.years_of_experience_id && !cache[`years_of_experience_${contact.years_of_experience_id}`]) {
-          const { data } = await supabase.from('years_of_experience').select('years_of_experience').eq('id', contact.years_of_experience_id).single();
-          cache[`years_of_experience_${contact.years_of_experience_id}`] = data?.years_of_experience || '';
-        }
-        if (contact.referral_source_id && !cache[`referral_source_${contact.referral_source_id}`]) {
-          const { data } = await supabase.from('referral_sources').select('referral_source').eq('id', contact.referral_source_id).single();
-          cache[`referral_source_${contact.referral_source_id}`] = data?.referral_source || '';
-        }
-        if (contact.workflow_status_id && !cache[`workflow_status_${contact.workflow_status_id}`]) {
-          const { data } = await supabase.from('workflow_status').select('workflow_status').eq('id', contact.workflow_status_id).single();
-          cache[`workflow_status_${contact.workflow_status_id}`] = data?.workflow_status || '';
-        }
+    async function fetchAllLookups() {
+      const tables = [
+        { key: 'visa_status', id: 'id', label: 'visa_status' },
+        { key: 'job_title', id: 'id', label: 'job_title' },
+        { key: 'type_of_roles', id: 'id', label: 'type_of_roles' },
+        { key: 'countries', id: 'country_id', label: 'name' },
+        { key: 'states', id: 'state_id', label: 'name' },
+        { key: 'cities', id: 'city_id', label: 'name' },
+        { key: 'years_of_experience', id: 'id', label: 'years_of_experience' },
+        { key: 'referral_sources', id: 'id', label: 'referral_source' },
+        { key: 'workflow_status', id: 'id', label: 'workflow_status' }
+      ];
+      const maps = {};
+      for (const tbl of tables) {
+        const { data } = await supabase.from(tbl.key).select(`${tbl.id}, ${tbl.label}`);
+        maps[tbl.key] = {};
+        (data || []).forEach(row => {
+          maps[tbl.key][row[tbl.id]] = row[tbl.label];
+        });
       }
-      setLookupCache(cache);
+      setLookupMaps(maps);
     }
-    if (contacts.length > 0) fetchLookups();
-  }, [contacts]);
+    fetchAllLookups();
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams()
   const { session, profile } = useAuth()
   const { tenant } = useTenant()
@@ -1090,9 +1070,9 @@ export default function ContactsManager() {
                     </span>
                   </td>
                   <td>
-                    <span className="status-badge">{lookupCache[`workflow_status_${contact.workflow_status_id}`] || 'Unknown'}</span>
+                    <span className="status-badge">{lookupMaps.workflow_status?.[contact.workflow_status_id] || 'Unknown'}</span>
                   </td>
-                  <td>{lookupCache[`job_title_${contact.job_title_id}`] || ''}</td>
+                  <td>{lookupMaps.job_title?.[contact.job_title_id] || ''}</td>
                   <td>
                     <div className="action-buttons">
                       <button 
