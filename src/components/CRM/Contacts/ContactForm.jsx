@@ -239,22 +239,31 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   // Sync form data when contact prop changes (Bug #7 fix)
   useEffect(() => {
     if (contact) {
+      // Map all lookup IDs to option objects for display
+      const countryObj = countries.find(c => c.country_id === contact.country_id) || '';
+      const stateObj = availableStates.find(s => s.state_id === contact.state_id) || '';
+      const cityObj = availableCities.find(c => c.city_id === contact.city_id) || '';
+      const visaStatusObj = (Array.isArray(VISA_STATUSES) ? VISA_STATUSES : []).find(v => v.id === contact.visa_status_id) || contact.visa_status_id || '';
+      const jobTitleObj = availableJobTitles.find(j => j.id === contact.job_title_id) || contact.job_title_id || '';
+      const typeOfRolesObj = (Array.isArray(ROLE_TYPES) ? ROLE_TYPES : []).find(r => r.id === contact.type_of_roles_id) || contact.type_of_roles_id || '';
+      const yearsExpObj = yearsExperienceOptions.find(y => y.id === contact.years_of_experience_id) || contact.years_of_experience_id || '';
+      const referralSourceObj = (Array.isArray(REFERRAL_SOURCES) ? REFERRAL_SOURCES : []).find(r => r.id === contact.referral_source_id) || contact.referral_source_id || '';
       setFormData({
         first_name: contact.first_name || '',
         last_name: contact.last_name || '',
         email: contact.email || '',
         phone: contact.phone || '',
         contact_type: contact.contact_type || 'it_candidate',
-        visa_status_id: contact.visa_status_id || '',
-        job_title_id: contact.job_title_id || '',
+        visa_status_id: visaStatusObj,
+        job_title_id: jobTitleObj,
         reasons_for_contact: contact.reasons_for_contact || [],
         status: contact.status || 'Initial Contact',
-        type_of_roles_id: contact.type_of_roles_id || '',
-        country_id: contact.country_id || '',
-        state_id: contact.state_id || '',
-        city_id: contact.city_id || '',
-        years_of_experience_id: contact.years_of_experience_id || '',
-        referral_source_id: contact.referral_source_id || '',
+        type_of_roles_id: typeOfRolesObj,
+        country_id: countryObj,
+        state_id: stateObj,
+        city_id: cityObj,
+        years_of_experience_id: yearsExpObj,
+        referral_source_id: referralSourceObj,
         recruiting_team_lead: contact.recruiting_team_lead || '',
         recruiter: contact.recruiter || '',
         remarks: contact.remarks || '',
