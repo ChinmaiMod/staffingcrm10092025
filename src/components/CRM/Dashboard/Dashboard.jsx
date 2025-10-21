@@ -97,7 +97,7 @@ export default function Dashboard() {
         // Get contacts by status for this week
         let weekStatusQuery = supabase
           .from('contacts')
-          .select('workflow_status')
+          .select('workflow_status_id, workflow_status:workflow_status_id ( workflow_status )')
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', weekAgo.toISOString())
 
@@ -110,7 +110,7 @@ export default function Dashboard() {
         // Get contacts by status for this month
         let monthStatusQuery = supabase
           .from('contacts')
-          .select('workflow_status')
+          .select('workflow_status_id, workflow_status:workflow_status_id ( workflow_status )')
           .eq('tenant_id', tenant.tenant_id)
           .gte('created_at', monthAgo.toISOString())
 
@@ -123,14 +123,14 @@ export default function Dashboard() {
         // Count by status for week
         const weekStatusCounts = {}
         weekByStatus?.forEach(contact => {
-          const status = contact.workflow_status || 'No Status'
+          const status = contact.workflow_status?.workflow_status || 'No Status'
           weekStatusCounts[status] = (weekStatusCounts[status] || 0) + 1
         })
 
         // Count by status for month
         const monthStatusCounts = {}
         monthByStatus?.forEach(contact => {
-          const status = contact.workflow_status || 'No Status'
+          const status = contact.workflow_status?.workflow_status || 'No Status'
           monthStatusCounts[status] = (monthStatusCounts[status] || 0) + 1
         })
 
