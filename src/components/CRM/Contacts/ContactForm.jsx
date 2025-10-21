@@ -239,15 +239,31 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   // Sync form data when contact prop changes (Bug #7 fix)
   useEffect(() => {
     if (contact) {
+      // Helper to normalize lookup arrays to [{id, label}] format
+      const normalizeOptions = (arr, labelKey = 'label', idKey = 'id') => {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(opt =>
+          typeof opt === 'object' ? opt : { id: opt, [labelKey]: opt }
+        );
+      };
+
+      // Normalize all lookup arrays
+      const visaStatusOptions = normalizeOptions(VISA_STATUSES, 'visa_status', 'id');
+      const jobTitleOptions = normalizeOptions(availableJobTitles, 'job_title', 'id');
+      const roleTypeOptions = normalizeOptions(ROLE_TYPES, 'type_of_roles', 'id');
+      const yearsExpOptions = normalizeOptions(yearsExperienceOptions, 'years_of_experience', 'id');
+      const referralSourceOptions = normalizeOptions(REFERRAL_SOURCES, 'referral_source', 'id');
+
       // Map all lookup IDs to option objects for display
-      const countryObj = countries.find(c => c.country_id === contact.country_id) || '';
+  // Country mapping: always pass object or null
+  const countryObj = countries.find(c => c.country_id === contact.country_id) || null;
       const stateObj = availableStates.find(s => s.state_id === contact.state_id) || '';
       const cityObj = availableCities.find(c => c.city_id === contact.city_id) || '';
-      const visaStatusObj = (Array.isArray(VISA_STATUSES) ? VISA_STATUSES : []).find(v => v.id === contact.visa_status_id) || contact.visa_status_id || '';
-      const jobTitleObj = availableJobTitles.find(j => j.id === contact.job_title_id) || contact.job_title_id || '';
-      const typeOfRolesObj = (Array.isArray(ROLE_TYPES) ? ROLE_TYPES : []).find(r => r.id === contact.type_of_roles_id) || contact.type_of_roles_id || '';
-      const yearsExpObj = yearsExperienceOptions.find(y => y.id === contact.years_of_experience_id) || contact.years_of_experience_id || '';
-      const referralSourceObj = (Array.isArray(REFERRAL_SOURCES) ? REFERRAL_SOURCES : []).find(r => r.id === contact.referral_source_id) || contact.referral_source_id || '';
+      const visaStatusObj = visaStatusOptions.find(v => v.id === contact.visa_status_id) || visaStatusOptions.find(v => v.visa_status === contact.visa_status_id) || '';
+      const jobTitleObj = jobTitleOptions.find(j => j.id === contact.job_title_id) || jobTitleOptions.find(j => j.job_title === contact.job_title_id) || '';
+      const typeOfRolesObj = roleTypeOptions.find(r => r.id === contact.type_of_roles_id) || roleTypeOptions.find(r => r.type_of_roles === contact.type_of_roles_id) || '';
+      const yearsExpObj = yearsExpOptions.find(y => y.id === contact.years_of_experience_id) || yearsExpOptions.find(y => y.years_of_experience === contact.years_of_experience_id) || '';
+      const referralSourceObj = referralSourceOptions.find(r => r.id === contact.referral_source_id) || referralSourceOptions.find(r => r.referral_source === contact.referral_source_id) || '';
       setFormData({
         first_name: contact.first_name || '',
         last_name: contact.last_name || '',
@@ -267,8 +283,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         recruiting_team_lead: contact.recruiting_team_lead || '',
         recruiter: contact.recruiter || '',
         remarks: contact.remarks || '',
-      })
-      initialStatus.current = contact.status || 'Initial Contact'
+      });
+      initialStatus.current = contact.status || 'Initial Contact';
     }
   }, [contact])
 
@@ -889,10 +905,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <label>Country</label>
             <AutocompleteSelect
               options={countries}
-              value={formData.country_id}
-              onChange={(id) => handleChange('country_id', id)}
-              getOptionLabel={option => option.name}
-              getOptionValue={option => option.country_id}
+              value={typeof formData.country_id === 'object' ? formData.country_id : null}
+              onChange={(option) => handleChange('country_id', option)}
+              getOptionLabel={option => option?.name || ''}
+              getOptionValue={option => option?.country_id || ''}
               placeholder="Select country..."
             />
           </div>
