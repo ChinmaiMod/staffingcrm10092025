@@ -297,7 +297,10 @@ BEGIN
       AND lower(ye.years_of_experience) = lower(d.value)
   );
 
-  -- Sample IT candidate contact
+  -- Lookup reason_for_contact_id for 'Training and Placement'
+  DECLARE v_reason_for_contact_id bigint;
+  SELECT id INTO v_reason_for_contact_id FROM reason_for_contact WHERE tenant_id = v_tenant_id AND lower(reason_for_contact) = lower('Training and Placement') LIMIT 1;
+
   SELECT id INTO v_contact_id
   FROM contacts
   WHERE tenant_id = v_tenant_id AND lower(email) = lower('john.doe@intuites.com')
@@ -316,7 +319,7 @@ BEGIN
       visa_status,
       job_title,
       years_of_experience,
-      reason_for_contact,
+      reason_for_contact_id,
       type_of_roles,
       referral_source,
       remarks,
@@ -334,8 +337,8 @@ BEGIN
       'H1B',
       'Java Full Stack Developer',
       '4 to 6',
-  ARRAY['Training and Placement'],
-  ARRAY['Remote'],
+      v_reason_for_contact_id,
+      'Remote',
       'Google',
       'Interested in training and placement opportunities.',
       now() - interval '14 days',
@@ -349,15 +352,18 @@ BEGIN
         visa_status = 'H1B',
         job_title = 'Java Full Stack Developer',
         years_of_experience = '4 to 6',
-  reason_for_contact = ARRAY['Training and Placement'],
-  type_of_roles = ARRAY['Remote'],
+        reason_for_contact_id = v_reason_for_contact_id,
+        type_of_roles = 'Remote',
         referral_source = 'Google',
         remarks = 'Interested in training and placement opportunities.',
         updated_at = now()
     WHERE id = v_contact_id;
   END IF;
 
-  -- Sample healthcare candidate contact
+  -- Lookup reason_for_contact_id for 'H1B Sponsorship'
+  DECLARE v_reason_for_contact_id_hc bigint;
+  SELECT id INTO v_reason_for_contact_id_hc FROM reason_for_contact WHERE tenant_id = v_tenant_id AND lower(reason_for_contact) = lower('H1B Sponsorship') LIMIT 1;
+
   SELECT id INTO v_contact_id
   FROM contacts
   WHERE tenant_id = v_tenant_id AND lower(email) = lower('jane.smith@intuites.com')
@@ -376,7 +382,7 @@ BEGIN
       visa_status,
       job_title,
       years_of_experience,
-      reason_for_contact,
+      reason_for_contact_id,
       type_of_roles,
       referral_source,
       remarks,
@@ -394,8 +400,8 @@ BEGIN
       'OPT',
       'Registered Nurse (RN)',
       '7 to 9',
-  ARRAY['H1B Sponsorship'],
-  ARRAY['Hybrid Local'],
+      v_reason_for_contact_id_hc,
+      'Hybrid Local',
       'Facebook',
       'Ready for recruiter marketing, prefers hybrid roles.',
       now() - interval '9 days',
@@ -409,8 +415,8 @@ BEGIN
         visa_status = 'OPT',
         job_title = 'Registered Nurse (RN)',
         years_of_experience = '7 to 9',
-  reason_for_contact = ARRAY['H1B Sponsorship'],
-  type_of_roles = ARRAY['Hybrid Local'],
+        reason_for_contact_id = v_reason_for_contact_id_hc,
+        type_of_roles = 'Hybrid Local',
         referral_source = 'Facebook',
         remarks = 'Ready for recruiter marketing, prefers hybrid roles.',
         updated_at = now()
