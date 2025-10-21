@@ -436,25 +436,25 @@ export default function ContactsManager() {
     }
 
     const payload = {
-      tenant_id: tenant.tenant_id,
-      business_id: businessId,
-      first_name: nullIfEmpty(formFields.first_name),
-      last_name: nullIfEmpty(formFields.last_name),
-      email: nullIfEmpty(formFields.email),
-      phone: nullIfEmpty(formFields.phone),
-      contact_type: mapContactTypeToDb(formFields.contact_type),
-      visa_status: nullIfEmpty(formFields.visa_status),
-      job_title: nullIfEmpty(formFields.job_title),
-  workflow_status_id: workflowStatusId,
-      reason_for_contact: normalizeStringArray(reasons_for_contact),
-      type_of_roles: normalizeStringArray(role_types),
-      country: nullIfEmpty(formFields.country),
-      state: nullIfEmpty(formFields.state),
-      city: nullIfEmpty(formFields.city),
-      years_of_experience: nullIfEmpty(years_experience),
-      referral_source: nullIfEmpty(referral_source),
-      remarks: nullIfEmpty(formFields.remarks),
-      referred_by: nullIfEmpty(formFields.referred_by)
+    tenant_id: tenant.tenant_id,
+    business_id: businessId,
+    first_name: nullIfEmpty(formFields.first_name),
+    last_name: nullIfEmpty(formFields.last_name),
+    email: nullIfEmpty(formFields.email),
+    phone: nullIfEmpty(formFields.phone),
+    contact_type: mapContactTypeToDb(formFields.contact_type),
+    visa_status_id: formFields.visa_status_id || null,
+    job_title_id: formFields.job_title_id || null,
+    type_of_roles_id: formFields.type_of_roles_id || null,
+    country_id: formFields.country_id || null,
+    state_id: formFields.state_id || null,
+    city_id: formFields.city_id || null,
+    years_of_experience_id: formFields.years_of_experience_id || null,
+    referral_source_id: formFields.referral_source_id || null,
+    workflow_status_id: workflowStatusId,
+    reason_for_contact: normalizeStringArray(reasons_for_contact),
+    remarks: nullIfEmpty(formFields.remarks),
+    referred_by: nullIfEmpty(formFields.referred_by)
     }
 
     try {

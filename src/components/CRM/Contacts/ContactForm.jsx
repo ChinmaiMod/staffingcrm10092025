@@ -117,16 +117,16 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     email: '',
     phone: '',
     contact_type: 'it_candidate',
-    visa_status: '',
-    job_title: '',
+    visa_status_id: '',
+    job_title_id: '',
     reasons_for_contact: [],
     status: 'Initial Contact',
-    role_types: [],
-    country: 'USA',
-    state: '',
-    city: '',
-    years_experience: '',
-    referral_source: '',
+    type_of_roles_id: '',
+    country_id: '',
+    state_id: '',
+    city_id: '',
+    years_of_experience_id: '',
+    referral_source_id: '',
     recruiting_team_lead: '',
     recruiter: '',
     remarks: '',
@@ -771,20 +771,24 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <div className="form-group">
               <label>Visa Status</label>
               <AutocompleteSelect
-                options={VISA_STATUSES}
-                value={formData.visa_status}
-                onChange={(value) => handleChange('visa_status', value)}
-                placeholder="Select or type visa status..."
+                options={visaStatusOptions}
+                value={formData.visa_status_id}
+                onChange={(id) => handleChange('visa_status_id', id)}
+                getOptionLabel={option => option.visa_status}
+                getOptionValue={option => option.id}
+                placeholder="Select visa status..."
               />
             </div>
 
             <div className="form-group">
               <label>Job Title</label>
               <AutocompleteSelect
-                options={availableJobTitles}
-                value={formData.job_title}
-                onChange={(value) => handleChange('job_title', value)}
-                placeholder="Select or type job title..."
+                options={jobTitleOptions}
+                value={formData.job_title_id}
+                onChange={(id) => handleChange('job_title_id', id)}
+                getOptionLabel={option => option.job_title}
+                getOptionValue={option => option.id}
+                placeholder="Select job title..."
               />
             </div>
 
@@ -800,42 +804,38 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
             <div className="form-group">
               <label>Type of Roles</label>
-              <MultiSelect
-                options={ROLE_TYPES}
-                selected={formData.role_types}
-                onChange={(values) => handleChange('role_types', values)}
-                placeholder="Select role types..."
+              <AutocompleteSelect
+                options={roleTypeOptions}
+                value={formData.type_of_roles_id}
+                onChange={(id) => handleChange('type_of_roles_id', id)}
+                getOptionLabel={option => option.type_of_roles}
+                getOptionValue={option => option.id}
+                placeholder="Select role type..."
               />
             </div>
 
             <div className="form-group">
               <label>Years of Experience</label>
-              <select
-                value={formData.years_experience}
-                onChange={(e) => handleChange('years_experience', e.target.value)}
-                disabled={loadingYearsExperience && yearsExperienceOptions.length === 0}
-              >
-                <option value="">Select...</option>
-                {yearsExperienceOptions.map(exp => (
-                  <option key={exp} value={exp}>{exp}</option>
-                ))}
-              </select>
-              {loadingYearsExperience && (
-                <small className="hint-text">Loading options...</small>
-              )}
+              <AutocompleteSelect
+                options={yearsExperienceOptions}
+                value={formData.years_of_experience_id}
+                onChange={(id) => handleChange('years_of_experience_id', id)}
+                getOptionLabel={option => option.years_of_experience}
+                getOptionValue={option => option.id}
+                placeholder="Select years of experience..."
+              />
             </div>
 
             <div className="form-group">
               <label>Referral Source</label>
-              <select
-                value={formData.referral_source}
-                onChange={(e) => handleChange('referral_source', e.target.value)}
-              >
-                <option value="">Select...</option>
-                {REFERRAL_SOURCES.map(source => (
-                  <option key={source} value={source}>{source}</option>
-                ))}
-              </select>
+              <AutocompleteSelect
+                options={referralSourceOptions}
+                value={formData.referral_source_id}
+                onChange={(id) => handleChange('referral_source_id', id)}
+                getOptionLabel={option => option.referral_source}
+                getOptionValue={option => option.id}
+                placeholder="Select referral source..."
+              />
             </div>
           </>
         )}
@@ -843,25 +843,26 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         {/* Location */}
         <div className="form-group">
           <label>Country</label>
-          <select
-            value={formData.country}
-            onChange={(e) => handleChange('country', e.target.value)}
-          >
-            <option value="">Select Country...</option>
-            {countries.map(country => (
-              <option key={country.code} value={country.name}>{country.name}</option>
-            ))}
-          </select>
+          <AutocompleteSelect
+            options={countries}
+            value={formData.country_id}
+            onChange={(id) => handleChange('country_id', id)}
+            getOptionLabel={option => option.name}
+            getOptionValue={option => option.country_id}
+            placeholder="Select country..."
+          />
         </div>
 
         <div className="form-group">
           <label>State {loadingStates && <small>(Loading...)</small>}</label>
           <AutocompleteSelect
             options={availableStates}
-            value={formData.state}
-            onChange={(value) => handleChange('state', value)}
-            placeholder={formData.country ? "Select or type state..." : "Select country first..."}
-            disabled={!formData.country || loadingStates}
+            value={formData.state_id}
+            onChange={(id) => handleChange('state_id', id)}
+            getOptionLabel={option => option.name}
+            getOptionValue={option => option.state_id}
+            placeholder="Select state..."
+            disabled={!formData.country_id || loadingStates}
           />
         </div>
 
@@ -869,10 +870,12 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           <label>City {loadingCities && <small>(Loading...)</small>}</label>
           <AutocompleteSelect
             options={availableCities}
-            value={formData.city}
-            onChange={(value) => handleChange('city', value)}
-            placeholder={formData.state ? "Select or type city..." : "Select state first..."}
-            disabled={!formData.state || loadingCities}
+            value={formData.city_id}
+            onChange={(id) => handleChange('city_id', id)}
+            getOptionLabel={option => option.name}
+            getOptionValue={option => option.city_id}
+            placeholder="Select city..."
+            disabled={!formData.state_id || loadingCities}
           />
         </div>
 
