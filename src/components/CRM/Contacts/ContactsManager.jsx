@@ -73,6 +73,7 @@ const normalizeStringArray = (value) => {
 }
 
 export default function ContactsManager() {
+  const [runtimeError, setRuntimeError] = useState(null)
   // Lookup maps for contact list rendering
   const [lookupMaps, setLookupMaps] = useState({})
 
@@ -1097,24 +1098,33 @@ export default function ContactsManager() {
       </div>
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{selectedContact ? 'Edit Contact' : 'New Contact'}</h2>
-              <button className="btn btn-icon btn-secondary" onClick={() => setShowForm(false)}>
-                ✕
-              </button>
+        <>
+          {runtimeError && (
+            <div style={{ color: 'red', background: '#fee2e2', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+              <strong>Runtime Error:</strong> {runtimeError.toString()}
             </div>
-            <div className="modal-body">
-              <ContactForm
-                contact={selectedContact}
-                onSave={handleSaveContact}
-                onCancel={() => setShowForm(false)}
-                isSaving={savingContact}
-              />
+          )}
+          <div className="modal-overlay" onClick={() => setShowForm(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{selectedContact ? 'Edit Contact' : 'New Contact'}</h2>
+                <button className="btn btn-icon btn-secondary" onClick={() => setShowForm(false)}>
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <ContactForm
+                  contact={selectedContact}
+                  onSave={handleSaveContact}
+                  onCancel={() => setShowForm(false)}
+                  isSaving={savingContact}
+                  // Error boundary for form
+                  key={selectedContact?.contact_id || 'new'}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {showBulkEmailModal && (
