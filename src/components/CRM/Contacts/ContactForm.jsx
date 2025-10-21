@@ -219,25 +219,24 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   useEffect(() => {
     if (contact) {
       setFormData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        contact_type: 'it_candidate',
-        visa_status: '',
-        job_title: '',
-        reasons_for_contact: [],
-        status: 'Initial Contact',
-        role_types: [],
-        country: 'USA',
-        state: '',
-        city: '',
-        years_experience: '',
-        referral_source: '',
-        recruiting_team_lead: '',
-        recruiter: '',
-        remarks: '',
-        ...contact
+        first_name: contact.first_name || '',
+        last_name: contact.last_name || '',
+        email: contact.email || '',
+        phone: contact.phone || '',
+        contact_type: contact.contact_type || 'it_candidate',
+        visa_status_id: contact.visa_status_id || '',
+        job_title_id: contact.job_title_id || '',
+        reasons_for_contact: contact.reasons_for_contact || [],
+        status: contact.status || 'Initial Contact',
+        type_of_roles_id: contact.type_of_roles_id || '',
+        country_id: contact.country_id || '',
+        state_id: contact.state_id || '',
+        city_id: contact.city_id || '',
+        years_of_experience_id: contact.years_of_experience_id || '',
+        referral_source_id: contact.referral_source_id || '',
+        recruiting_team_lead: contact.recruiting_team_lead || '',
+        recruiter: contact.recruiter || '',
+        remarks: contact.remarks || '',
       })
       initialStatus.current = contact.status || 'Initial Contact'
     }
