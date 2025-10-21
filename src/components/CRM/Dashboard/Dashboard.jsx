@@ -154,16 +154,16 @@ export default function Dashboard() {
   }, [tenant?.tenant_id, selectedBusiness])
 
   const statusColors = {
-    'Initial Contact': '#3b82f6',
-    'Spoke to candidate': '#8b5cf6',
-    'Resume needs to be prepared': '#f59e0b',
-    'Resume prepared and sent for review': '#10b981',
-    'Assigned to Recruiter': '#ec4899',
-    'Recruiter started marketing': '#6366f1',
-    'Placed into Job': '#22c55e',
-    'Candidate declined marketing': '#ef4444',
-    'Candidate on vacation': '#f59e0b',
-    'Candidate not responding': '#dc2626',
+    'initial contact': '#3b82f6',
+    'spoke to candidate': '#8b5cf6',
+    'resume needs to be prepared': '#f59e0b',
+    'resume prepared and sent for review': '#10b981',
+    'assigned to recruiter': '#ec4899',
+    'recruiter started marketing': '#6366f1',
+    'placed into job': '#22c55e',
+    'candidate declined marketing': '#ef4444',
+    'candidate on vacation': '#f59e0b',
+    'candidate not responding': '#dc2626',
   }
 
   const currentData = stats.byStatus[timeframe] || {}
@@ -325,7 +325,7 @@ export default function Dashboard() {
                   }}>
                     <div style={{ 
                       height: '100%', 
-                      background: statusColors[status] || '#3b82f6',
+                      background: statusColors[status.toLowerCase()] || '#3b82f6',
                       width: `${(count / Math.max(...Object.values(currentData))) * 100}%`,
                       transition: 'width 0.3s'
                     }}></div>
