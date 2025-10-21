@@ -1062,7 +1062,9 @@ export default function ContactsManager() {
                     </span>
                   </td>
                   <td>
-                    <span className="status-badge">{lookupMaps.workflow_status?.[contact.workflow_status_id] || 'Unknown'}</span>
+                    <span className="status-badge">
+                      {lookupMaps.workflow_status?.[contact.workflow_status_id] || contact.status || 'Unknown'}
+                    </span>
                   </td>
                   <td>{lookupMaps.job_title?.[contact.job_title_id] || ''}</td>
                   <td>
