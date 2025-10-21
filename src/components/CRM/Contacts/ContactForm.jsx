@@ -806,7 +806,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               <div className="form-group">
                 <label>Visa Status</label>
                 <AutocompleteSelect
-                  options={visaStatusOptions}
+                  options={VISA_STATUSES}
                   value={formData.visa_status_id}
                   onChange={(id) => handleChange('visa_status_id', id)}
                   getOptionLabel={option => option.visa_status}
