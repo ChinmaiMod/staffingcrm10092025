@@ -141,7 +141,6 @@ export default function ContactsManager() {
           visa_status,
           job_title,
           reason_for_contact,
-          // ...existing code...
           type_of_roles,
           country,
           state,
