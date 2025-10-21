@@ -148,6 +148,8 @@ export default function ContactsManager() {
           years_of_experience,
           referral_source,
           referred_by,
+          workflow_status:workflow_status_id ( workflow_status ),
+          workflow_status_id,
           businesses:business_id ( business_id, business_name )
         `)
         .eq('tenant_id', tenant.tenant_id)
@@ -184,7 +186,7 @@ export default function ContactsManager() {
           phone: contact.phone,
           contact_type: contactTypeLabel,
           contact_type_key: contactTypeKey,
-          status: contact.workflow_status_name || 'Unknown',
+          status: contact.workflow_status?.workflow_status || 'Unknown',
           status_code: contact.workflow_status_id || null,
           visa_status: contact.visa_status || null,
           visa_status_code: contact.visa_status || null,
