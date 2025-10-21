@@ -141,7 +141,7 @@ export default function ContactsManager() {
           visa_status,
           job_title,
           reason_for_contact,
-          workflow_status,
+          // ...existing code...
           type_of_roles,
           country,
           state,
@@ -185,8 +185,8 @@ export default function ContactsManager() {
           phone: contact.phone,
           contact_type: contactTypeLabel,
           contact_type_key: contactTypeKey,
-          status: contact.workflow_status || 'Unknown',
-          status_code: contact.workflow_status || null,
+          status: contact.workflow_status_name || 'Unknown',
+          status_code: contact.workflow_status_id || null,
           visa_status: contact.visa_status || null,
           visa_status_code: contact.visa_status || null,
           job_title: contact.job_title || null,
@@ -418,6 +418,22 @@ export default function ContactsManager() {
 
     const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
 
+  // Lookup workflow_status_id from workflow_status table
+    let workflowStatusId = null
+    if (status) {
+      const { data: statusRows, error: statusError } = await supabase
+  .from('workflow_status')
+  .select('id, workflow_status as workflow_status_name')
+  .eq('workflow_status', status)
+  .eq('tenant_id', tenant.tenant_id)
+  .eq('business_id', businessId)
+  .maybeSingle()
+      if (statusError) {
+  logger.error('Error looking up workflow_status_id:', statusError)
+      }
+      workflowStatusId = statusRows?.id || null
+    }
+
     const payload = {
       tenant_id: tenant.tenant_id,
       business_id: businessId,
@@ -428,7 +444,7 @@ export default function ContactsManager() {
       contact_type: mapContactTypeToDb(formFields.contact_type),
       visa_status: nullIfEmpty(formFields.visa_status),
       job_title: nullIfEmpty(formFields.job_title),
-      workflow_status: nullIfEmpty(status),
+  workflow_status_id: workflowStatusId,
       reason_for_contact: normalizeStringArray(reasons_for_contact),
       type_of_roles: normalizeStringArray(role_types),
       country: nullIfEmpty(formFields.country),
@@ -1024,7 +1040,7 @@ export default function ContactsManager() {
                     </span>
                   </td>
                   <td>
-                    <span className="status-badge">{contact.status}</span>
+                    <span className="status-badge">{contact.workflow_status_name || 'Unknown'}</span>
                   </td>
                   <td>{contact.job_title}</td>
                   <td>

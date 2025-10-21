@@ -50,7 +50,8 @@ const REASONS_FOR_CONTACT = [
   'H1B Transfer', 'GC Processing'
 ]
 
-const STATUSES = [
+// Statuses will be loaded from contact_statuses table
+const DEFAULT_STATUSES = [
   'Initial Contact', 'Spoke to candidate', 'Resume needs to be prepared', 
   'Resume prepared and sent for review', 'Assigned to Recruiter', 
   'Recruiter started marketing', 'Placed into Job', 'Candidate declined marketing', 
@@ -86,6 +87,30 @@ const REFERRAL_SOURCES = ['FB', 'Google', 'Friend']
 
 export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
+  const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
+  // Load statuses from contact_statuses table
+  useEffect(() => {
+    async function loadStatuses() {
+      if (!tenant?.tenant_id) {
+        setStatusOptions(DEFAULT_STATUSES)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('contact_statuses')
+          .select('status_name')
+          .eq('tenant_id', tenant.tenant_id)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+        if (error) throw error
+        const statuses = (data || []).map(row => row.status_name).filter(Boolean)
+        setStatusOptions(statuses.length > 0 ? statuses : DEFAULT_STATUSES)
+      } catch (err) {
+        setStatusOptions(DEFAULT_STATUSES)
+      }
+    }
+    loadStatuses()
+  }, [tenant?.tenant_id])
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -627,6 +652,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
 
     // Pass form data, attachments, and status change remarks to parent
+    // Note: status is still passed as value; ContactsManager now looks up workflow_status_id
     const saveData = {
       ...formData,
       // Trim text fields
@@ -732,7 +758,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         <div className="form-group">
           <label>Status <span style={{ color: 'red' }}>*</span></label>
           <AutocompleteSelect
-            options={STATUSES}
+            options={statusOptions}
             value={formData.status}
             onChange={(value) => handleChange('status', value)}
             placeholder="Select or type status..."
