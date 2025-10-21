@@ -88,6 +88,28 @@ const REFERRAL_SOURCES = ['FB', 'Google', 'Friend']
 export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
+  const [reasonOptions, setReasonOptions] = useState([])
+  // Load reason for contact options from DB
+  useEffect(() => {
+    async function loadReasons() {
+      if (!tenant?.tenant_id) {
+        setReasonOptions([])
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('reason_for_contact')
+          .select('id, reason_label')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('reason_label', { ascending: true })
+        if (error) throw error
+        setReasonOptions((data || []).map(row => ({ id: row.id, label: row.reason_label })))
+      } catch (err) {
+        setReasonOptions([])
+      }
+    }
+    loadReasons()
+  }, [tenant?.tenant_id])
   // Load statuses from contact_statuses table
   useEffect(() => {
     async function loadStatuses() {
@@ -119,7 +141,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     contact_type: 'it_candidate',
     visa_status_id: '',
     job_title_id: '',
-    reasons_for_contact: [],
+  reason_for_contact_id: '',
     status: 'Initial Contact',
     type_of_roles_id: '',
     country_id: '',
@@ -138,7 +160,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       contact_type: contact.contact_type || 'it_candidate',
       visa_status_id: contact.visa_status_id || '',
       job_title_id: contact.job_title_id || '',
-      reasons_for_contact: contact.reasons_for_contact || [],
+      reason_for_contact_id: contact.reason_for_contact_id || '',
       status: contact.status || 'Initial Contact',
       type_of_roles_id: contact.type_of_roles_id || '',
       country_id: contact.country_id || '',
@@ -696,11 +718,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       return;
     }
 
-    // Pass form data, attachments, and status change remarks to parent
-    // Note: status is still passed as value; ContactsManager now looks up workflow_status_id
+    // Extract IDs for all lookup fields before saving
+    const getId = (val, key = 'id') => (val && typeof val === 'object' ? val[key] : val);
     const saveData = {
       ...formData,
-      // Trim text fields
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       email: formData.email.trim(),
@@ -708,9 +729,18 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       city: formData.city ? formData.city.trim() : '',
       remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
-      statusChanged: formData.status !== initialStatus.current
-    }
-    onSave(saveData, attachments)
+      statusChanged: formData.status !== initialStatus.current,
+      visa_status_id: getId(formData.visa_status_id),
+      job_title_id: getId(formData.job_title_id),
+      reason_for_contact_id: getId(formData.reason_for_contact_id),
+      type_of_roles_id: getId(formData.type_of_roles_id),
+      years_of_experience_id: getId(formData.years_of_experience_id),
+      referral_source_id: getId(formData.referral_source_id),
+      country_id: getId(formData.country_id, 'country_id'),
+      state_id: getId(formData.state_id, 'state_id'),
+      city_id: getId(formData.city_id, 'city_id'),
+    };
+    onSave(saveData, attachments);
   }
 
   const showCandidateFields = formData.contact_type === 'it_candidate' || formData.contact_type === 'healthcare_candidate'
@@ -853,12 +883,14 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               </div>
 
               <div className="form-group">
-                <label>Reasons for Contact</label>
-                <MultiSelect
-                  options={REASONS_FOR_CONTACT}
-                  selected={formData.reasons_for_contact}
-                  onChange={(values) => handleChange('reasons_for_contact', values)}
-                  placeholder="Select reasons..."
+                <label>Reason for Contact</label>
+                <AutocompleteSelect
+                  options={reasonOptions}
+                  value={formData.reason_for_contact_id}
+                  onChange={option => handleChange('reason_for_contact_id', option)}
+                  getOptionLabel={option => option.label}
+                  getOptionValue={option => option.id}
+                  placeholder="Select reason for contact..."
                 />
               </div>
 
