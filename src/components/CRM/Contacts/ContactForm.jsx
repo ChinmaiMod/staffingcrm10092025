@@ -176,6 +176,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [statusChangeRemarks, setStatusChangeRemarks] = useState('')
   const yearsExperienceAbortController = useRef(null)
 
+  const [runtimeError, setRuntimeError] = useState(null)
+
   // Load countries on mount
   useEffect(() => {
     loadCountries()
@@ -689,377 +691,393 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const showCandidateFields = formData.contact_type === 'it_candidate' || formData.contact_type === 'healthcare_candidate'
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="form-grid">
-        {/* Basic Information */}
-        <div className="form-group">
-          <label>First Name <span style={{ color: 'red' }}>*</span></label>
-          <input
-            id="first_name"
-            type="text"
-            value={formData.first_name}
-            onChange={(e) => handleChange('first_name', e.target.value)}
-            className={fieldErrors.first_name ? 'error' : ''}
-            placeholder="John"
-            required
-          />
-          {fieldErrors.first_name && (
-            <small className="error-text">{fieldErrors.first_name}</small>
-          )}
+    <>
+      {runtimeError && (
+        <div style={{ color: 'red', background: '#fee2e2', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+          <strong>Runtime Error:</strong> {runtimeError.toString()}
         </div>
-
-        <div className="form-group">
-          <label>Last Name <span style={{ color: 'red' }}>*</span></label>
-          <input
-            id="last_name"
-            type="text"
-            value={formData.last_name}
-            onChange={(e) => handleChange('last_name', e.target.value)}
-            className={fieldErrors.last_name ? 'error' : ''}
-            placeholder="Doe"
-            required
-          />
-          {fieldErrors.last_name && (
-            <small className="error-text">{fieldErrors.last_name}</small>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label>Email <span style={{ color: 'red' }}>*</span></label>
-          <input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleChange('email', e.target.value)}
-            className={fieldErrors.email ? 'error' : ''}
-            placeholder="john.doe@example.com"
-            required
-          />
-          {fieldErrors.email && (
-            <small className="error-text">{fieldErrors.email}</small>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label>Phone</label>
-          <input
-            id="phone"
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handleChange('phone', e.target.value)}
-            className={fieldErrors.phone ? 'error' : ''}
-            placeholder="(555) 123-4567"
-          />
-          {fieldErrors.phone && (
-            <small className="error-text">{fieldErrors.phone}</small>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label>Contact Type <span style={{ color: 'red' }}>*</span></label>
-          <select
-            id="contact_type"
-            value={formData.contact_type}
-            onChange={(e) => handleChange('contact_type', e.target.value)}
-            className={fieldErrors.contact_type ? 'error' : ''}
-            required
-          >
-            {CONTACT_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
-          {fieldErrors.contact_type && (
-            <small className="error-text">{fieldErrors.contact_type}</small>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label>Status <span style={{ color: 'red' }}>*</span></label>
-          <AutocompleteSelect
-            options={statusOptions}
-            value={formData.status}
-            onChange={(value) => handleChange('status', value)}
-            placeholder="Select or type status..."
-          />
-        </div>
-
-        {/* Candidate-specific fields */}
-        {showCandidateFields && (
-          <>
-            <div className="form-group">
-              <label>Visa Status</label>
-              <AutocompleteSelect
-                options={visaStatusOptions}
-                value={formData.visa_status_id}
-                onChange={(id) => handleChange('visa_status_id', id)}
-                getOptionLabel={option => option.visa_status}
-                getOptionValue={option => option.id}
-                placeholder="Select visa status..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Job Title</label>
-              <AutocompleteSelect
-                options={jobTitleOptions}
-                value={formData.job_title_id}
-                onChange={(id) => handleChange('job_title_id', id)}
-                getOptionLabel={option => option.job_title}
-                getOptionValue={option => option.id}
-                placeholder="Select job title..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Reasons for Contact</label>
-              <MultiSelect
-                options={REASONS_FOR_CONTACT}
-                selected={formData.reasons_for_contact}
-                onChange={(values) => handleChange('reasons_for_contact', values)}
-                placeholder="Select reasons..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Type of Roles</label>
-              <AutocompleteSelect
-                options={roleTypeOptions}
-                value={formData.type_of_roles_id}
-                onChange={(id) => handleChange('type_of_roles_id', id)}
-                getOptionLabel={option => option.type_of_roles}
-                getOptionValue={option => option.id}
-                placeholder="Select role type..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Years of Experience</label>
-              <AutocompleteSelect
-                options={yearsExperienceOptions}
-                value={formData.years_of_experience_id}
-                onChange={(id) => handleChange('years_of_experience_id', id)}
-                getOptionLabel={option => option.years_of_experience}
-                getOptionValue={option => option.id}
-                placeholder="Select years of experience..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Referral Source</label>
-              <AutocompleteSelect
-                options={referralSourceOptions}
-                value={formData.referral_source_id}
-                onChange={(id) => handleChange('referral_source_id', id)}
-                getOptionLabel={option => option.referral_source}
-                getOptionValue={option => option.id}
-                placeholder="Select referral source..."
-              />
-            </div>
-          </>
-        )}
-
-        {/* Location */}
-        <div className="form-group">
-          <label>Country</label>
-          <AutocompleteSelect
-            options={countries}
-            value={formData.country_id}
-            onChange={(id) => handleChange('country_id', id)}
-            getOptionLabel={option => option.name}
-            getOptionValue={option => option.country_id}
-            placeholder="Select country..."
-          />
-        </div>
-
-        <div className="form-group">
-          <label>State {loadingStates && <small>(Loading...)</small>}</label>
-          <AutocompleteSelect
-            options={availableStates}
-            value={formData.state_id}
-            onChange={(id) => handleChange('state_id', id)}
-            getOptionLabel={option => option.name}
-            getOptionValue={option => option.state_id}
-            placeholder="Select state..."
-            disabled={!formData.country_id || loadingStates}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>City {loadingCities && <small>(Loading...)</small>}</label>
-          <AutocompleteSelect
-            options={availableCities}
-            value={formData.city_id}
-            onChange={(id) => handleChange('city_id', id)}
-            getOptionLabel={option => option.name}
-            getOptionValue={option => option.city_id}
-            placeholder="Select city..."
-            disabled={!formData.state_id || loadingCities}
-          />
-        </div>
-
-        {showCandidateFields && (
-          <>
-            {/* Show recruiting team lead and recruiter fields only for specific statuses */}
-            {(formData.status === 'Assigned to Recruiter' || 
-              formData.status === 'Recruiter started marketing' || 
-              formData.status === 'Placed into Job' ||
-              formData.status === 'Exclusive roles only') && (
-              <>
-                <div className="form-group">
-                  <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
-                  <AutocompleteSelect
-                    options={teamLeads.map(lead => 
-                      `${lead.first_name} ${lead.last_name}${lead.job_title ? ` - ${lead.job_title}` : ''}`
-                    )}
-                    value={formData.recruiting_team_lead}
-                    onChange={(value) => handleChange('recruiting_team_lead', value)}
-                    placeholder={loadingTeamLeads ? "Loading team leads..." : "Select recruiting team lead..."}
-                    disabled={loadingTeamLeads}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Recruiter {loadingRecruiters && <small>(Loading...)</small>}</label>
-                  <AutocompleteSelect
-                    options={recruiters.map(rec => 
-                      `${rec.first_name} ${rec.last_name}${rec.job_title ? ` - ${rec.job_title}` : ''}`
-                    )}
-                    value={formData.recruiter}
-                    onChange={(value) => handleChange('recruiter', value)}
-                    placeholder={loadingRecruiters ? "Loading recruiters..." : "Select recruiter..."}
-                    disabled={loadingRecruiters}
-                  />
-                </div>
-              </>
+      )}
+      <form
+        onSubmit={e => {
+          try {
+            handleSubmit(e)
+          } catch (err) {
+            setRuntimeError(err)
+            throw err
+          }
+        }}
+      >
+        <div className="form-grid">
+          {/* Basic Information */}
+          <div className="form-group">
+            <label>First Name <span style={{ color: 'red' }}>*</span></label>
+            <input
+              id="first_name"
+              type="text"
+              value={formData.first_name}
+              onChange={(e) => handleChange('first_name', e.target.value)}
+              className={fieldErrors.first_name ? 'error' : ''}
+              placeholder="John"
+              required
+            />
+            {fieldErrors.first_name && (
+              <small className="error-text">{fieldErrors.first_name}</small>
             )}
-          </>
-        )}
-      </div>
+          </div>
 
-      {/* Remarks */}
-      <div className="form-group" style={{ marginTop: '8px' }}>
-        <label>Remarks / Comments (Optional)</label>
-        <textarea
-          value={formData.remarks}
-          onChange={(e) => handleChange('remarks', e.target.value)}
-          placeholder="Add any additional notes or comments (optional)..."
-          rows="4"
-        />
-      </div>
+          <div className="form-group">
+            <label>Last Name <span style={{ color: 'red' }}>*</span></label>
+            <input
+              id="last_name"
+              type="text"
+              value={formData.last_name}
+              onChange={(e) => handleChange('last_name', e.target.value)}
+              className={fieldErrors.last_name ? 'error' : ''}
+              placeholder="Doe"
+              required
+            />
+            {fieldErrors.last_name && (
+              <small className="error-text">{fieldErrors.last_name}</small>
+            )}
+          </div>
 
-      {/* Attachments */}
-      <div className="form-group" style={{ marginTop: '12px' }}>
-        <label>Attachments (Resume, Documents, etc.)</label>
-        <div className="attachment-upload-area">
-          <input
-            type="file"
-            id="file-upload"
-            multiple
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-            accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
-          />
-          <label htmlFor="file-upload" className="btn btn-secondary" style={{ cursor: 'pointer', marginBottom: '12px' }}>
-            <span style={{ marginRight: '8px' }}>📎</span>
-            Choose Files
-          </label>
-          <small style={{ display: 'block', color: '#64748b', marginTop: '4px' }}>
-            Supported: PDF, DOC, DOCX, TXT, Images (Max 10MB per file)
-          </small>
+          <div className="form-group">
+            <label>Email <span style={{ color: 'red' }}>*</span></label>
+            <input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              className={fieldErrors.email ? 'error' : ''}
+              placeholder="john.doe@example.com"
+              required
+            />
+            {fieldErrors.email && (
+              <small className="error-text">{fieldErrors.email}</small>
+            )}
+          </div>
 
-          {/* Attachment List */}
-          {attachments.length > 0 && (
-            <div className="attachment-list" style={{ marginTop: '16px' }}>
-              {attachments.map((attachment, index) => (
-                <div key={attachment.id || attachment.name || `attachment-${index}`} className="attachment-item" style={{
-                  padding: '12px',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '6px',
-                  marginBottom: '12px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                    {attachment.preview ? (
-                      <img 
-                        src={attachment.preview} 
-                        alt={attachment.name}
-                        style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', marginRight: '12px' }}
-                      />
-                    ) : (
-                      <div style={{ 
-                        width: '40px', 
-                        height: '40px', 
-                        backgroundColor: '#3b82f6', 
-                        borderRadius: '4px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        marginRight: '12px',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        fontSize: '12px'
-                      }}>
-                        {attachment.name.split('.').pop().toUpperCase()}
-                      </div>
-                    )}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', fontSize: '14px', color: '#1e293b' }}>
-                        {attachment.name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                        {formatFileSize(attachment.size)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(index)}
-                      className="btn btn-danger"
-                      style={{ padding: '4px 12px', fontSize: '12px' }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div style={{ marginTop: '8px' }}>
-                    <input
-                      type="text"
-                      value={attachment.description || ''}
-                      onChange={(e) => handleAttachmentDescriptionChange(index, e.target.value)}
-                      placeholder="Add a description (e.g., Resume, Cover Letter, Portfolio...)"  
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        backgroundColor: 'white'
-                      }}
+          <div className="form-group">
+            <label>Phone</label>
+            <input
+              id="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+              className={fieldErrors.phone ? 'error' : ''}
+              placeholder="(555) 123-4567"
+            />
+            {fieldErrors.phone && (
+              <small className="error-text">{fieldErrors.phone}</small>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Contact Type <span style={{ color: 'red' }}>*</span></label>
+            <select
+              id="contact_type"
+              value={formData.contact_type}
+              onChange={(e) => handleChange('contact_type', e.target.value)}
+              className={fieldErrors.contact_type ? 'error' : ''}
+              required
+            >
+              {CONTACT_TYPES.map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+            {fieldErrors.contact_type && (
+              <small className="error-text">{fieldErrors.contact_type}</small>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Status <span style={{ color: 'red' }}>*</span></label>
+            <AutocompleteSelect
+              options={statusOptions}
+              value={formData.status}
+              onChange={(value) => handleChange('status', value)}
+              placeholder="Select or type status..."
+            />
+          </div>
+
+          {/* Candidate-specific fields */}
+          {showCandidateFields && (
+            <>
+              <div className="form-group">
+                <label>Visa Status</label>
+                <AutocompleteSelect
+                  options={visaStatusOptions}
+                  value={formData.visa_status_id}
+                  onChange={(id) => handleChange('visa_status_id', id)}
+                  getOptionLabel={option => option.visa_status}
+                  getOptionValue={option => option.id}
+                  placeholder="Select visa status..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Job Title</label>
+                <AutocompleteSelect
+                  options={jobTitleOptions}
+                  value={formData.job_title_id}
+                  onChange={(id) => handleChange('job_title_id', id)}
+                  getOptionLabel={option => option.job_title}
+                  getOptionValue={option => option.id}
+                  placeholder="Select job title..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Reasons for Contact</label>
+                <MultiSelect
+                  options={REASONS_FOR_CONTACT}
+                  selected={formData.reasons_for_contact}
+                  onChange={(values) => handleChange('reasons_for_contact', values)}
+                  placeholder="Select reasons..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Type of Roles</label>
+                <AutocompleteSelect
+                  options={roleTypeOptions}
+                  value={formData.type_of_roles_id}
+                  onChange={(id) => handleChange('type_of_roles_id', id)}
+                  getOptionLabel={option => option.type_of_roles}
+                  getOptionValue={option => option.id}
+                  placeholder="Select role type..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Years of Experience</label>
+                <AutocompleteSelect
+                  options={yearsExperienceOptions}
+                  value={formData.years_of_experience_id}
+                  onChange={(id) => handleChange('years_of_experience_id', id)}
+                  getOptionLabel={option => option.years_of_experience}
+                  getOptionValue={option => option.id}
+                  placeholder="Select years of experience..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Referral Source</label>
+                <AutocompleteSelect
+                  options={referralSourceOptions}
+                  value={formData.referral_source_id}
+                  onChange={(id) => handleChange('referral_source_id', id)}
+                  getOptionLabel={option => option.referral_source}
+                  getOptionValue={option => option.id}
+                  placeholder="Select referral source..."
+                />
+              </div>
+            </>
+          )}
+
+          {/* Location */}
+          <div className="form-group">
+            <label>Country</label>
+            <AutocompleteSelect
+              options={countries}
+              value={formData.country_id}
+              onChange={(id) => handleChange('country_id', id)}
+              getOptionLabel={option => option.name}
+              getOptionValue={option => option.country_id}
+              placeholder="Select country..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label>State {loadingStates && <small>(Loading...)</small>}</label>
+            <AutocompleteSelect
+              options={availableStates}
+              value={formData.state_id}
+              onChange={(id) => handleChange('state_id', id)}
+              getOptionLabel={option => option.name}
+              getOptionValue={option => option.state_id}
+              placeholder="Select state..."
+              disabled={!formData.country_id || loadingStates}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>City {loadingCities && <small>(Loading...)</small>}</label>
+            <AutocompleteSelect
+              options={availableCities}
+              value={formData.city_id}
+              onChange={(id) => handleChange('city_id', id)}
+              getOptionLabel={option => option.name}
+              getOptionValue={option => option.city_id}
+              placeholder="Select city..."
+              disabled={!formData.state_id || loadingCities}
+            />
+          </div>
+
+          {showCandidateFields && (
+            <>
+              {/* Show recruiting team lead and recruiter fields only for specific statuses */}
+              {(formData.status === 'Assigned to Recruiter' || 
+                formData.status === 'Recruiter started marketing' || 
+                formData.status === 'Placed into Job' ||
+                formData.status === 'Exclusive roles only') && (
+                <>
+                  <div className="form-group">
+                    <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
+                    <AutocompleteSelect
+                      options={teamLeads.map(lead => 
+                        `${lead.first_name} ${lead.last_name}${lead.job_title ? ` - ${lead.job_title}` : ''}`
+                      )}
+                      value={formData.recruiting_team_lead}
+                      onChange={(value) => handleChange('recruiting_team_lead', value)}
+                      placeholder={loadingTeamLeads ? "Loading team leads..." : "Select recruiting team lead..."}
+                      disabled={loadingTeamLeads}
                     />
                   </div>
-                </div>
-              ))}
-            </div>
+
+                  <div className="form-group">
+                    <label>Recruiter {loadingRecruiters && <small>(Loading...)</small>}</label>
+                    <AutocompleteSelect
+                      options={recruiters.map(rec => 
+                        `${rec.first_name} ${rec.last_name}${rec.job_title ? ` - ${rec.job_title}` : ''}`
+                      )}
+                      value={formData.recruiter}
+                      onChange={(value) => handleChange('recruiter', value)}
+                      placeholder={loadingRecruiters ? "Loading recruiters..." : "Select recruiter..."}
+                      disabled={loadingRecruiters}
+                    />
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="submit" className="btn btn-primary" disabled={isSaving}>
-          {isSaving ? 'Saving...' : contact ? 'Update Contact' : 'Create Contact'}
-        </button>
-      </div>
+        {/* Remarks */}
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label>Remarks / Comments (Optional)</label>
+          <textarea
+            value={formData.remarks}
+            onChange={(e) => handleChange('remarks', e.target.value)}
+            placeholder="Add any additional notes or comments (optional)..."
+            rows="4"
+          />
+        </div>
 
-      {/* Status Change Modal */}
-      <StatusChangeModal
-        isOpen={showStatusModal}
-        oldStatus={initialStatus.current}
-        newStatus={pendingStatusChange?.value}
-        onConfirm={handleStatusChangeConfirm}
-        onCancel={handleStatusChangeCancel}
-      />
-    </form>
+        {/* Attachments */}
+        <div className="form-group" style={{ marginTop: '12px' }}>
+          <label>Attachments (Resume, Documents, etc.)</label>
+          <div className="attachment-upload-area">
+            <input
+              type="file"
+              id="file-upload"
+              multiple
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
+            />
+            <label htmlFor="file-upload" className="btn btn-secondary" style={{ cursor: 'pointer', marginBottom: '12px' }}>
+              <span style={{ marginRight: '8px' }}>📎</span>
+              Choose Files
+            </label>
+            <small style={{ display: 'block', color: '#64748b', marginTop: '4px' }}>
+              Supported: PDF, DOC, DOCX, TXT, Images (Max 10MB per file)
+            </small>
+
+            {/* Attachment List */}
+            {attachments.length > 0 && (
+              <div className="attachment-list" style={{ marginTop: '16px' }}>
+                {attachments.map((attachment, index) => (
+                  <div key={attachment.id || attachment.name || `attachment-${index}`} className="attachment-item" style={{
+                    padding: '12px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    marginBottom: '12px',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                      {attachment.preview ? (
+                        <img 
+                          src={attachment.preview} 
+                          alt={attachment.name}
+                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', marginRight: '12px' }}
+                        />
+                      ) : (
+                        <div style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          backgroundColor: '#3b82f6', 
+                          borderRadius: '4px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          marginRight: '12px',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '12px'
+                        }}>
+                          {attachment.name.split('.').pop().toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500', fontSize: '14px', color: '#1e293b' }}>
+                          {attachment.name}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          {formatFileSize(attachment.size)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(index)}
+                        className="btn btn-danger"
+                        style={{ padding: '4px 12px', fontSize: '12px' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div style={{ marginTop: '8px' }}>
+                      <input
+                        type="text"
+                        value={attachment.description || ''}
+                        onChange={(e) => handleAttachmentDescriptionChange(index, e.target.value)}
+                        placeholder="Add a description (e.g., Resume, Cover Letter, Portfolio...)"  
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          backgroundColor: 'white'
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="modal-footer" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isSaving ? 'Saving...' : contact ? 'Update Contact' : 'Create Contact'}
+          </button>
+        </div>
+
+        {/* Status Change Modal */}
+        <StatusChangeModal
+          isOpen={showStatusModal}
+          oldStatus={initialStatus.current}
+          newStatus={pendingStatusChange?.value}
+          onConfirm={handleStatusChangeConfirm}
+          onCancel={handleStatusChangeCancel}
+        />
+      </form>
+    </>
   )
 }
