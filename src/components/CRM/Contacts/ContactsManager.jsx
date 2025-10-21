@@ -398,15 +398,18 @@ export default function ContactsManager() {
         mapContactTypeToKey(contact.contact_type) ||
         'it_candidate',
       business_name: contact.business_name || null,
-      visa_status: contact.visa_status,
-      job_title: contact.job_title,
-      years_experience: contact.years_experience,
-      referral_source: contact.referral_source,
+      visa_status_id: contact.visa_status_id || null,
+      job_title_id: contact.job_title_id || null,
+      type_of_roles_id: contact.type_of_roles_id || null,
+      country_id: contact.country_id || null,
+      state_id: contact.state_id || null,
+      city_id: contact.city_id || null,
+      years_of_experience_id: contact.years_of_experience_id || null,
+      referral_source_id: contact.referral_source_id || null,
       reasons_for_contact: contact.reasons_for_contact,
       role_types: contact.role_types,
-      country: contact.country,
-      state: contact.state,
-      city: contact.city,
+      remarks: contact.remarks,
+      referred_by: contact.referred_by || null,
       business_id: contact.business_id || null
     }
 
