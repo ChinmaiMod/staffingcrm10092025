@@ -7,6 +7,58 @@ import { createUniqueFileName, formatFileSize } from '../../../utils/fileUtils'
 import { logger } from '../../../utils/logger'
 
 export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
+  // Lookup values state
+  const [lookupValues, setLookupValues] = useState({})
+
+  // Fetch lookup values for all referenced IDs
+  useEffect(() => {
+    async function fetchLookups() {
+      if (!contact) return;
+      const result = {};
+      try {
+        if (contact.visa_status_id) {
+          const { data } = await supabase.from('visa_status').select('visa_status').eq('id', contact.visa_status_id).single();
+          result.visa_status = data?.visa_status || '';
+        }
+        if (contact.job_title_id) {
+          const { data } = await supabase.from('job_title').select('job_title').eq('id', contact.job_title_id).single();
+          result.job_title = data?.job_title || '';
+        }
+        if (contact.type_of_roles_id) {
+          const { data } = await supabase.from('type_of_roles').select('type_of_roles').eq('id', contact.type_of_roles_id).single();
+          result.type_of_roles = data?.type_of_roles || '';
+        }
+        if (contact.country_id) {
+          const { data } = await supabase.from('countries').select('name').eq('country_id', contact.country_id).single();
+          result.country = data?.name || '';
+        }
+        if (contact.state_id) {
+          const { data } = await supabase.from('states').select('name').eq('state_id', contact.state_id).single();
+          result.state = data?.name || '';
+        }
+        if (contact.city_id) {
+          const { data } = await supabase.from('cities').select('name').eq('city_id', contact.city_id).single();
+          result.city = data?.name || '';
+        }
+        if (contact.years_of_experience_id) {
+          const { data } = await supabase.from('years_of_experience').select('years_of_experience').eq('id', contact.years_of_experience_id).single();
+          result.years_experience = data?.years_of_experience || '';
+        }
+        if (contact.referral_source_id) {
+          const { data } = await supabase.from('referral_sources').select('referral_source').eq('id', contact.referral_source_id).single();
+          result.referral_source = data?.referral_source || '';
+        }
+        if (contact.workflow_status_id) {
+          const { data } = await supabase.from('workflow_status').select('workflow_status').eq('id', contact.workflow_status_id).single();
+          result.workflow_status = data?.workflow_status || '';
+        }
+      } catch (err) {
+        // Ignore errors, fallback to empty string
+      }
+      setLookupValues(result);
+    }
+    fetchLookups();
+  }, [contact]);
   const [activeTab, setActiveTab] = useState('details')
   const [attachments, setAttachments] = useState([])
   const [comments, setComments] = useState([])
@@ -293,42 +345,60 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
               <div className="form-group">
                 <label>Status</label>
                 <div style={{ padding: '10px' }}>
-                  <span className="status-badge">{contact.workflow_status?.workflow_status || contact.status || 'Unknown'}</span>
+                  <span className="status-badge">{lookupValues.workflow_status || contact.status || 'Unknown'}</span>
                 </div>
               </div>
 
-              {contact.visa_status && (
+              {lookupValues.visa_status && (
                 <div className="form-group">
                   <label>Visa Status</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
-                    {contact.visa_status}
+                    {lookupValues.visa_status}
                   </div>
                 </div>
               )}
 
-              {contact.job_title && (
+              {lookupValues.job_title && (
                 <div className="form-group">
                   <label>Job Title</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
-                    {contact.job_title}
+                    {lookupValues.job_title}
                   </div>
                 </div>
               )}
 
-              {contact.years_experience && (
+              {lookupValues.years_experience && (
                 <div className="form-group">
                   <label>Years of Experience</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
-                    {contact.years_experience}
+                    {lookupValues.years_experience}
                   </div>
                 </div>
               )}
 
-              {contact.country && (
+              {(lookupValues.country || lookupValues.state || lookupValues.city) && (
                 <div className="form-group">
                   <label>Location</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
-                    {[contact.city, contact.state, contact.country].filter(Boolean).join(', ')}
+                    {[lookupValues.city, lookupValues.state, lookupValues.country].filter(Boolean).join(', ')}
+                  </div>
+                </div>
+              )}
+
+              {lookupValues.type_of_roles && (
+                <div className="form-group">
+                  <label>Type of Roles</label>
+                  <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                    {lookupValues.type_of_roles}
+                  </div>
+                </div>
+              )}
+
+              {lookupValues.referral_source && (
+                <div className="form-group">
+                  <label>Referral Source</label>
+                  <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                    {lookupValues.referral_source}
                   </div>
                 </div>
               )}
