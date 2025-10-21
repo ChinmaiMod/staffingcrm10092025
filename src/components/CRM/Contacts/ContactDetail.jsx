@@ -293,7 +293,7 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
               <div className="form-group">
                 <label>Status</label>
                 <div style={{ padding: '10px' }}>
-                  <span className="status-badge">{contact.status}</span>
+                  <span className="status-badge">{contact.workflow_status?.workflow_status || contact.status || 'Unknown'}</span>
                 </div>
               </div>
 
