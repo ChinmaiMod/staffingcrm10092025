@@ -818,7 +818,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               <div className="form-group">
                 <label>Job Title</label>
                 <AutocompleteSelect
-                  options={jobTitleOptions}
+                  options={availableJobTitles}
                   value={formData.job_title_id}
                   onChange={(id) => handleChange('job_title_id', id)}
                   getOptionLabel={option => option.job_title}
@@ -840,7 +840,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               <div className="form-group">
                 <label>Type of Roles</label>
                 <AutocompleteSelect
-                  options={roleTypeOptions}
+                  options={ROLE_TYPES}
                   value={formData.type_of_roles_id}
                   onChange={(id) => handleChange('type_of_roles_id', id)}
                   getOptionLabel={option => option.type_of_roles}
@@ -864,7 +864,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               <div className="form-group">
                 <label>Referral Source</label>
                 <AutocompleteSelect
-                  options={referralSourceOptions}
+                  options={REFERRAL_SOURCES}
                   value={formData.referral_source_id}
                   onChange={(id) => handleChange('referral_source_id', id)}
                   getOptionLabel={option => option.referral_source}
