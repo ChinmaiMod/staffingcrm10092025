@@ -52,6 +52,10 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
           const { data } = await supabase.from('workflow_status').select('workflow_status').eq('id', contact.workflow_status_id).single();
           result.workflow_status = data?.workflow_status || '';
         }
+        if (contact.reason_for_contact_id) {
+          const { data } = await supabase.from('reason_for_contact').select('reason_label').eq('id', contact.reason_for_contact_id).single();
+          result.reason_for_contact = data?.reason_label || '';
+        }
       } catch (err) {
         // Ignore errors, fallback to empty string
       }
@@ -395,6 +399,14 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
               )}
 
               {lookupValues.referral_source && (
+              {lookupValues.reason_for_contact && (
+                <div className="form-group">
+                  <label>Reason for Contact</label>
+                  <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                    {lookupValues.reason_for_contact}
+                  </div>
+                </div>
+              )}
                 <div className="form-group">
                   <label>Referral Source</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>

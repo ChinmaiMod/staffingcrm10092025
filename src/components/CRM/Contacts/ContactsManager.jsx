@@ -89,7 +89,8 @@ export default function ContactsManager() {
         { key: 'cities', id: 'city_id', label: 'name' },
         { key: 'years_of_experience', id: 'id', label: 'years_of_experience' },
         { key: 'referral_sources', id: 'id', label: 'referral_source' },
-        { key: 'workflow_status', id: 'id', label: 'workflow_status' }
+        { key: 'workflow_status', id: 'id', label: 'workflow_status' },
+        { key: 'reason_for_contact', id: 'id', label: 'reason_label' }
       ];
       const maps = {};
       for (const tbl of tables) {
@@ -179,6 +180,7 @@ export default function ContactsManager() {
           referred_by,
           workflow_status:workflow_status_id ( workflow_status ),
           workflow_status_id,
+          reason_for_contact_id,
           businesses:business_id ( business_id, business_name )
         `)
         .eq('tenant_id', tenant.tenant_id)
@@ -192,12 +194,6 @@ export default function ContactsManager() {
       const normalizedContacts = (data || []).map((contact) => {
         const contactTypeKey = mapContactTypeToKey(contact.contact_type)
         const contactTypeLabel = CONTACT_TYPE_LABELS[contactTypeKey] || contact.contact_type || null
-
-        const reasons = Array.isArray(contact.reason_for_contact)
-          ? contact.reason_for_contact.filter(Boolean)
-          : contact.reason_for_contact
-          ? [contact.reason_for_contact]
-          : []
 
         const roleTypes = Array.isArray(contact.type_of_roles)
           ? contact.type_of_roles.filter(Boolean)
@@ -225,7 +221,8 @@ export default function ContactsManager() {
           city_id: contact.city_id || null,
           years_of_experience_id: contact.years_of_experience_id || null,
           referral_source_id: contact.referral_source_id || null,
-          reasons_for_contact: reasons,
+          reason_for_contact_id: contact.reason_for_contact_id || null,
+          reason_for_contact_label: contact.reason_for_contact_id ? lookupMaps.reason_for_contact?.[contact.reason_for_contact_id] || '' : '',
           role_types: roleTypes,
           remarks: contact.remarks,
           referred_by: contact.referred_by || null,
@@ -407,7 +404,7 @@ export default function ContactsManager() {
       city_id: contact.city_id || null,
       years_of_experience_id: contact.years_of_experience_id || null,
       referral_source_id: contact.referral_source_id || null,
-      reasons_for_contact: contact.reasons_for_contact,
+      reason_for_contact_id: contact.reason_for_contact_id || null,
       role_types: contact.role_types,
       remarks: contact.remarks,
       referred_by: contact.referred_by || null,
@@ -432,7 +429,7 @@ export default function ContactsManager() {
       statusChangeRemarks,
       statusChanged,
       status,
-      reasons_for_contact,
+      reason_for_contact_id,
       role_types,
       years_experience,
       referral_source,
@@ -458,25 +455,25 @@ export default function ContactsManager() {
     }
 
     const payload = {
-    tenant_id: tenant.tenant_id,
-    business_id: businessId,
-    first_name: nullIfEmpty(formFields.first_name),
-    last_name: nullIfEmpty(formFields.last_name),
-    email: nullIfEmpty(formFields.email),
-    phone: nullIfEmpty(formFields.phone),
-    contact_type: mapContactTypeToDb(formFields.contact_type),
-    visa_status_id: formFields.visa_status_id || null,
-    job_title_id: formFields.job_title_id || null,
-    type_of_roles_id: formFields.type_of_roles_id || null,
-    country_id: formFields.country_id || null,
-    state_id: formFields.state_id || null,
-    city_id: formFields.city_id || null,
-    years_of_experience_id: formFields.years_of_experience_id || null,
-    referral_source_id: formFields.referral_source_id || null,
-    workflow_status_id: workflowStatusId,
-    reason_for_contact: normalizeStringArray(reasons_for_contact),
-    remarks: nullIfEmpty(formFields.remarks),
-    referred_by: nullIfEmpty(formFields.referred_by)
+  tenant_id: tenant.tenant_id,
+  business_id: businessId,
+  first_name: nullIfEmpty(formFields.first_name),
+  last_name: nullIfEmpty(formFields.last_name),
+  email: nullIfEmpty(formFields.email),
+  phone: nullIfEmpty(formFields.phone),
+  contact_type: mapContactTypeToDb(formFields.contact_type),
+  visa_status_id: formFields.visa_status_id || null,
+  job_title_id: formFields.job_title_id || null,
+  type_of_roles_id: formFields.type_of_roles_id || null,
+  country_id: formFields.country_id || null,
+  state_id: formFields.state_id || null,
+  city_id: formFields.city_id || null,
+  years_of_experience_id: formFields.years_of_experience_id || null,
+  referral_source_id: formFields.referral_source_id || null,
+  workflow_status_id: workflowStatusId,
+  reason_for_contact_id: reason_for_contact_id || null,
+  remarks: nullIfEmpty(formFields.remarks),
+  referred_by: nullIfEmpty(formFields.referred_by)
     }
 
     try {
@@ -1007,13 +1004,14 @@ export default function ContactsManager() {
               <th>Type</th>
               <th>Status</th>
               <th>Job Title</th>
+              <th>Reason for Contact</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {finalContacts.length === 0 ? (
               <tr>
-                <td colSpan="8">
+                <td colSpan="10">
                   <div className="empty-state">
                     <div className="empty-state-icon">👥</div>
                     <h3>No Contacts Found</h3>
@@ -1068,6 +1066,7 @@ export default function ContactsManager() {
                     </span>
                   </td>
                   <td>{lookupMaps.job_title?.[contact.job_title_id] || ''}</td>
+                  <td>{contact.reason_for_contact_label || ''}</td>
                   <td>
                     <div className="action-buttons">
                       <button 

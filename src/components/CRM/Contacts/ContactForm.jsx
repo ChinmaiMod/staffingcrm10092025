@@ -372,10 +372,13 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .order('name')
 
       if (error) throw error
-      setCountries(data || [])
+  setCountries((data || []).map(c => ({ country_id: c.country_id, name: c.name, code: c.code })))
     } catch (err) {
       console.error('Error loading countries:', err)
-      setCountries([{ code: 'USA', name: 'USA' }, { code: 'IN', name: 'India' }])
+      setCountries([
+        { country_id: 'USA', name: 'USA', code: 'USA' },
+        { country_id: 'IN', name: 'India', code: 'IN' }
+      ])
     }
   }
 
@@ -399,11 +402,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .order('name')
 
       if (error) throw error
-      setAvailableStates(data?.map(s => s.name) || [])
+  setAvailableStates((data || []).map(s => ({ state_id: s.state_id, name: s.name, code: s.code })))
     } catch (err) {
       console.error('Error loading states:', err)
       // Fallback to hardcoded lists
-      setAvailableStates(countryName === 'USA' ? USA_STATES : INDIA_STATES)
+  setAvailableStates((countryName === 'USA' ? USA_STATES : INDIA_STATES).map(s => ({ state_id: s, name: s, code: s })))
     } finally {
       setLoadingStates(false)
     }
@@ -429,10 +432,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .order('name')
 
       if (error) throw error
-      setAvailableCities(data?.map(c => c.name) || [])
+  setAvailableCities((data || []).map(c => ({ city_id: c.city_id, name: c.name })))
     } catch (err) {
       console.error('Error loading cities:', err)
-      setAvailableCities([])
+  setAvailableCities([])
     } finally {
       setLoadingCities(false)
     }
@@ -937,8 +940,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <label>Country</label>
             <AutocompleteSelect
               options={countries}
-              value={typeof formData.country_id === 'object' ? formData.country_id : null}
-              onChange={(option) => handleChange('country_id', option)}
+              value={formData.country_id}
+              onChange={id => handleChange('country_id', id)}
               getOptionLabel={option => option?.name || ''}
               getOptionValue={option => option?.country_id || ''}
               placeholder="Select country..."
@@ -950,7 +953,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <AutocompleteSelect
               options={availableStates}
               value={formData.state_id}
-              onChange={(id) => handleChange('state_id', id)}
+              onChange={id => handleChange('state_id', id)}
               getOptionLabel={option => option.name}
               getOptionValue={option => option.state_id}
               placeholder="Select state..."
@@ -963,7 +966,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <AutocompleteSelect
               options={availableCities}
               value={formData.city_id}
-              onChange={(id) => handleChange('city_id', id)}
+              onChange={id => handleChange('city_id', id)}
               getOptionLabel={option => option.name}
               getOptionValue={option => option.city_id}
               placeholder="Select city..."
