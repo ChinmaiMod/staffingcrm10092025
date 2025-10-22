@@ -207,14 +207,22 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
   // Load states when country changes
   useEffect(() => {
-    if (formData.country_id && typeof formData.country_id === 'object') {
-      loadStates(formData.country_id.name)
+    if (formData.country_id) {
+      // If country_id is an object, use its name; if string, find object in countries array
+      let countryName = '';
+      if (typeof formData.country_id === 'object') {
+        countryName = formData.country_id.name;
+      } else {
+        const countryObj = countries.find(c => c.country_id === formData.country_id);
+        countryName = countryObj ? countryObj.name : formData.country_id;
+      }
+      loadStates(countryName);
     } else {
-      setAvailableStates([])
-      setAvailableCities([])
+      setAvailableStates([]);
+      setAvailableCities([]);
       // Only reset if country was actually changed (not initial load)
       if (contact && contact.country_id !== formData.country_id) {
-        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
+        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }));
       }
     }
   }, [formData.country_id])
