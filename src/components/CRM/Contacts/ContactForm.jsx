@@ -723,6 +723,16 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
     // Extract IDs for all lookup fields before saving
     const getId = (val, key = 'id') => (val && typeof val === 'object' ? val[key] : val);
+    // Ensure job_title_id is always an ID, not a label string
+    let jobTitleId = formData.job_title_id;
+    if (jobTitleId && typeof jobTitleId === 'string') {
+      // Try to find the matching job title object by label
+      const jobTitleObj = (availableJobTitles || []).find(j => j.job_title === jobTitleId);
+      jobTitleId = jobTitleObj ? jobTitleObj.id : jobTitleId;
+    } else if (jobTitleId && typeof jobTitleId === 'object') {
+      jobTitleId = jobTitleId.id;
+    }
+
     const saveData = {
       ...formData,
       first_name: formData.first_name.trim(),
@@ -734,7 +744,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       statusChangeRemarks: statusChangeRemarks || null,
       statusChanged: formData.status !== initialStatus.current,
       visa_status_id: getId(formData.visa_status_id),
-      job_title_id: getId(formData.job_title_id),
+      job_title_id: jobTitleId,
       reason_for_contact_id: getId(formData.reason_for_contact_id),
       type_of_roles_id: getId(formData.type_of_roles_id),
       years_of_experience_id: getId(formData.years_of_experience_id),
