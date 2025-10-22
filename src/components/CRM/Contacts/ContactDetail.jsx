@@ -398,7 +398,6 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
                 </div>
               )}
 
-              {lookupValues.referral_source && (
               {lookupValues.reason_for_contact && (
                 <div className="form-group">
                   <label>Reason for Contact</label>
@@ -407,6 +406,8 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
                   </div>
                 </div>
               )}
+
+              {lookupValues.referral_source && (
                 <div className="form-group">
                   <label>Referral Source</label>
                   <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
