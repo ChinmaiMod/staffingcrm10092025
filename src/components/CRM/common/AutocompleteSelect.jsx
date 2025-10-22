@@ -1,14 +1,115 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 
-export default function AutocompleteSelect({ options, value, onChange, placeholder = 'Type to search...', disabled = false }) {
-  const [inputValue, setInputValue] = useState(value || '')
+const defaultGetOptionLabel = (option) => {
+  if (option == null) return ''
+  if (typeof option === 'string' || typeof option === 'number') {
+    return String(option)
+  }
+  if (typeof option === 'object') {
+    if (typeof option.label !== 'undefined') return option.label ?? ''
+    if (typeof option.name !== 'undefined') return option.name ?? ''
+    if (typeof option.value !== 'undefined') return option.value ?? ''
+  }
+  return ''
+}
+
+const defaultGetOptionValue = (option) => {
+  if (option == null) return ''
+  if (typeof option === 'string' || typeof option === 'number') {
+    return option
+  }
+  if (typeof option === 'object') {
+    if (typeof option.value !== 'undefined') return option.value ?? ''
+    if (typeof option.id !== 'undefined') return option.id ?? ''
+    if (typeof option.code !== 'undefined') return option.code ?? ''
+    if (typeof option.country_id !== 'undefined') return option.country_id ?? ''
+    if (typeof option.state_id !== 'undefined') return option.state_id ?? ''
+    if (typeof option.city_id !== 'undefined') return option.city_id ?? ''
+  }
+  return ''
+}
+
+const toDisplayString = (value) => (value == null ? '' : String(value))
+
+export default function AutocompleteSelect({
+  options = [],
+  value,
+  onChange,
+  placeholder = 'Type to search...',
+  disabled = false,
+  getOptionLabel,
+  getOptionValue,
+  allowCustomValue = true
+}) {
+  const labelGetter = useMemo(() => (
+    typeof getOptionLabel === 'function' ? getOptionLabel : defaultGetOptionLabel
+  ), [getOptionLabel])
+
+  const valueGetter = useMemo(() => (
+    typeof getOptionValue === 'function' ? getOptionValue : defaultGetOptionValue
+  ), [getOptionValue])
+
+  const normalizeValue = (val) => {
+    if (val == null) return ''
+    if (typeof val === 'object') {
+      return valueGetter(val)
+    }
+    return val
+  }
+
+  const [inputValue, setInputValue] = useState(() => {
+    const normalized = normalizeValue(value)
+    const normalizedString = toDisplayString(normalized)
+    const selectedOption = Array.isArray(options)
+      ? options.find(option => {
+          if (option === value) return true
+          const optionValue = valueGetter(option)
+          const optionLabel = toDisplayString(labelGetter(option))
+          return String(optionValue) === normalizedString || optionLabel === normalizedString
+        })
+      : null
+    if (selectedOption) {
+      return toDisplayString(labelGetter(selectedOption))
+    }
+    return normalizedString
+  })
   const [isOpen, setIsOpen] = useState(false)
-  const [filteredOptions, setFilteredOptions] = useState(options)
+  const [filteredOptions, setFilteredOptions] = useState(Array.isArray(options) ? options : [])
   const dropdownRef = useRef(null)
 
   useEffect(() => {
-    setInputValue(value || '')
-  }, [value])
+    if (!Array.isArray(options)) {
+      setFilteredOptions([])
+      return
+    }
+    setFilteredOptions(options)
+  }, [options])
+
+  useEffect(() => {
+    if (!Array.isArray(options)) {
+      setInputValue('')
+      return
+    }
+
+    const normalized = normalizeValue(value)
+    const normalizedString = toDisplayString(normalized)
+    const selectedOption = options.find(option => {
+      if (option === value) return true
+      const optionValue = valueGetter(option)
+      const optionLabel = toDisplayString(labelGetter(option))
+      return String(optionValue) === normalizedString || optionLabel === normalizedString
+    })
+
+    if (selectedOption) {
+      setInputValue(toDisplayString(labelGetter(selectedOption)))
+    } else if (!normalizedString) {
+      setInputValue('')
+    } else if (allowCustomValue) {
+      setInputValue(normalizedString)
+    } else {
+      setInputValue('')
+    }
+  }, [value, options, labelGetter, valueGetter, allowCustomValue])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -26,31 +127,52 @@ export default function AutocompleteSelect({ options, value, onChange, placehold
     const newValue = e.target.value
     setInputValue(newValue)
     
-    // Filter options based on input
-    const filtered = options.filter(option =>
-      option.toLowerCase().includes(newValue.toLowerCase())
-    )
+    if (!Array.isArray(options)) {
+      setFilteredOptions([])
+      setIsOpen(true)
+      return
+    }
+
+    const filtered = options.filter(option => {
+      const optionLabel = toDisplayString(labelGetter(option))
+      return optionLabel.toLowerCase().includes(newValue.toLowerCase())
+    })
     setFilteredOptions(filtered)
     setIsOpen(true)
   }
 
   const handleSelectOption = (option) => {
     if (disabled) return
-    setInputValue(option)
-    onChange(option)
+    const optionLabel = toDisplayString(labelGetter(option))
+    const optionValue = valueGetter(option)
+    setInputValue(optionLabel)
+    onChange(optionValue)
     setIsOpen(false)
   }
 
   const handleFocus = () => {
     if (disabled) return
-    setFilteredOptions(options)
+    setFilteredOptions(Array.isArray(options) ? options : [])
     setIsOpen(true)
   }
 
   const handleBlur = () => {
-    // Only update if the input value matches an option or is empty
-    if (!disabled && inputValue && !options.some(opt => opt.toLowerCase() === inputValue.toLowerCase())) {
-      onChange(inputValue) // Allow custom values
+    if (disabled) return
+    if (!allowCustomValue) {
+      const normalized = normalizeValue(value)
+      if (!normalized) {
+        setInputValue('')
+      }
+      return
+    }
+
+    const hasExactMatch = Array.isArray(options) && options.some(option => {
+      const label = toDisplayString(labelGetter(option))
+      return label.toLowerCase() === inputValue.toLowerCase()
+    })
+
+    if (inputValue && !hasExactMatch) {
+      onChange(inputValue)
     }
   }
 
@@ -78,19 +200,27 @@ export default function AutocompleteSelect({ options, value, onChange, placehold
 
       {isOpen && !disabled && filteredOptions.length > 0 && (
         <div className="multi-select-dropdown" style={{ position: 'absolute', width: '100%', zIndex: 10 }}>
-          {filteredOptions.map(option => (
-            <div
-              key={option}
-              className="multi-select-option"
-              onMouseDown={(e) => {
-                e.preventDefault() // Prevent blur
-                handleSelectOption(option)
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <span>{option}</span>
-            </div>
-          ))}
+          {filteredOptions.map((option, index) => {
+            const optionValue = valueGetter(option)
+            const optionLabel = toDisplayString(labelGetter(option))
+            const key = optionValue != null && optionValue !== ''
+              ? String(optionValue)
+              : `${optionLabel}-${index}`
+
+            return (
+              <div
+                key={key}
+                className="multi-select-option"
+                onMouseDown={(e) => {
+                  e.preventDefault() // Prevent blur while selecting
+                  handleSelectOption(option)
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                <span>{optionLabel}</span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
