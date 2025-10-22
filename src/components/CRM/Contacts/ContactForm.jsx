@@ -229,16 +229,24 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
   // Load cities when state changes
   useEffect(() => {
-    if (formData.state) {
-      loadCities(formData.state)
+    if (formData.state_id) {
+      // If state_id is an object, use its name; if string, find object in availableStates array
+      let stateName = '';
+      if (typeof formData.state_id === 'object') {
+        stateName = formData.state_id.name;
+      } else {
+        const stateObj = availableStates.find(s => s.state_id === formData.state_id);
+        stateName = stateObj ? stateObj.name : formData.state_id;
+      }
+      loadCities(stateName);
     } else {
       setAvailableCities([])
       // Only reset if state was actually changed (not initial load)
-      if (contact && contact.state !== formData.state) {
-        setFormData(prev => ({ ...prev, city: '' }))
+      if (contact && contact.state_id !== formData.state_id) {
+        setFormData(prev => ({ ...prev, city_id: '' }))
       }
     }
-  }, [formData.state])
+  }, [formData.state_id])
 
   // Load team leads on mount
   useEffect(() => {
@@ -909,8 +917,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   options={reasonOptions}
                   value={formData.reason_for_contact_id}
                   onChange={option => handleChange('reason_for_contact_id', option)}
-                  getOptionLabel={option => option.label}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'object' ? option.label : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select reason for contact..."
                 />
               </div>
@@ -921,8 +929,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   options={ROLE_TYPES}
                   value={formData.type_of_roles_id}
                   onChange={(id) => handleChange('type_of_roles_id', id)}
-                  getOptionLabel={option => option.type_of_roles}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'string' ? option : option.type_of_roles)}
+                  getOptionValue={option => (typeof option === 'string' ? option : option.id)}
                   placeholder="Select role type..."
                 />
               </div>
@@ -945,8 +953,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   options={REFERRAL_SOURCES}
                   value={formData.referral_source_id}
                   onChange={(id) => handleChange('referral_source_id', id)}
-                  getOptionLabel={option => option.referral_source}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'string' ? option : option.referral_source)}
+                  getOptionValue={option => (typeof option === 'string' ? option : option.id)}
                   placeholder="Select referral source..."
                 />
               </div>
@@ -972,8 +980,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               options={availableStates}
               value={formData.state_id}
               onChange={id => handleChange('state_id', id)}
-              getOptionLabel={option => option.name}
-              getOptionValue={option => option.state_id}
+              getOptionLabel={option => (typeof option === 'object' ? option.name : option)}
+              getOptionValue={option => (typeof option === 'object' ? option.state_id : option)}
               placeholder="Select state..."
               disabled={!formData.country_id || loadingStates}
             />
@@ -985,8 +993,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               options={availableCities}
               value={formData.city_id}
               onChange={id => handleChange('city_id', id)}
-              getOptionLabel={option => option.name}
-              getOptionValue={option => option.city_id}
+              getOptionLabel={option => (typeof option === 'object' ? option.name : option)}
+              getOptionValue={option => (typeof option === 'object' ? option.city_id : option)}
               placeholder="Select city..."
               disabled={!formData.state_id || loadingCities}
             />
