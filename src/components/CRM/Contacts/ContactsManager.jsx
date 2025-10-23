@@ -76,37 +76,59 @@ export default function ContactsManager() {
   const [runtimeError, setRuntimeError] = useState(null)
   // Lookup maps for contact list rendering
   const [lookupMaps, setLookupMaps] = useState({})
+  const { tenant } = useTenant()
 
   // Batch fetch all lookup tables once
   useEffect(() => {
     async function fetchAllLookups() {
+      if (!tenant?.tenant_id) {
+        setLookupMaps({})
+        return
+      }
+
       const tables = [
-        { key: 'visa_status', id: 'id', label: 'visa_status' },
-        { key: 'job_title', id: 'id', label: 'job_title' },
-        { key: 'type_of_roles', id: 'id', label: 'type_of_roles' },
+        { key: 'visa_status', id: 'id', label: 'visa_status', tenantColumn: 'tenant_id' },
+        { key: 'job_title', id: 'id', label: 'job_title', tenantColumn: 'tenant_id' },
+        { key: 'type_of_roles', id: 'id', label: 'type_of_roles', tenantColumn: 'tenant_id' },
         { key: 'countries', id: 'country_id', label: 'name' },
         { key: 'states', id: 'state_id', label: 'name' },
         { key: 'cities', id: 'city_id', label: 'name' },
-        { key: 'years_of_experience', id: 'id', label: 'years_of_experience' },
-        { key: 'referral_sources', id: 'id', label: 'referral_source' },
-  { key: 'workflow_status', id: 'id', label: 'workflow_status' },
-  { key: 'reason_for_contact', id: 'id', label: 'reason_for_contact' }
-      ];
-      const maps = {};
+        { key: 'years_of_experience', id: 'id', label: 'years_of_experience', tenantColumn: 'tenant_id' },
+        { key: 'referral_sources', id: 'id', label: 'referral_source', tenantColumn: 'tenant_id' },
+        { key: 'workflow_status', id: 'id', label: 'workflow_status', tenantColumn: 'tenant_id' },
+        { key: 'reason_for_contact', id: 'id', label: 'reason_for_contact', tenantColumn: 'tenant_id' }
+      ]
+
+      const maps = {}
+
       for (const tbl of tables) {
-        const { data } = await supabase.from(tbl.key).select(`${tbl.id}, ${tbl.label}`);
-        maps[tbl.key] = {};
-        (data || []).forEach(row => {
-          maps[tbl.key][row[tbl.id]] = row[tbl.label];
-        });
+        try {
+          let query = supabase.from(tbl.key).select(`${tbl.id}, ${tbl.label}`)
+          if (tbl.tenantColumn) {
+            query = query.eq(tbl.tenantColumn, tenant.tenant_id)
+          }
+          const { data, error } = await query
+          if (error) {
+            logger.error(`Failed to load lookup table ${tbl.key}:`, error)
+            continue
+          }
+
+          maps[tbl.key] = {}
+          ;(data || []).forEach((row) => {
+            maps[tbl.key][row[tbl.id]] = row[tbl.label]
+          })
+        } catch (err) {
+          logger.error(`Unexpected error loading lookup table ${tbl.key}:`, err)
+        }
       }
-      setLookupMaps(maps);
+
+      setLookupMaps(maps)
     }
-    fetchAllLookups();
-  }, []);
+
+    fetchAllLookups()
+  }, [tenant?.tenant_id])
   const [searchParams, setSearchParams] = useSearchParams()
   const { session, profile } = useAuth()
-  const { tenant } = useTenant()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -180,6 +202,7 @@ export default function ContactsManager() {
           referred_by,
           workflow_status:workflow_status_id ( workflow_status ),
           workflow_status_id,
+          reason_for_contact:reason_for_contact_id ( reason_for_contact ),
           reason_for_contact_id,
           businesses:business_id ( business_id, business_name )
         `)
@@ -222,7 +245,9 @@ export default function ContactsManager() {
           years_of_experience_id: contact.years_of_experience_id || null,
           referral_source_id: contact.referral_source_id || null,
           reason_for_contact_id: contact.reason_for_contact_id || null,
-          reason_for_contact_label: contact.reason_for_contact_id ? lookupMaps.reason_for_contact?.[contact.reason_for_contact_id] || '' : '',
+          reason_for_contact_label:
+            contact.reason_for_contact?.reason_for_contact ||
+            (contact.reason_for_contact_id ? lookupMaps.reason_for_contact?.[contact.reason_for_contact_id] || '' : ''),
           role_types: roleTypes,
           remarks: contact.remarks,
           referred_by: contact.referred_by || null,
@@ -580,14 +605,14 @@ export default function ContactsManager() {
         })
       }
 
-      if (contactId && statusChanged && statusChangeRemarks) {
+      if (contactId && statusChanged) {
         const { error: statusHistoryError } = await supabase
           .from('contact_status_history')
           .insert({
             contact_id: contactId,
             old_status: selectedContact?.status || null,
             new_status: status,
-            notes: statusChangeRemarks,
+            notes: statusChangeRemarks || null,
             changed_by: profile?.id || null
           })
 

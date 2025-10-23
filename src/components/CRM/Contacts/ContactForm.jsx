@@ -125,6 +125,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
+  const [initialWorkflowStatusId, setInitialWorkflowStatusId] = useState(contact?.workflow_status_id || null)
   // Load reason for contact options from DB
   useEffect(() => {
     async function loadReasons() {
@@ -150,7 +151,9 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
       }
     }
-    loadReasons()
+    if (tenant?.tenant_id) {
+      loadReasons()
+    }
   }, [tenant?.tenant_id])
   // Load statuses from contact_statuses table
   useEffect(() => {
@@ -173,7 +176,9 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         setStatusOptions(DEFAULT_STATUSES)
       }
     }
-    loadStatuses()
+    if (tenant?.tenant_id) {
+      loadStatuses()
+    }
   }, [tenant?.tenant_id])
   const [formData, setFormData] = useState({
     first_name: '',
@@ -433,8 +438,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         remarks: contact.remarks || ''
       }))
       initialStatus.current = contact.status || 'Initial Contact'
+      setInitialWorkflowStatusId(contact.workflow_status_id || null)
     } else {
       initialStatus.current = 'Initial Contact'
+      setInitialWorkflowStatusId(null)
     }
   }, [contact])
 
