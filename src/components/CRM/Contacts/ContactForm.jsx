@@ -60,8 +60,6 @@ const DEFAULT_STATUSES = [
 
 const ROLE_TYPES = ['Remote', 'Hybrid Local', 'Onsite Local', 'Open to Relocate']
 
-const COUNTRIES = ['USA', 'India']
-
 const USA_STATES = [
   'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
   'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
@@ -85,27 +83,71 @@ const YEARS_EXPERIENCE = ['0', '1 to 3', '4 to 6', '7 to 9', '10 -15', '15+']
 
 const REFERRAL_SOURCES = ['FB', 'Google', 'Friend']
 
+const FALLBACK_VISA_STATUS_RECORDS = VISA_STATUSES.map((label, index) => ({
+  id: `fallback-visa-${index}`,
+  visa_status: label
+}))
+
+const mapJobTitlesByField = (titles, field) =>
+  titles.map((title, index) => ({
+    id: `fallback-${field.toLowerCase()}-${index}`,
+    job_title: title,
+    field: field.toUpperCase()
+  }))
+
+const FALLBACK_JOB_TITLE_RECORDS = [
+  ...mapJobTitlesByField(IT_JOB_TITLES, 'IT'),
+  ...mapJobTitlesByField(HEALTHCARE_JOB_TITLES, 'HEALTHCARE')
+]
+
+const FALLBACK_ROLE_TYPE_RECORDS = ROLE_TYPES.map((label, index) => ({
+  id: `fallback-role-${index}`,
+  type_of_roles: label
+}))
+
+const FALLBACK_YEARS_EXPERIENCE_RECORDS = YEARS_EXPERIENCE.map((label, index) => ({
+  id: `fallback-years-${index}`,
+  years_of_experience: label
+}))
+
+const FALLBACK_REFERRAL_SOURCE_RECORDS = REFERRAL_SOURCES.map((label, index) => ({
+  id: `fallback-ref-${index}`,
+  referral_source: label
+}))
+
+const FALLBACK_REASON_FOR_CONTACT_RECORDS = REASONS_FOR_CONTACT.map((label, index) => ({
+  id: `fallback-reason-${index}`,
+  label,
+  reason_for_contact: label
+}))
+
 export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
-  const [reasonOptions, setReasonOptions] = useState([])
+  const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
   // Load reason for contact options from DB
   useEffect(() => {
     async function loadReasons() {
       if (!tenant?.tenant_id) {
-        setReasonOptions([])
+        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
         return
       }
       try {
         const { data, error } = await supabase
           .from('reason_for_contact')
-          .select('id, reason_label')
+          .select('id, reason_for_contact')
           .eq('tenant_id', tenant.tenant_id)
-          .order('reason_label', { ascending: true })
+          .order('reason_for_contact', { ascending: true })
         if (error) throw error
-        setReasonOptions((data || []).map(row => ({ id: row.id, label: row.reason_label })))
+        const mapped = (data || []).map(row => ({
+          id: row.id,
+          label: row.reason_for_contact,
+          reason_for_contact: row.reason_for_contact
+        }))
+        setReasonOptions(mapped.length > 0 ? mapped : FALLBACK_REASON_FOR_CONTACT_RECORDS)
       } catch (err) {
-        setReasonOptions([])
+        console.error('Error loading reasons for contact:', err)
+        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
       }
     }
     loadReasons()
@@ -119,15 +161,15 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
       try {
         const { data, error } = await supabase
-          .from('contact_statuses')
-          .select('status_name')
+          .from('workflow_status')
+          .select('workflow_status')
           .eq('tenant_id', tenant.tenant_id)
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true })
+          .order('workflow_status', { ascending: true })
         if (error) throw error
-        const statuses = (data || []).map(row => row.status_name).filter(Boolean)
+        const statuses = (data || []).map(row => row.workflow_status).filter(Boolean)
         setStatusOptions(statuses.length > 0 ? statuses : DEFAULT_STATUSES)
       } catch (err) {
+        console.error('Error loading workflow statuses:', err)
         setStatusOptions(DEFAULT_STATUSES)
       }
     }
@@ -179,12 +221,108 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [countries, setCountries] = useState([])
   const [loadingStates, setLoadingStates] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
-  const [availableJobTitles, setAvailableJobTitles] = useState(IT_JOB_TITLES)
+  const [visaStatusOptions, setVisaStatusOptions] = useState(FALLBACK_VISA_STATUS_RECORDS)
+  const [allJobTitles, setAllJobTitles] = useState(FALLBACK_JOB_TITLE_RECORDS)
+  const [availableJobTitles, setAvailableJobTitles] = useState(FALLBACK_JOB_TITLE_RECORDS)
+  const [roleTypeOptions, setRoleTypeOptions] = useState(FALLBACK_ROLE_TYPE_RECORDS)
+  const [referralSourceOptions, setReferralSourceOptions] = useState(FALLBACK_REFERRAL_SOURCE_RECORDS)
   const [attachments, setAttachments] = useState([])
   const [fieldErrors, setFieldErrors] = useState({})
-  const [yearsExperienceOptions, setYearsExperienceOptions] = useState(YEARS_EXPERIENCE)
+  const [yearsExperienceOptions, setYearsExperienceOptions] = useState(FALLBACK_YEARS_EXPERIENCE_RECORDS)
   const [loadingYearsExperience, setLoadingYearsExperience] = useState(false)
   
+  useEffect(() => {
+    async function loadVisaStatuses() {
+      if (!tenant?.tenant_id) {
+        setVisaStatusOptions(FALLBACK_VISA_STATUS_RECORDS)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('visa_status')
+          .select('id, visa_status')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('visa_status', { ascending: true })
+        if (error) throw error
+  const records = Array.isArray(data) ? data : []
+  setVisaStatusOptions(records.length > 0 ? records : FALLBACK_VISA_STATUS_RECORDS)
+      } catch (err) {
+        console.error('Error loading visa statuses:', err)
+        setVisaStatusOptions(FALLBACK_VISA_STATUS_RECORDS)
+      }
+    }
+    loadVisaStatuses()
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    async function loadJobTitles() {
+      if (!tenant?.tenant_id) {
+        setAllJobTitles(FALLBACK_JOB_TITLE_RECORDS)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('job_title')
+          .select('id, job_title, field')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('job_title', { ascending: true })
+        if (error) throw error
+  const records = Array.isArray(data) ? data : []
+  setAllJobTitles(records.length > 0 ? records : FALLBACK_JOB_TITLE_RECORDS)
+      } catch (err) {
+        console.error('Error loading job titles:', err)
+        setAllJobTitles(FALLBACK_JOB_TITLE_RECORDS)
+      }
+    }
+    loadJobTitles()
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    async function loadRoleTypes() {
+      if (!tenant?.tenant_id) {
+        setRoleTypeOptions(FALLBACK_ROLE_TYPE_RECORDS)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('type_of_roles')
+          .select('id, type_of_roles')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('type_of_roles', { ascending: true })
+        if (error) throw error
+  const records = Array.isArray(data) ? data : []
+  setRoleTypeOptions(records.length > 0 ? records : FALLBACK_ROLE_TYPE_RECORDS)
+      } catch (err) {
+        console.error('Error loading role types:', err)
+        setRoleTypeOptions(FALLBACK_ROLE_TYPE_RECORDS)
+      }
+    }
+    loadRoleTypes()
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    async function loadReferralSources() {
+      if (!tenant?.tenant_id) {
+        setReferralSourceOptions(FALLBACK_REFERRAL_SOURCE_RECORDS)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('referral_sources')
+          .select('id, referral_source')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('referral_source', { ascending: true })
+        if (error) throw error
+  const records = Array.isArray(data) ? data : []
+  setReferralSourceOptions(records.length > 0 ? records : FALLBACK_REFERRAL_SOURCE_RECORDS)
+      } catch (err) {
+        console.error('Error loading referral sources:', err)
+        setReferralSourceOptions(FALLBACK_REFERRAL_SOURCE_RECORDS)
+      }
+    }
+    loadReferralSources()
+  }, [tenant?.tenant_id])
+
   // Team leads and recruiters
   const [teamLeads, setTeamLeads] = useState([])
   const [recruiters, setRecruiters] = useState([])
@@ -208,43 +346,21 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   // Load states when country changes
   useEffect(() => {
     if (formData.country_id) {
-      // If country_id is an object, use its name; if string, find object in countries array
-      let countryName = '';
-      if (typeof formData.country_id === 'object') {
-        countryName = formData.country_id.name;
-      } else {
-        const countryObj = countries.find(c => c.country_id === formData.country_id);
-        countryName = countryObj ? countryObj.name : formData.country_id;
-      }
-      loadStates(countryName);
+      loadStates(formData.country_id)
     } else {
-      setAvailableStates([]);
-      setAvailableCities([]);
-      // Only reset if country was actually changed (not initial load)
-      if (contact && contact.country_id !== formData.country_id) {
-        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }));
-      }
+      setAvailableStates([])
+      setAvailableCities([])
+      setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
     }
   }, [formData.country_id])
 
   // Load cities when state changes
   useEffect(() => {
     if (formData.state_id) {
-      // If state_id is an object, use its name; if string, find object in availableStates array
-      let stateName = '';
-      if (typeof formData.state_id === 'object') {
-        stateName = formData.state_id.name;
-      } else {
-        const stateObj = availableStates.find(s => s.state_id === formData.state_id);
-        stateName = stateObj ? stateObj.name : formData.state_id;
-      }
-      loadCities(stateName);
+      loadCities(formData.state_id)
     } else {
       setAvailableCities([])
-      // Only reset if state was actually changed (not initial load)
-      if (contact && contact.state_id !== formData.state_id) {
-        setFormData(prev => ({ ...prev, city_id: '' }))
-      }
+      setFormData(prev => ({ ...prev, city_id: '' }))
     }
   }, [formData.state_id])
 
@@ -264,71 +380,67 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   }, [tenant?.tenant_id, formData.recruiting_team_lead])
 
   useEffect(() => {
-    // Update job titles based on contact type
+    let filtered = allJobTitles
+
     if (formData.contact_type === 'healthcare_candidate') {
-      setAvailableJobTitles(HEALTHCARE_JOB_TITLES)
+      filtered = allJobTitles.filter(title => (title.field || '').toLowerCase().includes('health'))
     } else if (formData.contact_type === 'it_candidate') {
-      setAvailableJobTitles(IT_JOB_TITLES)
-    } else {
-      setAvailableJobTitles([])
+      filtered = allJobTitles.filter(title => (title.field || '').toLowerCase().includes('it'))
     }
-  }, [formData.contact_type])
+
+    setAvailableJobTitles(filtered)
+
+    setFormData(prev => {
+      if (!prev.job_title_id) {
+        return prev
+      }
+
+      const currentId = typeof prev.job_title_id === 'object'
+        ? prev.job_title_id.id
+        : prev.job_title_id
+
+      const hasMatch = filtered.some(title => title.id === currentId)
+      if (hasMatch) {
+        return prev
+      }
+
+      return { ...prev, job_title_id: '' }
+    })
+  }, [formData.contact_type, allJobTitles])
 
   // Sync form data when contact prop changes (Bug #7 fix)
   useEffect(() => {
     if (contact) {
-      // Helper to normalize lookup arrays to [{id, label}] format
-      const normalizeOptions = (arr, labelKey = 'label', idKey = 'id') => {
-        if (!Array.isArray(arr)) return [];
-        return arr.map(opt =>
-          typeof opt === 'object' ? opt : { id: opt, [labelKey]: opt }
-        );
-      };
-
-      // Normalize all lookup arrays
-      const visaStatusOptions = normalizeOptions(VISA_STATUSES, 'visa_status', 'id');
-      const jobTitleOptions = normalizeOptions(availableJobTitles, 'job_title', 'id');
-      const roleTypeOptions = normalizeOptions(ROLE_TYPES, 'type_of_roles', 'id');
-      const yearsExpOptions = normalizeOptions(yearsExperienceOptions, 'years_of_experience', 'id');
-      const referralSourceOptions = normalizeOptions(REFERRAL_SOURCES, 'referral_source', 'id');
-
-      // Map all lookup IDs to option objects for display
-  // Country mapping: always pass object or null
-  const countryObj = countries.find(c => c.country_id === contact.country_id) || null;
-      const stateObj = availableStates.find(s => s.state_id === contact.state_id) || '';
-      const cityObj = availableCities.find(c => c.city_id === contact.city_id) || '';
-      const visaStatusObj = visaStatusOptions.find(v => v.id === contact.visa_status_id) || visaStatusOptions.find(v => v.visa_status === contact.visa_status_id) || '';
-      const jobTitleObj = jobTitleOptions.find(j => j.id === contact.job_title_id) || jobTitleOptions.find(j => j.job_title === contact.job_title_id) || '';
-      const typeOfRolesObj = roleTypeOptions.find(r => r.id === contact.type_of_roles_id) || roleTypeOptions.find(r => r.type_of_roles === contact.type_of_roles_id) || '';
-      const yearsExpObj = yearsExpOptions.find(y => y.id === contact.years_of_experience_id) || yearsExpOptions.find(y => y.years_of_experience === contact.years_of_experience_id) || '';
-      const referralSourceObj = referralSourceOptions.find(r => r.id === contact.referral_source_id) || referralSourceOptions.find(r => r.referral_source === contact.referral_source_id) || '';
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         first_name: contact.first_name || '',
         last_name: contact.last_name || '',
         email: contact.email || '',
         phone: contact.phone || '',
         contact_type: contact.contact_type || 'it_candidate',
-        visa_status_id: visaStatusObj,
-        job_title_id: jobTitleObj,
-        reasons_for_contact: contact.reasons_for_contact || [],
+        visa_status_id: contact.visa_status_id || '',
+        job_title_id: contact.job_title_id || '',
+        reason_for_contact_id: contact.reason_for_contact_id || '',
         status: contact.status || 'Initial Contact',
-        type_of_roles_id: typeOfRolesObj,
-        country_id: countryObj,
-        state_id: stateObj,
-        city_id: cityObj,
-        years_of_experience_id: yearsExpObj,
-        referral_source_id: referralSourceObj,
+        type_of_roles_id: contact.type_of_roles_id || '',
+        country_id: contact.country_id || '',
+        state_id: contact.state_id || '',
+        city_id: contact.city_id || '',
+        years_of_experience_id: contact.years_of_experience_id || '',
+        referral_source_id: contact.referral_source_id || '',
         recruiting_team_lead: contact.recruiting_team_lead || '',
         recruiter: contact.recruiter || '',
-        remarks: contact.remarks || '',
-      });
-      initialStatus.current = contact.status || 'Initial Contact';
+        remarks: contact.remarks || ''
+      }))
+      initialStatus.current = contact.status || 'Initial Contact'
+    } else {
+      initialStatus.current = 'Initial Contact'
     }
   }, [contact])
 
   useEffect(() => {
     if (!tenant?.tenant_id) {
-      setYearsExperienceOptions(YEARS_EXPERIENCE)
+      setYearsExperienceOptions(FALLBACK_YEARS_EXPERIENCE_RECORDS)
       return
     }
 
@@ -345,7 +457,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
         const { data: yearsData, error } = await supabase
           .from('years_of_experience')
-          .select('years_of_experience, business_id')
+          .select('id, years_of_experience, business_id')
           .eq('tenant_id', tenant.tenant_id)
           .order('business_id', { ascending: true, nullsFirst: true })
           .order('years_of_experience', { ascending: true })
@@ -355,16 +467,28 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           throw error
         }
 
-        const deduped = Array.from(
-          new Set((yearsData || []).map((row) => row.years_of_experience).filter(Boolean))
-        )
+        const dedupedMap = new Map()
+        ;(yearsData || []).forEach((row) => {
+          if (!row.years_of_experience) {
+            return
+          }
+          if (!dedupedMap.has(row.years_of_experience)) {
+            dedupedMap.set(row.years_of_experience, row.id)
+          }
+        })
 
-        setYearsExperienceOptions(deduped.length > 0 ? deduped : YEARS_EXPERIENCE)
+        const deduped = Array.from(dedupedMap.entries()).map(([label, id]) => ({
+          id,
+          years_of_experience: label
+        }))
+
+        setYearsExperienceOptions(deduped.length > 0 ? deduped : FALLBACK_YEARS_EXPERIENCE_RECORDS)
       } catch (err) {
         if (err.name === 'AbortError') {
           return
         }
-        setYearsExperienceOptions(YEARS_EXPERIENCE)
+        console.error('Error loading years of experience options:', err)
+        setYearsExperienceOptions(FALLBACK_YEARS_EXPERIENCE_RECORDS)
       } finally {
         if (!controller.signal.aborted) {
           setLoadingYearsExperience(false)
@@ -387,8 +511,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .select('country_id, code, name')
         .order('name')
 
-      if (error) throw error
-  setCountries((data || []).map(c => ({ country_id: c.country_id, name: c.name, code: c.code })))
+    if (error) throw error
+    setCountries((data || []).map(c => ({ country_id: c.country_id, name: c.name, code: c.code })))
     } catch (err) {
       console.error('Error loading countries:', err)
       setCountries([
@@ -399,59 +523,105 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   }
 
   // Load states for selected country
-  const loadStates = async (countryName) => {
+  const loadStates = async (countryValue) => {
     try {
       setLoadingStates(true)
-      
-      const { data: countryData, error: countryError } = await supabase
-        .from('countries')
-        .select('country_id')
-        .eq('name', countryName)
-        .single()
 
-      if (countryError) throw countryError
+      const countryId = typeof countryValue === 'object'
+        ? countryValue.country_id || countryValue.id
+        : countryValue
+
+      if (!countryId) {
+        setAvailableStates([])
+        return
+      }
+
+      // If fallback country is selected (non-UUID), return static list
+      if (typeof countryId === 'string' && countryId.length !== 36) {
+        const fallbackCountry = countries.find(c => c.country_id === countryId || c.code === countryId)
+        const countryName = (fallbackCountry?.name || '').toLowerCase()
+        const fallbackList = countryName === 'india' ? INDIA_STATES : countryName === 'usa' ? USA_STATES : []
+        const mappedFallback = fallbackList.map((state, index) => ({
+          state_id: `fallback-state-${index}`,
+          name: state,
+          code: state
+        }))
+        setAvailableStates(mappedFallback)
+        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
+        return
+      }
 
       const { data, error } = await supabase
         .from('states')
         .select('state_id, code, name')
-        .eq('country_id', countryData.country_id)
+        .eq('country_id', countryId)
         .order('name')
 
       if (error) throw error
-  setAvailableStates((data || []).map(s => ({ state_id: s.state_id, name: s.name, code: s.code })))
+
+      const mappedStates = (data || []).map(s => ({ state_id: s.state_id, name: s.name, code: s.code }))
+      setAvailableStates(mappedStates)
+
+      setFormData(prev => {
+        if (!prev.state_id) {
+          return prev
+        }
+        const currentStateId = typeof prev.state_id === 'object' ? prev.state_id.state_id : prev.state_id
+        const hasState = mappedStates.some(state => state.state_id === currentStateId)
+        return hasState ? prev : { ...prev, state_id: '', city_id: '' }
+      })
     } catch (err) {
       console.error('Error loading states:', err)
-      // Fallback to hardcoded lists
-  setAvailableStates((countryName === 'USA' ? USA_STATES : INDIA_STATES).map(s => ({ state_id: s, name: s, code: s })))
+      setAvailableStates([])
+      setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
     } finally {
       setLoadingStates(false)
     }
   }
 
   // Load cities for selected state
-  const loadCities = async (stateName) => {
+  const loadCities = async (stateValue) => {
     try {
       setLoadingCities(true)
-      
-      const { data: stateData, error: stateError } = await supabase
-        .from('states')
-        .select('state_id')
-        .eq('name', stateName)
-        .single()
 
-      if (stateError) throw stateError
+      const stateId = typeof stateValue === 'object'
+        ? stateValue.state_id || stateValue.id
+        : stateValue
+
+      if (!stateId) {
+        setAvailableCities([])
+        return
+      }
+
+      if (typeof stateId === 'string' && stateId.startsWith('fallback-')) {
+        setAvailableCities([])
+        setFormData(prev => ({ ...prev, city_id: '' }))
+        return
+      }
 
       const { data, error } = await supabase
         .from('cities')
         .select('city_id, name')
-        .eq('state_id', stateData.state_id)
+        .eq('state_id', stateId)
         .order('name')
 
       if (error) throw error
-  setAvailableCities((data || []).map(c => ({ city_id: c.city_id, name: c.name })))
+
+      const mappedCities = (data || []).map(c => ({ city_id: c.city_id, name: c.name }))
+      setAvailableCities(mappedCities)
+
+      setFormData(prev => {
+        if (!prev.city_id) {
+          return prev
+        }
+        const currentCityId = typeof prev.city_id === 'object' ? prev.city_id.city_id : prev.city_id
+        const hasCity = mappedCities.some(city => city.city_id === currentCityId)
+        return hasCity ? prev : { ...prev, city_id: '' }
+      })
     } catch (err) {
       console.error('Error loading cities:', err)
-  setAvailableCities([])
+      setAvailableCities([])
+      setFormData(prev => ({ ...prev, city_id: '' }))
     } finally {
       setLoadingCities(false)
     }
@@ -738,15 +908,31 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
 
     // Extract IDs for all lookup fields before saving
-    const getId = (val, key = 'id') => (val && typeof val === 'object' ? val[key] : val);
-    // Ensure job_title_id is always an ID, not a label string
-    let jobTitleId = formData.job_title_id;
-    if (jobTitleId && typeof jobTitleId === 'string') {
-      // Try to find the matching job title object by label
-      const jobTitleObj = (availableJobTitles || []).find(j => j.job_title === jobTitleId);
-      jobTitleId = jobTitleObj ? jobTitleObj.id : jobTitleId;
-    } else if (jobTitleId && typeof jobTitleId === 'object') {
-      jobTitleId = jobTitleId.id;
+    const getId = (val, key = 'id') => (val && typeof val === 'object' ? val[key] : val)
+    const toNumericId = (val) => {
+      const resolved = getId(val)
+      if (resolved === null || resolved === undefined || resolved === '') {
+        return null
+      }
+      if (typeof resolved === 'number') {
+        return resolved
+      }
+      if (typeof resolved === 'string') {
+        const numeric = Number(resolved)
+        return Number.isNaN(numeric) ? null : numeric
+      }
+      return null
+    }
+
+    const normalizeGeoId = (val, key) => {
+      const resolved = getId(val, key)
+      if (!resolved) {
+        return null
+      }
+      if (typeof resolved === 'string' && resolved.length !== 36) {
+        return null
+      }
+      return resolved
     }
 
     const saveData = {
@@ -759,15 +945,15 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
       statusChanged: formData.status !== initialStatus.current,
-      visa_status_id: getId(formData.visa_status_id),
-      job_title_id: jobTitleId,
-      reason_for_contact_id: getId(formData.reason_for_contact_id),
-      type_of_roles_id: getId(formData.type_of_roles_id),
-      years_of_experience_id: getId(formData.years_of_experience_id),
-      referral_source_id: getId(formData.referral_source_id),
-      country_id: getId(formData.country_id, 'country_id'),
-      state_id: getId(formData.state_id, 'state_id'),
-      city_id: getId(formData.city_id, 'city_id'),
+      visa_status_id: toNumericId(formData.visa_status_id),
+      job_title_id: toNumericId(formData.job_title_id),
+      reason_for_contact_id: toNumericId(formData.reason_for_contact_id),
+      type_of_roles_id: toNumericId(formData.type_of_roles_id),
+      years_of_experience_id: toNumericId(formData.years_of_experience_id),
+      referral_source_id: toNumericId(formData.referral_source_id),
+      country_id: normalizeGeoId(formData.country_id, 'country_id'),
+      state_id: normalizeGeoId(formData.state_id, 'state_id'),
+      city_id: normalizeGeoId(formData.city_id, 'city_id'),
     };
     onSave(saveData, attachments);
   }
@@ -880,7 +1066,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               options={statusOptions}
               value={formData.status}
               onChange={(value) => handleChange('status', value)}
-              placeholder="Select or type status..."
+              placeholder="Select status..."
+              allowCustomValue={false}
             />
           </div>
 
@@ -890,12 +1077,13 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               <div className="form-group">
                 <label>Visa Status</label>
                 <AutocompleteSelect
-                  options={VISA_STATUSES}
+                  options={visaStatusOptions}
                   value={formData.visa_status_id}
                   onChange={(id) => handleChange('visa_status_id', id)}
-                  getOptionLabel={option => option.visa_status}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'object' ? option.visa_status : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select visa status..."
+                  allowCustomValue={false}
                 />
               </div>
 
@@ -905,9 +1093,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   options={availableJobTitles}
                   value={formData.job_title_id}
                   onChange={(id) => handleChange('job_title_id', id)}
-                  getOptionLabel={option => option.job_title}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'object' ? option.job_title : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select job title..."
+                  allowCustomValue={false}
                 />
               </div>
 
@@ -916,22 +1105,24 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                 <AutocompleteSelect
                   options={reasonOptions}
                   value={formData.reason_for_contact_id}
-                  onChange={option => handleChange('reason_for_contact_id', option)}
-                  getOptionLabel={option => (typeof option === 'object' ? option.label : option)}
+                  onChange={value => handleChange('reason_for_contact_id', value)}
+                  getOptionLabel={option => (typeof option === 'object' ? option.label || option.reason_for_contact : option)}
                   getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select reason for contact..."
+                  allowCustomValue={false}
                 />
               </div>
 
               <div className="form-group">
                 <label>Type of Roles</label>
                 <AutocompleteSelect
-                  options={ROLE_TYPES}
+                  options={roleTypeOptions}
                   value={formData.type_of_roles_id}
                   onChange={(id) => handleChange('type_of_roles_id', id)}
-                  getOptionLabel={option => (typeof option === 'string' ? option : option.type_of_roles)}
-                  getOptionValue={option => (typeof option === 'string' ? option : option.id)}
+                  getOptionLabel={option => (typeof option === 'object' ? option.type_of_roles : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select role type..."
+                  allowCustomValue={false}
                 />
               </div>
 
@@ -941,21 +1132,23 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   options={yearsExperienceOptions}
                   value={formData.years_of_experience_id}
                   onChange={(id) => handleChange('years_of_experience_id', id)}
-                  getOptionLabel={option => option.years_of_experience}
-                  getOptionValue={option => option.id}
+                  getOptionLabel={option => (typeof option === 'object' ? option.years_of_experience : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select years of experience..."
+                  allowCustomValue={false}
                 />
               </div>
 
               <div className="form-group">
                 <label>Referral Source</label>
                 <AutocompleteSelect
-                  options={REFERRAL_SOURCES}
+                  options={referralSourceOptions}
                   value={formData.referral_source_id}
                   onChange={(id) => handleChange('referral_source_id', id)}
-                  getOptionLabel={option => (typeof option === 'string' ? option : option.referral_source)}
-                  getOptionValue={option => (typeof option === 'string' ? option : option.id)}
+                  getOptionLabel={option => (typeof option === 'object' ? option.referral_source : option)}
+                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select referral source..."
+                  allowCustomValue={false}
                 />
               </div>
             </>
@@ -971,6 +1164,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               getOptionLabel={option => option?.name || ''}
               getOptionValue={option => option?.country_id || ''}
               placeholder="Select country..."
+              allowCustomValue={false}
             />
           </div>
 
@@ -984,6 +1178,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               getOptionValue={option => (typeof option === 'object' ? option.state_id : option)}
               placeholder="Select state..."
               disabled={!formData.country_id || loadingStates}
+              allowCustomValue={false}
             />
           </div>
 
@@ -997,6 +1192,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
               getOptionValue={option => (typeof option === 'object' ? option.city_id : option)}
               placeholder="Select city..."
               disabled={!formData.state_id || loadingCities}
+              allowCustomValue={false}
             />
           </div>
 
