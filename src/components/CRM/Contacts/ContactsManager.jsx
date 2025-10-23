@@ -487,13 +487,18 @@ export default function ContactsManager() {
     // Lookup workflow_status_id from workflow_status table
     let workflowStatusId = null
     if (status) {
-      const { data: statusRows, error: statusError } = await supabase
+      let query = supabase
         .from('workflow_status')
         .select('id, workflow_status as workflow_status_name')
         .eq('workflow_status', status)
         .eq('tenant_id', tenant.tenant_id)
-        .eq('business_id', businessId)
-        .maybeSingle()
+
+      // Match business_id if provided, otherwise look for NULL business_id or any match
+      if (businessId) {
+        query = query.eq('business_id', businessId)
+      }
+
+      const { data: statusRows, error: statusError } = await query.maybeSingle()
 
       if (statusError) {
         logger.error('Error looking up workflow_status_id:', statusError)
