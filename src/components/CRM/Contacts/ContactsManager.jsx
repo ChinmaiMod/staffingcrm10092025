@@ -478,6 +478,7 @@ export default function ContactsManager() {
       role_types,
       years_experience,
       referral_source,
+      referral_source_label,
       ...formFields
     } = contactData
 
@@ -619,6 +620,34 @@ export default function ContactsManager() {
         if (statusHistoryError) {
           throw statusHistoryError
         }
+      }
+
+      try {
+        if (payload.referral_source_id) {
+          const referralLabel = referral_source_label || lookupMaps.referral_sources?.[payload.referral_source_id] || null
+          const normalizedLabel = referralLabel ? referralLabel.trim().toLowerCase() : ''
+          if (payload.referred_by && normalizedLabel && normalizedLabel !== 'facebook' && normalizedLabel !== 'google') {
+            const { error: referralUpdateError } = await supabase
+              .from('referral_sources')
+              .update({ refered_by: payload.referred_by })
+              .eq('id', payload.referral_source_id)
+              .eq('tenant_id', tenant.tenant_id)
+            if (referralUpdateError) {
+              logger.warn('Failed to update referral source refered_by:', referralUpdateError)
+            }
+          } else if (normalizedLabel === 'facebook' || normalizedLabel === 'google') {
+            const { error: referralClearError } = await supabase
+              .from('referral_sources')
+              .update({ refered_by: null })
+              .eq('id', payload.referral_source_id)
+              .eq('tenant_id', tenant.tenant_id)
+            if (referralClearError) {
+              logger.warn('Failed to clear referral source refered_by:', referralClearError)
+            }
+          }
+        }
+      } catch (referralErr) {
+        logger.warn('Unexpected error updating referral source refered_by:', referralErr)
       }
 
       setShowForm(false)

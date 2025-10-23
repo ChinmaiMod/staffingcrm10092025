@@ -416,6 +416,15 @@ export default function ContactDetail({ contact, onClose, onEdit, onDelete }) {
                 </div>
               )}
 
+              {contact.referred_by && (
+                <div className="form-group">
+                  <label>Referred By</label>
+                  <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+                    {contact.referred_by}
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Created At</label>
                 <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>

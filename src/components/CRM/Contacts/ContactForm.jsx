@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useTenant } from '../../../contexts/TenantProvider'
 import MultiSelect from '../common/MultiSelect'
@@ -112,7 +112,8 @@ const FALLBACK_YEARS_EXPERIENCE_RECORDS = YEARS_EXPERIENCE.map((label, index) =>
 
 const FALLBACK_REFERRAL_SOURCE_RECORDS = REFERRAL_SOURCES.map((label, index) => ({
   id: `fallback-ref-${index}`,
-  referral_source: label
+  referral_source: label,
+  refered_by: ''
 }))
 
 const FALLBACK_REASON_FOR_CONTACT_RECORDS = REASONS_FOR_CONTACT.map((label, index) => ({
@@ -126,6 +127,25 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
   const [initialWorkflowStatusId, setInitialWorkflowStatusId] = useState(contact?.workflow_status_id || null)
+  const getIdValue = (val, defaultKey = 'id') => {
+    if (val == null) return null
+    if (typeof val === 'object') {
+      if (val[defaultKey] != null) return val[defaultKey]
+      if (val.id != null) return val.id
+      if (val.value != null) return val.value
+      if (val.country_id != null) return val.country_id
+      if (val.state_id != null) return val.state_id
+      if (val.city_id != null) return val.city_id
+    }
+    return val
+  }
+  const extractReferralLabel = (option) => {
+    if (!option) return ''
+    if (typeof option === 'object') {
+      return option.referral_source || option.label || option.name || option.value || ''
+    }
+    return String(option)
+  }
   // Load reason for contact options from DB
   useEffect(() => {
     async function loadReasons() {
@@ -198,6 +218,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     referral_source_id: '',
     recruiting_team_lead: '',
     recruiter: '',
+    referred_by: '',
     remarks: '',
     ...(contact ? {
       first_name: contact.first_name || '',
@@ -217,6 +238,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       referral_source_id: contact.referral_source_id || '',
       recruiting_team_lead: contact.recruiting_team_lead || '',
       recruiter: contact.recruiter || '',
+      referred_by: contact.referred_by || '',
       remarks: contact.remarks || '',
     } : {})
   })
@@ -314,7 +336,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       try {
         const { data, error } = await supabase
           .from('referral_sources')
-          .select('id, referral_source')
+          .select('id, referral_source, refered_by')
           .eq('tenant_id', tenant.tenant_id)
           .order('referral_source', { ascending: true })
         if (error) throw error
@@ -777,6 +799,25 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       // Status is changing - show modal for remarks
       setPendingStatusChange({ field, value })
       setShowStatusModal(true)
+      return
+    }
+
+    if (field === 'referral_source_id') {
+      const selectedId = getIdValue(value)
+      const selectedOption = referralSourceOptions.find(option => {
+        const optionId = getIdValue(option)
+        return optionId != null && String(optionId) === String(selectedId)
+      })
+      const label = extractReferralLabel(selectedOption).trim().toLowerCase()
+      const isSocial = label === 'facebook' || label === 'google'
+      const optionReferedBy = selectedOption && typeof selectedOption === 'object'
+        ? selectedOption.refered_by || ''
+        : ''
+      setFormData(prev => ({
+        ...prev,
+        referral_source_id: value,
+        referred_by: isSocial ? '' : (prev.referred_by || optionReferedBy || '')
+      }))
     } else {
       setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -915,7 +956,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
 
     // Extract IDs for all lookup fields before saving
-    const getId = (val, key = 'id') => (val && typeof val === 'object' ? val[key] : val)
+    const getId = (val, key = 'id') => getIdValue(val, key)
     const toNumericId = (val) => {
       const resolved = getId(val)
       if (resolved === null || resolved === undefined || resolved === '') {
@@ -961,11 +1002,44 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       country_id: normalizeGeoId(formData.country_id, 'country_id'),
       state_id: normalizeGeoId(formData.state_id, 'state_id'),
       city_id: normalizeGeoId(formData.city_id, 'city_id'),
+      referral_source_label: extractReferralLabel(selectedReferralSourceOption) || null,
     };
     onSave(saveData, attachments);
   }
 
   const showCandidateFields = formData.contact_type === 'it_candidate' || formData.contact_type === 'healthcare_candidate'
+  const selectedReferralSourceOption = useMemo(() => {
+    const selectedId = getIdValue(formData.referral_source_id)
+    if (selectedId == null) {
+      return null
+    }
+    return referralSourceOptions.find(option => {
+      const optionId = getIdValue(option)
+      if (optionId == null) return false
+      return String(optionId) === String(selectedId)
+    }) || null
+  }, [formData.referral_source_id, referralSourceOptions])
+
+  const shouldShowReferredByInput = useMemo(() => {
+    const label = extractReferralLabel(selectedReferralSourceOption).trim().toLowerCase()
+    if (!label) return false
+    return !(label === 'facebook' || label === 'google')
+  }, [selectedReferralSourceOption])
+
+  useEffect(() => {
+    if (!shouldShowReferredByInput) {
+      setFormData(prev => (prev.referred_by ? { ...prev, referred_by: '' } : prev))
+      return
+    }
+
+    const optionReferedBy = selectedReferralSourceOption && typeof selectedReferralSourceOption === 'object'
+      ? selectedReferralSourceOption.refered_by || ''
+      : ''
+
+    if (optionReferedBy) {
+      setFormData(prev => (prev.referred_by ? prev : { ...prev, referred_by: optionReferedBy }))
+    }
+  }, [shouldShowReferredByInput, selectedReferralSourceOption])
 
   return (
     <>
@@ -1158,6 +1232,18 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   allowCustomValue={false}
                 />
               </div>
+
+              {shouldShowReferredByInput && (
+                <div className="form-group">
+                  <label>Referred By</label>
+                  <input
+                    type="text"
+                    value={formData.referred_by}
+                    onChange={(e) => handleChange('referred_by', e.target.value)}
+                    placeholder="Enter name of the referring person"
+                  />
+                </div>
+              )}
             </>
           )}
 
