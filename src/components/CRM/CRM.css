@@ -781,6 +781,10 @@
   transition: background 0.15s;
 }
 
+.multi-select-option span {
+  color: #111827;
+}
+
 .multi-select-option:hover {
   background: #f8fafc;
 }

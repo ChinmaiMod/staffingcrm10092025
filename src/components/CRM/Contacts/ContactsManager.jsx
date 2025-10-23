@@ -89,8 +89,8 @@ export default function ContactsManager() {
         { key: 'cities', id: 'city_id', label: 'name' },
         { key: 'years_of_experience', id: 'id', label: 'years_of_experience' },
         { key: 'referral_sources', id: 'id', label: 'referral_source' },
-        { key: 'workflow_status', id: 'id', label: 'workflow_status' },
-        { key: 'reason_for_contact', id: 'id', label: 'reason_label' }
+  { key: 'workflow_status', id: 'id', label: 'workflow_status' },
+  { key: 'reason_for_contact', id: 'id', label: 'reason_for_contact' }
       ];
       const maps = {};
       for (const tbl of tables) {
@@ -419,6 +419,26 @@ export default function ContactsManager() {
     setSelectedContact(contact)
   }
 
+  const coerceLookupId = (value) => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+    if (typeof value === 'number') {
+      return value
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (!trimmed) {
+        return null
+      }
+      if (/^\d+$/.test(trimmed)) {
+        const numeric = Number(trimmed)
+        return Number.isNaN(numeric) ? null : numeric
+      }
+    }
+    return null
+  }
+
   const handleSaveContact = async (contactData, attachments = []) => {
     if (!tenant?.tenant_id) {
       alert('Missing tenant context. Please refresh and try again.')
@@ -438,42 +458,44 @@ export default function ContactsManager() {
 
     const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
 
-  // Lookup workflow_status_id from workflow_status table
+    // Lookup workflow_status_id from workflow_status table
     let workflowStatusId = null
     if (status) {
       const { data: statusRows, error: statusError } = await supabase
-  .from('workflow_status')
-  .select('id, workflow_status as workflow_status_name')
-  .eq('workflow_status', status)
-  .eq('tenant_id', tenant.tenant_id)
-  .eq('business_id', businessId)
-  .maybeSingle()
+        .from('workflow_status')
+        .select('id, workflow_status as workflow_status_name')
+        .eq('workflow_status', status)
+        .eq('tenant_id', tenant.tenant_id)
+        .eq('business_id', businessId)
+        .maybeSingle()
+
       if (statusError) {
-  logger.error('Error looking up workflow_status_id:', statusError)
+        logger.error('Error looking up workflow_status_id:', statusError)
       }
+
       workflowStatusId = statusRows?.id || null
     }
 
     const payload = {
-  tenant_id: tenant.tenant_id,
-  business_id: businessId,
-  first_name: nullIfEmpty(formFields.first_name),
-  last_name: nullIfEmpty(formFields.last_name),
-  email: nullIfEmpty(formFields.email),
-  phone: nullIfEmpty(formFields.phone),
-  contact_type: mapContactTypeToDb(formFields.contact_type),
-  visa_status_id: formFields.visa_status_id || null,
-  job_title_id: formFields.job_title_id || null,
-  type_of_roles_id: formFields.type_of_roles_id || null,
-  country_id: formFields.country_id || null,
-  state_id: formFields.state_id || null,
-  city_id: formFields.city_id || null,
-  years_of_experience_id: formFields.years_of_experience_id || null,
-  referral_source_id: formFields.referral_source_id || null,
-  workflow_status_id: workflowStatusId,
-  reason_for_contact_id: reason_for_contact_id || null,
-  remarks: nullIfEmpty(formFields.remarks),
-  referred_by: nullIfEmpty(formFields.referred_by)
+      tenant_id: tenant.tenant_id,
+      business_id: businessId,
+      first_name: nullIfEmpty(formFields.first_name),
+      last_name: nullIfEmpty(formFields.last_name),
+      email: nullIfEmpty(formFields.email),
+      phone: nullIfEmpty(formFields.phone),
+      contact_type: mapContactTypeToDb(formFields.contact_type),
+      visa_status_id: coerceLookupId(formFields.visa_status_id),
+      job_title_id: coerceLookupId(formFields.job_title_id),
+      type_of_roles_id: coerceLookupId(formFields.type_of_roles_id),
+      country_id: formFields.country_id || null,
+      state_id: formFields.state_id || null,
+      city_id: formFields.city_id || null,
+      years_of_experience_id: coerceLookupId(formFields.years_of_experience_id),
+      referral_source_id: coerceLookupId(formFields.referral_source_id),
+      workflow_status_id: coerceLookupId(workflowStatusId),
+      reason_for_contact_id: coerceLookupId(reason_for_contact_id),
+      remarks: nullIfEmpty(formFields.remarks),
+      referred_by: nullIfEmpty(formFields.referred_by)
     }
 
     try {

@@ -192,6 +192,7 @@ export default function AutocompleteSelect({
           border: '1px solid #e2e8f0',
           borderRadius: '8px',
           fontSize: '14px',
+          color: '#111827',
           backgroundColor: disabled ? '#f3f4f6' : 'white',
           cursor: disabled ? 'not-allowed' : 'text',
           opacity: disabled ? 0.6 : 1,
