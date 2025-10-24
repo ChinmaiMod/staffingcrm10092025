@@ -207,7 +207,6 @@ describe('ContactsManager', () => {
   await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
   // Check for contact row content
   expect(screen.getByText((content) => content.includes('John') && content.includes('Doe'))).toBeInTheDocument();
-  expect(screen.getByText(/john@example.com/)).toBeInTheDocument();
   expect(screen.getAllByText(/Global/).length).toBeGreaterThan(0);
   expect(screen.getByRole('button', { name: /New Contact/i })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /New Contact/i }));

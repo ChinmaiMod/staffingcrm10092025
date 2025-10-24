@@ -1074,7 +1074,6 @@ export default function ContactsManager() {
                 />
               </th>
               <th>Name</th>
-              <th>Email</th>
               <th>Phone</th>
               <th>Business</th>
               <th>Type</th>
@@ -1087,7 +1086,7 @@ export default function ContactsManager() {
           <tbody>
             {finalContacts.length === 0 ? (
               <tr>
-                <td colSpan="10">
+                <td colSpan="9">
                   <div className="empty-state">
                     <div className="empty-state-icon">👥</div>
                     <h3>No Contacts Found</h3>
@@ -1118,7 +1117,6 @@ export default function ContactsManager() {
                   <td>
                     <strong>{contact.first_name} {contact.last_name}</strong>
                   </td>
-                  <td>{contact.email}</td>
                   <td>{contact.phone}</td>
                   <td>
                     {contact.business_id ? (
