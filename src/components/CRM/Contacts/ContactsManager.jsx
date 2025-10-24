@@ -473,7 +473,7 @@ export default function ContactsManager() {
     const {
       statusChangeRemarks,
       statusChanged,
-      status,
+      workflow_status_id,
       reason_for_contact_id,
       role_types,
       years_experience,
@@ -484,27 +484,22 @@ export default function ContactsManager() {
 
     const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
 
-    // Lookup workflow_status_id from workflow_status table
-    let workflowStatusId = null
-    if (status) {
+    // Get workflow_status label for status history
+    let statusLabel = null
+    if (workflow_status_id) {
       let query = supabase
         .from('workflow_status')
-        .select('id, workflow_status as workflow_status_name')
-        .ilike('workflow_status', status)
+        .select('workflow_status')
+        .eq('id', workflow_status_id)
         .eq('tenant_id', tenant.tenant_id)
-
-      // Match business_id if provided, otherwise look for NULL business_id or any match
-      if (businessId) {
-        query = query.eq('business_id', businessId)
-      }
 
       const { data: statusRows, error: statusError } = await query.maybeSingle()
 
       if (statusError) {
-        logger.error('Error looking up workflow_status_id:', statusError)
+        logger.error('Error looking up workflow_status label:', statusError)
       }
 
-      workflowStatusId = statusRows?.id || null
+      statusLabel = statusRows?.workflow_status || null
     }
 
     const payload = {
@@ -523,7 +518,7 @@ export default function ContactsManager() {
       city_id: formFields.city_id || null,
       years_of_experience_id: coerceLookupId(formFields.years_of_experience_id),
       referral_source_id: coerceLookupId(formFields.referral_source_id),
-      workflow_status_id: coerceLookupId(workflowStatusId),
+      workflow_status_id: coerceLookupId(workflow_status_id),
       reason_for_contact_id: coerceLookupId(reason_for_contact_id),
       remarks: nullIfEmpty(formFields.remarks),
       referred_by: nullIfEmpty(formFields.referred_by)
@@ -617,7 +612,7 @@ export default function ContactsManager() {
           .insert({
             contact_id: contactId,
             old_status: selectedContact?.status || null,
-            new_status: status,
+            new_status: statusLabel,
             notes: statusChangeRemarks || null,
             changed_by: profile?.id || null
           })

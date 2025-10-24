@@ -50,13 +50,18 @@ const REASONS_FOR_CONTACT = [
   'H1B Transfer', 'GC Processing'
 ]
 
-// Statuses will be loaded from contact_statuses table
+// Statuses will be loaded from workflow_status table
 const DEFAULT_STATUSES = [
   'Initial Contact', 'Spoke to candidate', 'Resume needs to be prepared', 
   'Resume prepared and sent for review', 'Assigned to Recruiter', 
   'Recruiter started marketing', 'Placed into Job', 'Candidate declined marketing', 
   'Candidate on vacation', 'Candidate not responding', 'Exclusive roles only'
 ]
+
+const FALLBACK_STATUS_RECORDS = DEFAULT_STATUSES.map((label, index) => ({
+  id: `fallback-status-${index}`,
+  workflow_status: label
+}))
 
 const ROLE_TYPES = ['Remote', 'Hybrid Local', 'Onsite Local', 'Open to Relocate']
 
@@ -124,7 +129,7 @@ const FALLBACK_REASON_FOR_CONTACT_RECORDS = REASONS_FOR_CONTACT.map((label, inde
 
 export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
-  const [statusOptions, setStatusOptions] = useState(DEFAULT_STATUSES)
+  const [statusOptions, setStatusOptions] = useState(FALLBACK_STATUS_RECORDS)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
   const [initialWorkflowStatusId, setInitialWorkflowStatusId] = useState(contact?.workflow_status_id || null)
   const getIdValue = (val, defaultKey = 'id') => {
@@ -175,25 +180,25 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       loadReasons()
     }
   }, [tenant?.tenant_id])
-  // Load statuses from contact_statuses table
+  // Load statuses from workflow_status table
   useEffect(() => {
     async function loadStatuses() {
       if (!tenant?.tenant_id) {
-        setStatusOptions(DEFAULT_STATUSES)
+        setStatusOptions(FALLBACK_STATUS_RECORDS)
         return
       }
       try {
         const { data, error } = await supabase
           .from('workflow_status')
-          .select('workflow_status')
+          .select('id, workflow_status')
           .eq('tenant_id', tenant.tenant_id)
           .order('workflow_status', { ascending: true })
         if (error) throw error
-        const statuses = (data || []).map(row => row.workflow_status).filter(Boolean)
-        setStatusOptions(statuses.length > 0 ? statuses : DEFAULT_STATUSES)
+        const statuses = (data || []).filter(row => row.id && row.workflow_status)
+        setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
       } catch (err) {
         console.error('Error loading workflow statuses:', err)
-        setStatusOptions(DEFAULT_STATUSES)
+        setStatusOptions(FALLBACK_STATUS_RECORDS)
       }
     }
     if (tenant?.tenant_id) {
@@ -209,7 +214,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     visa_status_id: '',
     job_title_id: '',
   reason_for_contact_id: '',
-    status: 'Initial Contact',
+    workflow_status_id: '',
     type_of_roles_id: '',
     country_id: '',
     state_id: '',
@@ -229,7 +234,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       visa_status_id: contact.visa_status_id || '',
       job_title_id: contact.job_title_id || '',
       reason_for_contact_id: contact.reason_for_contact_id || '',
-      status: contact.status || 'Initial Contact',
+      workflow_status_id: contact.workflow_status_id || '',
       type_of_roles_id: contact.type_of_roles_id || '',
       country_id: contact.country_id || '',
       state_id: contact.state_id || '',
@@ -357,7 +362,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [loadingRecruiters, setLoadingRecruiters] = useState(false)
   
   // Status change tracking
-  const initialStatus = useRef(contact?.status || 'Initial Contact')
+  const initialStatus = useRef(contact?.workflow_status_id || null)
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState(null)
   const [statusChangeRemarks, setStatusChangeRemarks] = useState('')
@@ -459,10 +464,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         recruiter: contact.recruiter || '',
         remarks: contact.remarks || ''
       }))
-      initialStatus.current = contact.status || 'Initial Contact'
+      initialStatus.current = contact.workflow_status_id || null
       setInitialWorkflowStatusId(contact.workflow_status_id || null)
     } else {
-      initialStatus.current = 'Initial Contact'
+      initialStatus.current = null
       setInitialWorkflowStatusId(null)
     }
   }, [contact])
@@ -789,8 +794,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
     }
 
-    // Special handling for status changes
-    if (field === 'status' && contact && value !== initialStatus.current) {
+    // Special handling for workflow_status_id changes
+    if (field === 'workflow_status_id' && contact && value !== initialStatus.current) {
       // Bug #15 fix: Don't open another modal if one is already showing
       if (showStatusModal) {
         return  // Prevent multiple modals
@@ -992,10 +997,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       city: formData.city ? formData.city.trim() : '',
       remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
-      statusChanged: formData.status !== initialStatus.current,
+      statusChanged: formData.workflow_status_id !== initialStatus.current,
       visa_status_id: toNumericId(formData.visa_status_id),
       job_title_id: toNumericId(formData.job_title_id),
       reason_for_contact_id: toNumericId(formData.reason_for_contact_id),
+      workflow_status_id: toNumericId(formData.workflow_status_id),
       type_of_roles_id: toNumericId(formData.type_of_roles_id),
       years_of_experience_id: toNumericId(formData.years_of_experience_id),
       referral_source_id: toNumericId(formData.referral_source_id),
@@ -1008,6 +1014,18 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   }
 
   const showCandidateFields = formData.contact_type === 'it_candidate' || formData.contact_type === 'healthcare_candidate'
+  
+  // Get current status label from workflow_status_id
+  const currentStatusLabel = useMemo(() => {
+    const selectedId = getIdValue(formData.workflow_status_id)
+    if (selectedId == null) return ''
+    const statusOption = statusOptions.find(option => {
+      const optionId = getIdValue(option)
+      return optionId != null && String(optionId) === String(selectedId)
+    })
+    return statusOption && typeof statusOption === 'object' ? statusOption.workflow_status : ''
+  }, [formData.workflow_status_id, statusOptions])
+  
   const selectedReferralSourceOption = useMemo(() => {
     const selectedId = getIdValue(formData.referral_source_id)
     if (selectedId == null) {
@@ -1145,8 +1163,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             <label>Status <span style={{ color: 'red' }}>*</span></label>
             <AutocompleteSelect
               options={statusOptions}
-              value={formData.status}
-              onChange={(value) => handleChange('status', value)}
+              value={formData.workflow_status_id}
+              onChange={(id) => handleChange('workflow_status_id', id)}
+              getOptionLabel={option => (typeof option === 'object' ? option.workflow_status : option)}
+              getOptionValue={option => (typeof option === 'object' ? option.id : option)}
               placeholder="Select status..."
               allowCustomValue={false}
             />
@@ -1292,10 +1312,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           {showCandidateFields && (
             <>
               {/* Show recruiting team lead and recruiter fields only for specific statuses */}
-              {(formData.status === 'Assigned to Recruiter' || 
-                formData.status === 'Recruiter started marketing' || 
-                formData.status === 'Placed into Job' ||
-                formData.status === 'Exclusive roles only') && (
+              {(currentStatusLabel === 'Assigned to Recruiter' || 
+                currentStatusLabel === 'Recruiter Started Marketing' || 
+                currentStatusLabel === 'Placed into Job' ||
+                currentStatusLabel === 'Exclusive Roles Only') && (
                 <>
                   <div className="form-group">
                     <label>Recruiting Team Lead {loadingTeamLeads && <small>(Loading...)</small>}</label>
