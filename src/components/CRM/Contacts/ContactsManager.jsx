@@ -490,7 +490,7 @@ export default function ContactsManager() {
       let query = supabase
         .from('workflow_status')
         .select('id, workflow_status as workflow_status_name')
-        .eq('workflow_status', status)
+        .ilike('workflow_status', status)
         .eq('tenant_id', tenant.tenant_id)
 
       // Match business_id if provided, otherwise look for NULL business_id or any match
