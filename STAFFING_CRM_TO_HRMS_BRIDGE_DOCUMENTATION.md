@@ -39,11 +39,11 @@ CREATE TABLE hrms_employees (
 1. **tenant_id**: NOT NULL, UUID data type, references tenants(id) ON DELETE CASCADE
 2. **business_id**: NULL allowed (for tenant-wide data), UUID data type, references businesses(id) ON DELETE SET NULL
 3. **Indexes**: Always create indexes on tenant_id and business_id for query performance
-4. **Audit fields**: created_at, updated_at, created_by, updated_by on all tables
+4. **Audit fields**: created_at, updated_at, created_by (optional), updated_by (optional) - same as CRM
 
 ---
 
-## 🔐 UUID-Based Multi-Tenancy & Audit Tracking
+## 🔐 UUID-Based Multi-Tenancy
 
 ### Understanding UUID Types for tenant_id and business_id
 
@@ -196,80 +196,77 @@ CREATE TABLE example_table (
   -- Your business logic columns
   column_name DATA_TYPE,
   
-  -- Audit Tracking (REQUIRED)
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  
-  -- Optional: Soft delete support
-  deleted_at TIMESTAMPTZ,
-  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  is_deleted BOOLEAN DEFAULT false
+  -- Audit tracking (Same as CRM pattern)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,  -- Optional
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL   -- Optional
 );
 
--- Trigger to auto-update updated_at
+-- Auto-update trigger for updated_at (reuse CRM trigger function)
 CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON example_table
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 ```
 
-### Audit Field Specifications
+### Simple Audit Field Details
 
-#### 1. created_at (TIMESTAMPTZ)
+| Field | Type | NULL? | Default | Purpose | CRM Usage |
+|-------|------|-------|---------|---------|-----------|
+| `created_at` | TIMESTAMPTZ | No | NOW() | When record was created | ✅ Used in all tables |
+| `updated_at` | TIMESTAMPTZ | No | NOW() | When record was last updated | ✅ Used in all tables |
+| `created_by` | UUID | Yes | NULL | User who created (optional) | ✅ Used in some tables |
+| `updated_by` | UUID | Yes | NULL | User who updated (optional) | ✅ Used in some tables |
 
-| Property | Value | Description |
-|----------|-------|-------------|
-| **Purpose** | Record creation timestamp | When was this record first created? |
-| **Data Type** | TIMESTAMPTZ | Timestamp with timezone support |
-| **NOT NULL** | ✅ Required | Every record must have creation time |
-| **Default** | NOW() | Auto-populated on INSERT |
-| **Timezone** | UTC stored | PostgreSQL stores as UTC, converts on retrieval |
-| **Format** | ISO 8601 | `2025-10-25T14:30:00.123Z` |
+**Key Points:**
+- `created_at` and `updated_at` are **mandatory** - add to all HRMS tables
+- `created_by` and `updated_by` are **optional** - use when you need to track users
+- `updated_at` is **automatically updated** via trigger (no manual intervention needed)
+- NULL `created_by` indicates system-generated records (e.g., migrations, seed data)
+- CRM does **NOT** use soft deletes (no `deleted_at`, `deleted_by`, `is_deleted`)
 
-**Usage:**
-```sql
--- Automatic population
-INSERT INTO hrms_employees (tenant_id, first_name, last_name)
-VALUES ('tenant-uuid', 'John', 'Doe');
--- created_at is automatically set to current timestamp
+**Example Usage in Code:**
 
--- Query records created in last 30 days
-SELECT * FROM hrms_employees
-WHERE created_at >= NOW() - INTERVAL '30 days'
-  AND tenant_id = 'tenant-uuid';
+```javascript
+// Frontend (React) - Creating a record
+const { user } = useAuth();
+const { tenant } = useTenant();
 
--- Format in application
-SELECT 
-  first_name,
-  created_at,
-  to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date
-FROM hrms_employees;
+const createEmployee = async (employeeData) => {
+  const payload = {
+    tenant_id: tenant.id,
+    business_id: selectedBusiness.id,
+    created_by: user.id, // Track who created it
+    updated_by: user.id, // Same on creation
+    ...employeeData
+    // created_at and updated_at auto-populated by database
+  };
+  
+  await supabase.from('hrms_employees').insert(payload);
+};
+
+// Frontend (React) - Updating a record
+const updateEmployee = async (employeeId, updates) => {
+  const { user } = useAuth();
+  
+  const payload = {
+    ...updates,
+    updated_by: user.id // Track who made the change
+    // updated_at will be auto-set by trigger
+  };
+  
+  await supabase
+    .from('hrms_employees')
+    .update(payload)
+    .eq('id', employeeId);
+};
 ```
 
-#### 2. updated_at (TIMESTAMPTZ)
+**Reuse CRM's Trigger Function:**
 
-| Property | Value | Description |
-|----------|-------|-------------|
-| **Purpose** | Last modification timestamp | When was this record last updated? |
-| **Data Type** | TIMESTAMPTZ | Timestamp with timezone support |
-| **NOT NULL** | ✅ Required | Always has a value (initially same as created_at) |
-| **Default** | NOW() | Set to current time on INSERT |
-| **Auto-Update** | ✅ Trigger | Automatically updated on every UPDATE |
-
-**Automatic Update Trigger:**
 ```sql
--- Function to update updated_at column
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply trigger to all tables
+-- This function already exists in CRM - just apply trigger to new tables
 CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON hrms_employees
   FOR EACH ROW
@@ -280,287 +277,7 @@ CREATE TRIGGER set_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- Repeat for all tables...
-```
-
-**Usage:**
-```sql
--- Find recently modified records
-SELECT * FROM hrms_employees
-WHERE updated_at >= NOW() - INTERVAL '7 days'
-  AND tenant_id = 'tenant-uuid'
-ORDER BY updated_at DESC;
-
--- Track stale records (not updated in 6 months)
-SELECT * FROM employee_training
-WHERE updated_at < NOW() - INTERVAL '6 months'
-  AND status = 'IN_PROGRESS';
-```
-
-#### 3. created_by (UUID)
-
-| Property | Value | Description |
-|----------|-------|-------------|
-| **Purpose** | User who created the record | Which user/profile created this? |
-| **Data Type** | UUID | References profiles(id) |
-| **NULL Allowed** | ✅ Yes | System-generated records may have NULL |
-| **References** | profiles(id) | Foreign key to user profiles |
-| **ON DELETE** | SET NULL | If user deleted, keep record but NULL the reference |
-
-**Setting created_by:**
-```javascript
-// Frontend (React)
-const { user } = useAuth(); // From AuthProvider
-
-const createEmployee = async (employeeData) => {
-  const payload = {
-    tenant_id: tenant.id,
-    business_id: selectedBusiness.id,
-    created_by: user.id, // UUID of current user
-    updated_by: user.id, // Same on creation
-    ...employeeData
-  };
-  
-  await supabase.from('hrms_employees').insert(payload);
-};
-```
-
-```sql
--- Backend (Edge Function or SQL)
-INSERT INTO hrms_employees (
-  tenant_id, 
-  business_id, 
-  first_name, 
-  last_name,
-  created_by,
-  updated_by
-)
-VALUES (
-  'tenant-uuid',
-  'business-uuid',
-  'John',
-  'Doe',
-  auth.uid(), -- Get current user ID from auth context
-  auth.uid()
-);
-
--- Query records by creator
-SELECT 
-  e.*,
-  p.full_name as created_by_name,
-  p.email as created_by_email
-FROM hrms_employees e
-LEFT JOIN profiles p ON e.created_by = p.id
-WHERE e.tenant_id = 'tenant-uuid';
-```
-
-#### 4. updated_by (UUID)
-
-| Property | Value | Description |
-|----------|-------|-------------|
-| **Purpose** | User who last modified the record | Which user made the last update? |
-| **Data Type** | UUID | References profiles(id) |
-| **NULL Allowed** | ✅ Yes | Initially same as created_by |
-| **References** | profiles(id) | Foreign key to user profiles |
-| **ON DELETE** | SET NULL | If user deleted, keep record but NULL the reference |
-
-**Usage Pattern:**
-```javascript
-// Frontend update
-const updateEmployee = async (employeeId, updates) => {
-  const { user } = useAuth();
-  
-  const payload = {
-    ...updates,
-    updated_by: user.id, // Track who made the change
-    updated_at: new Date().toISOString() // Explicit timestamp (trigger will override)
-  };
-  
-  await supabase
-    .from('hrms_employees')
-    .update(payload)
-    .eq('id', employeeId);
-};
-```
-
-#### 5. Soft Delete Fields (Optional but Recommended)
-
-**Why Soft Deletes?**
-- ✅ Maintain data integrity for audit trails
-- ✅ Allow "undo" functionality
-- ✅ Preserve historical references
-- ✅ Comply with data retention policies
-
-```sql
--- Add soft delete columns
-ALTER TABLE hrms_employees
-ADD COLUMN deleted_at TIMESTAMPTZ,
-ADD COLUMN deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-ADD COLUMN is_deleted BOOLEAN DEFAULT false;
-
--- Create index for filtering active records
-CREATE INDEX idx_hrms_employees_not_deleted 
-  ON hrms_employees(tenant_id, business_id) 
-  WHERE is_deleted = false;
-```
-
-**Soft Delete Implementation:**
-```javascript
-// Instead of DELETE, update is_deleted flag
-const softDeleteEmployee = async (employeeId) => {
-  const { user } = useAuth();
-  
-  await supabase
-    .from('hrms_employees')
-    .update({
-      is_deleted: true,
-      deleted_at: new Date().toISOString(),
-      deleted_by: user.id,
-      updated_by: user.id,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', employeeId);
-};
-
-// Query only active records
-const getActiveEmployees = async (tenantId, businessId) => {
-  const { data } = await supabase
-    .from('hrms_employees')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .eq('business_id', businessId)
-    .eq('is_deleted', false); // Exclude soft-deleted records
-  
-  return data;
-};
-
-// Restore soft-deleted record
-const restoreEmployee = async (employeeId) => {
-  await supabase
-    .from('hrms_employees')
-    .update({
-      is_deleted: false,
-      deleted_at: null,
-      deleted_by: null
-    })
-    .eq('id', employeeId);
-};
-```
-
-### Complete Audit Tracking Example
-
-```sql
-CREATE TABLE hrms_employees (
-  -- Primary key
-  id BIGSERIAL PRIMARY KEY,
-  
-  -- Multi-tenancy (REQUIRED)
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
-  
-  -- Employee data
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  hire_date DATE NOT NULL,
-  employment_status TEXT DEFAULT 'ACTIVE',
-  
-  -- Audit tracking (REQUIRED)
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  
-  -- Soft delete (OPTIONAL)
-  deleted_at TIMESTAMPTZ,
-  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  is_deleted BOOLEAN DEFAULT false
-);
-
--- Indexes for performance
-CREATE INDEX idx_hrms_employees_tenant ON hrms_employees(tenant_id);
-CREATE INDEX idx_hrms_employees_business ON hrms_employees(business_id);
-CREATE INDEX idx_hrms_employees_created ON hrms_employees(created_at);
-CREATE INDEX idx_hrms_employees_updated ON hrms_employees(updated_at);
-CREATE INDEX idx_hrms_employees_active ON hrms_employees(tenant_id, business_id) 
-  WHERE is_deleted = false;
-
--- Auto-update trigger
-CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON hrms_employees
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- Audit log trigger (optional - logs all changes to audit table)
-CREATE TRIGGER audit_hrms_employees_changes
-  AFTER INSERT OR UPDATE OR DELETE ON hrms_employees
-  FOR EACH ROW
-  EXECUTE FUNCTION log_table_changes();
-```
-
-### Audit Query Examples
-
-```sql
--- 1. Who created the most employees this month?
-SELECT 
-  p.full_name,
-  p.email,
-  COUNT(*) as employees_created
-FROM hrms_employees e
-JOIN profiles p ON e.created_by = p.id
-WHERE e.created_at >= date_trunc('month', NOW())
-  AND e.tenant_id = 'tenant-uuid'
-GROUP BY p.id, p.full_name, p.email
-ORDER BY employees_created DESC;
-
--- 2. Find records modified by specific user
-SELECT 
-  e.id,
-  e.first_name,
-  e.last_name,
-  e.updated_at,
-  p.full_name as updated_by_name
-FROM hrms_employees e
-JOIN profiles p ON e.updated_by = p.id
-WHERE e.updated_by = 'user-uuid'
-  AND e.updated_at >= NOW() - INTERVAL '30 days'
-ORDER BY e.updated_at DESC;
-
--- 3. Audit trail: Creation and modification history
-SELECT 
-  e.id,
-  e.first_name,
-  e.last_name,
-  e.created_at,
-  creator.full_name as created_by_name,
-  e.updated_at,
-  updater.full_name as updated_by_name,
-  EXTRACT(EPOCH FROM (e.updated_at - e.created_at))/3600 as hours_since_creation
-FROM hrms_employees e
-LEFT JOIN profiles creator ON e.created_by = creator.id
-LEFT JOIN profiles updater ON e.updated_by = updater.id
-WHERE e.tenant_id = 'tenant-uuid'
-ORDER BY e.updated_at DESC;
-
--- 4. Find orphaned records (created_by user no longer exists)
-SELECT * FROM hrms_employees
-WHERE created_by IS NULL 
-  AND created_at IS NOT NULL -- Was created by someone, but they're deleted
-  AND tenant_id = 'tenant-uuid';
-
--- 5. Soft-deleted records with details
-SELECT 
-  e.id,
-  e.first_name,
-  e.last_name,
-  e.deleted_at,
-  p.full_name as deleted_by_name,
-  EXTRACT(DAY FROM (NOW() - e.deleted_at)) as days_since_deletion
-FROM hrms_employees e
-LEFT JOIN profiles p ON e.deleted_by = p.id
-WHERE e.is_deleted = true
-  AND e.tenant_id = 'tenant-uuid'
-ORDER BY e.deleted_at DESC;
+-- Repeat for all HRMS tables
 ```
 
 ---
@@ -2257,9 +1974,9 @@ When building HRMS to link with CRM:
 
 ---
 
-## 🔑 Quick Reference: tenant_id, business_id & Audit Tracking
+## 🔑 Quick Reference: tenant_id, business_id & Audit Tracking (CRM Pattern)
 
-### Every HRMS Table Must Follow This Complete Pattern
+### Every HRMS Table Must Follow This Pattern
 
 ```sql
 CREATE TABLE table_name (
@@ -2273,25 +1990,16 @@ CREATE TABLE table_name (
   -- Your table-specific columns
   column_name DATA_TYPE,
   
-  -- CRITICAL: Audit tracking columns (ALWAYS REQUIRED)
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  
-  -- OPTIONAL: Soft delete support (RECOMMENDED)
-  deleted_at TIMESTAMPTZ,
-  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  is_deleted BOOLEAN DEFAULT false
+  -- Audit tracking (Same as CRM pattern)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,  -- Optional
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL   -- Optional
 );
 
 -- CRITICAL: Always create these indexes
 CREATE INDEX idx_table_name_tenant ON table_name(tenant_id);
 CREATE INDEX idx_table_name_business ON table_name(business_id);
-CREATE INDEX idx_table_name_created ON table_name(created_at);
-CREATE INDEX idx_table_name_updated ON table_name(updated_at);
-CREATE INDEX idx_table_name_active ON table_name(tenant_id, business_id) 
-  WHERE is_deleted = false; -- For soft delete support
 
 -- CRITICAL: Auto-update trigger for updated_at
 CREATE TRIGGER set_updated_at
@@ -2309,7 +2017,6 @@ CREATE POLICY "Users can view records from their tenant"
     tenant_id IN (
       SELECT tenant_id FROM profiles WHERE id = auth.uid()
     )
-    AND (is_deleted = false OR is_deleted IS NULL) -- Exclude soft-deleted
   );
 
 -- CRITICAL: Tenant-scoped INSERT policy
@@ -2336,20 +2043,19 @@ CREATE POLICY "Users can update records from their tenant"
   );
 ```
 
-### Complete Column Requirements Summary
+### Column Requirements Summary
 
 | Column | Required | Data Type | Foreign Key | On Delete | Default | Purpose |
 |--------|----------|-----------|-------------|-----------|---------|---------|
 | `id` | ✅ YES | BIGSERIAL | - | - | AUTO | Primary key |
 | `tenant_id` | ✅ YES (NOT NULL) | **UUID** | tenants(id) | CASCADE | - | Multi-tenancy isolation |
 | `business_id` | ⚠️ Recommended | **UUID** | businesses(id) | SET NULL | NULL | Business-level filtering |
-| `created_at` | ✅ YES (NOT NULL) | TIMESTAMPTZ | - | - | NOW() | Creation timestamp (UTC) |
-| `updated_at` | ✅ YES (NOT NULL) | TIMESTAMPTZ | - | - | NOW() | Last update timestamp (UTC) |
-| `created_by` | ✅ Recommended | **UUID** | profiles(id) | SET NULL | - | User who created record |
-| `updated_by` | ✅ Recommended | **UUID** | profiles(id) | SET NULL | - | User who last updated |
-| `deleted_at` | ⚠️ Optional | TIMESTAMPTZ | - | - | NULL | Soft delete timestamp |
-| `deleted_by` | ⚠️ Optional | **UUID** | profiles(id) | SET NULL | NULL | User who deleted record |
-| `is_deleted` | ⚠️ Optional | BOOLEAN | - | - | false | Soft delete flag |
+| `created_at` | ✅ YES | TIMESTAMPTZ | - | - | NOW() | Creation timestamp (UTC) |
+| `updated_at` | ✅ YES | TIMESTAMPTZ | - | - | NOW() | Last update (auto-updated) |
+| `created_by` | ⚠️ Optional | **UUID** | profiles(id) | SET NULL | - | User who created record |
+| `updated_by` | ⚠️ Optional | **UUID** | profiles(id) | SET NULL | - | User who last updated |
+
+**Note:** CRM does NOT use soft deletes.
 
 ### UUID Type Details
 
@@ -2413,7 +2119,7 @@ const createEmployee = async (formData) => {
 };
 ```
 
-**2. Setting Audit Fields on UPDATE:**
+**2. Updating Records:**
 ```javascript
 const updateEmployee = async (employeeId, updates) => {
   const { user } = useAuth();
@@ -2435,73 +2141,7 @@ const updateEmployee = async (employeeId, updates) => {
 };
 ```
 
-**3. Soft Delete Implementation:**
-```javascript
-const softDeleteEmployee = async (employeeId) => {
-  const { user } = useAuth();
-  
-  const { data, error } = await supabase
-    .from('hrms_employees')
-    .update({
-      is_deleted: true,
-      deleted_at: new Date().toISOString(),
-      deleted_by: user.id,
-      updated_by: user.id,
-    })
-    .eq('id', employeeId)
-    .select()
-    .single();
-  
-  return data;
-};
-
-// Restore soft-deleted record
-const restoreEmployee = async (employeeId) => {
-  const { data, error } = await supabase
-    .from('hrms_employees')
-    .update({
-      is_deleted: false,
-      deleted_at: null,
-      deleted_by: null,
-    })
-    .eq('id', employeeId)
-    .select()
-    .single();
-  
-  return data;
-};
-```
-
-**4. Querying with Audit Filters:**
-```sql
--- Records created in last 30 days by specific user
-SELECT * FROM hrms_employees
-WHERE tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
-  AND created_by = 'user-uuid'::uuid
-  AND created_at >= NOW() - INTERVAL '30 days'
-  AND is_deleted = false
-ORDER BY created_at DESC;
-
--- Recently modified records
-SELECT 
-  e.*,
-  creator.full_name as created_by_name,
-  updater.full_name as updated_by_name
-FROM hrms_employees e
-LEFT JOIN profiles creator ON e.created_by = creator.id
-LEFT JOIN profiles updater ON e.updated_by = updater.id
-WHERE e.tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
-  AND e.updated_at >= NOW() - INTERVAL '7 days'
-  AND e.is_deleted = false
-ORDER BY e.updated_at DESC;
-
--- Audit trail: Who modified what and when
-SELECT 
-  e.id,
-  e.first_name,
-  e.last_name,
-  e.created_at,
-  creator.email as created_by_email,
+---
   e.updated_at,
   updater.email as updated_by_email,
   CASE 
@@ -2524,7 +2164,7 @@ Only system-wide configuration tables should omit these:
 - ❌ **All other tables MUST have tenant_id (UUID type)**
 - ❌ **All transactional tables SHOULD have business_id (UUID type)**
 
-### Comprehensive Testing Checklist
+### Testing Checklist (CRM Pattern)
 
 Before deploying any new HRMS table, run these verification queries:
 
@@ -2550,7 +2190,7 @@ WHERE table_name = 'your_table'
   AND column_name = 'business_id';
 -- Expected: data_type = 'uuid', is_nullable = 'YES' (null allowed)
 
--- 3. Verify all audit fields exist with correct types
+-- 3. Verify audit fields exist
 SELECT 
   column_name, 
   data_type,
@@ -2560,7 +2200,7 @@ FROM information_schema.columns
 WHERE table_name = 'your_table' 
   AND column_name IN ('created_at', 'updated_at', 'created_by', 'updated_by')
 ORDER BY column_name;
--- Expected: created_at/updated_at = timestamp with time zone, NOT NULL, default now()
+-- Expected: created_at/updated_at = timestamptz, default now()
 -- Expected: created_by/updated_by = uuid, nullable
 
 -- 4. Verify foreign key constraints with proper CASCADE/SET NULL
@@ -2568,9 +2208,7 @@ SELECT
   tc.constraint_name,
   kcu.column_name,
   ccu.table_name AS foreign_table_name,
-  ccu.column_name AS foreign_column_name,
-  rc.delete_rule,
-  rc.update_rule
+  rc.delete_rule
 FROM information_schema.table_constraints tc
 JOIN information_schema.key_column_usage kcu 
   ON tc.constraint_name = kcu.constraint_name
@@ -2585,103 +2223,45 @@ ORDER BY kcu.column_name;
 -- Expected for business_id: delete_rule = 'SET NULL'
 -- Expected for created_by/updated_by: delete_rule = 'SET NULL'
 
--- 5. Verify all required indexes exist
+-- 5. Verify required indexes exist
 SELECT 
   indexname,
   indexdef
 FROM pg_indexes 
 WHERE tablename = 'your_table' 
 ORDER BY indexname;
--- Expected: At least these indexes:
---   - idx_your_table_tenant (on tenant_id)
---   - idx_your_table_business (on business_id)
---   - idx_your_table_created (on created_at) - optional but recommended
---   - idx_your_table_updated (on updated_at) - optional but recommended
+-- Expected: idx_your_table_tenant, idx_your_table_business
 
 -- 6. Verify RLS is enabled
 SELECT 
-  schemaname,
   tablename, 
   rowsecurity
 FROM pg_tables 
 WHERE tablename = 'your_table';
 -- Expected: rowsecurity = true
 
--- 7. Verify RLS policies exist for all operations
+-- 7. Verify RLS policies exist
 SELECT 
   policyname,
-  cmd,
-  qual,
-  with_check
+  cmd
 FROM pg_policies 
 WHERE tablename = 'your_table'
 ORDER BY cmd;
--- Expected: Policies for SELECT, INSERT, UPDATE at minimum
--- Each should check tenant_id against auth.uid()
+-- Expected: Policies for SELECT, INSERT, UPDATE
 
 -- 8. Verify update trigger exists for updated_at
 SELECT 
   trigger_name,
-  event_manipulation,
-  action_statement
+  event_manipulation
 FROM information_schema.triggers
 WHERE event_object_table = 'your_table'
   AND trigger_name LIKE '%updated_at%';
--- Expected: At least one BEFORE UPDATE trigger
+-- Expected: BEFORE UPDATE trigger
 
--- 9. Test UUID format validation
--- This should succeed
-INSERT INTO your_table (tenant_id, business_id, ...)
-VALUES (
-  '550e8400-e29b-41d4-a716-446655440000'::uuid,
-  'b1111111-1111-1111-1111-111111111111'::uuid,
-  ...
-);
-
--- This should fail with error
-INSERT INTO your_table (tenant_id, business_id, ...)
-VALUES (
-  'not-a-valid-uuid',  -- ERROR
-  'also-invalid',       -- ERROR
-  ...
-);
-
--- 10. Test RLS policies prevent cross-tenant access
--- Switch to different user/tenant and try to query
--- Should return empty result set for other tenant's data
+-- 9. Test RLS policies prevent cross-tenant access
 SELECT * FROM your_table 
 WHERE tenant_id = 'some-other-tenant-uuid'::uuid;
 -- Expected: 0 rows (RLS blocks access)
--- 10. Test RLS policies prevent cross-tenant access
--- Switch to different user/tenant and try to query
--- Should return empty result set for other tenant's data
-SELECT * FROM your_table 
-WHERE tenant_id = 'some-other-tenant-uuid'::uuid;
--- Expected: 0 rows (RLS blocks access)
-
--- 11. Test soft delete (if implemented)
-SELECT 
-  column_name,
-  data_type,
-  column_default
-FROM information_schema.columns 
-WHERE table_name = 'your_table' 
-  AND column_name IN ('is_deleted', 'deleted_at', 'deleted_by')
-ORDER BY column_name;
--- Expected (if soft delete enabled):
---   - is_deleted: boolean, default false
---   - deleted_at: timestamp with time zone, nullable
---   - deleted_by: uuid, nullable
-
--- 12. Verify no missing NOT NULL constraints on critical fields
-SELECT 
-  column_name,
-  is_nullable
-FROM information_schema.columns 
-WHERE table_name = 'your_table' 
-  AND column_name IN ('tenant_id', 'created_at', 'updated_at')
-  AND is_nullable = 'YES';  -- Should return 0 rows
--- Expected: Empty result (all should be NOT NULL)
 ```
 
 ### Common Mistakes to Avoid
@@ -2744,25 +2324,16 @@ CREATE TABLE good_table (
   name TEXT NOT NULL,
   description TEXT,
   
-  -- Audit tracking
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  -- Audit tracking (Same as CRM)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  
-  -- Soft delete (optional)
-  is_deleted BOOLEAN DEFAULT false,
-  deleted_at TIMESTAMPTZ,
-  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL
 );
 
 -- Indexes
 CREATE INDEX idx_good_table_tenant ON good_table(tenant_id);
 CREATE INDEX idx_good_table_business ON good_table(business_id);
-CREATE INDEX idx_good_table_created ON good_table(created_at);
-CREATE INDEX idx_good_table_updated ON good_table(updated_at);
-CREATE INDEX idx_good_table_active ON good_table(tenant_id, business_id) 
-  WHERE is_deleted = false;
 
 -- Auto-update trigger
 CREATE TRIGGER set_updated_at
@@ -2776,7 +2347,6 @@ ALTER TABLE good_table ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation_select" ON good_table
   FOR SELECT USING (
     tenant_id IN (SELECT tenant_id FROM profiles WHERE id = auth.uid())
-    AND (is_deleted = false OR is_deleted IS NULL)
   );
 
 CREATE POLICY "tenant_isolation_insert" ON good_table
@@ -2795,16 +2365,13 @@ CREATE POLICY "tenant_isolation_update" ON good_table
 ### UUID Best Practices Summary
 
 1. **Always use UUID for tenant_id, business_id, and user references** (created_by, updated_by)
-2. **Generate UUIDs using `gen_random_uuid()`** in PostgreSQL (version 13+)
-3. **Use uuid v4** format when generating on client side
-4. **Cast string literals to UUID** using `::uuid` in SQL queries
-5. **Index all UUID foreign key columns** for performance
-6. **Validate UUID format** before insertion (frontend validation)
-7. **Use parameterized queries** to prevent SQL injection with UUID values
-8. **Store UUIDs efficiently** - PostgreSQL UUID type uses 16 bytes vs 36-char string
+2. **Generate UUIDs using `gen_random_uuid()`** in PostgreSQL
+3. **Cast string literals to UUID** using `::uuid` in SQL queries
+4. **Index all UUID foreign key columns** for performance
+5. **Use parameterized queries** to prevent SQL injection with UUID values
 
 ---
 
 **Last Updated:** October 25, 2025  
-**Version:** 2.1  
+**Version:** 2.2 (Simplified to match CRM audit pattern)  
 **Maintainer:** Development Team
