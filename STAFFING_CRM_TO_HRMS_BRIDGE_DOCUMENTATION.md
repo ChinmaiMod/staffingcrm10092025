@@ -36,10 +36,534 @@ CREATE TABLE hrms_employees (
 - ✅ All foreign key references include appropriate ON DELETE actions
 
 **Critical Rules:**
-1. **tenant_id**: NOT NULL, references tenants(id) ON DELETE CASCADE
-2. **business_id**: NULL allowed (for tenant-wide data), references businesses(id) ON DELETE SET NULL
+1. **tenant_id**: NOT NULL, UUID data type, references tenants(id) ON DELETE CASCADE
+2. **business_id**: NULL allowed (for tenant-wide data), UUID data type, references businesses(id) ON DELETE SET NULL
 3. **Indexes**: Always create indexes on tenant_id and business_id for query performance
 4. **Audit fields**: created_at, updated_at, created_by, updated_by on all tables
+
+---
+
+## 🔐 UUID-Based Multi-Tenancy & Audit Tracking
+
+### Understanding UUID Types for tenant_id and business_id
+
+**Why UUID instead of BIGSERIAL?**
+
+✅ **Globally Unique Identifiers** - No collisions across distributed systems
+✅ **Security** - Non-sequential IDs prevent enumeration attacks
+✅ **Portability** - Can generate IDs client-side or server-side
+✅ **Sharding-Ready** - UUIDs work well with database partitioning
+✅ **Cross-System Integration** - External systems can reference tenant/business safely
+
+**PostgreSQL UUID Type:**
+```sql
+-- UUID is a 128-bit value (32 hexadecimal digits)
+-- Example: 550e8400-e29b-41d4-a716-446655440000
+-- Storage: 16 bytes (vs 8 bytes for BIGINT)
+
+-- UUID Generation in PostgreSQL
+SELECT gen_random_uuid(); -- Built-in function (recommended)
+-- Returns: a3bb189e-8bf9-3888-9912-ace4e6543002
+
+-- UUID Generation in JavaScript (frontend)
+import { v4 as uuidv4 } from 'uuid';
+const newId = uuidv4();
+```
+
+### tenant_id Field Specification
+
+**Purpose:** Isolate all data by tenant (company/organization level)
+
+**Technical Specifications:**
+```sql
+tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+```
+
+| Property | Value | Reason |
+|----------|-------|--------|
+| **Data Type** | UUID | Globally unique, secure, non-sequential |
+| **NOT NULL** | ✅ Required | Every record MUST belong to a tenant |
+| **References** | tenants(id) | Foreign key ensures referential integrity |
+| **ON DELETE** | CASCADE | When tenant deleted, all related data automatically removed |
+| **Default** | None | Must be explicitly provided during INSERT |
+| **Index** | ✅ Required | B-tree index for fast lookups: `CREATE INDEX idx_table_tenant ON table(tenant_id)` |
+
+**How tenant_id is Set:**
+
+1. **During User Registration:**
+   ```sql
+   -- New tenant created with UUID
+   INSERT INTO tenants (id, company_name, subscription_tier)
+   VALUES (gen_random_uuid(), 'Acme Staffing', 'CRM')
+   RETURNING id;
+   -- Returns: tenant_id = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+   ```
+
+2. **During Record Creation:**
+   ```sql
+   -- All records include tenant_id from authenticated user's session
+   INSERT INTO hrms_employees (tenant_id, business_id, first_name, last_name)
+   VALUES (
+     (SELECT tenant_id FROM profiles WHERE id = auth.uid()), -- From session
+     'b7c85f64-1234-4562-b3fc-2c963f66afa6', -- Selected business
+     'John',
+     'Doe'
+   );
+   ```
+
+3. **In Application Code (React/JavaScript):**
+   ```javascript
+   const { tenant } = useTenant(); // From TenantProvider context
+   
+   const createEmployee = async (employeeData) => {
+     const payload = {
+       tenant_id: tenant.id, // UUID from context
+       business_id: selectedBusiness.id, // UUID from state
+       ...employeeData
+     };
+     
+     await supabase.from('hrms_employees').insert(payload);
+   };
+   ```
+
+### business_id Field Specification
+
+**Purpose:** Support multiple divisions/businesses within a single tenant
+
+**Technical Specifications:**
+```sql
+business_id UUID REFERENCES businesses(id) ON DELETE SET NULL
+```
+
+| Property | Value | Reason |
+|----------|-------|--------|
+| **Data Type** | UUID | Consistent with tenant_id, globally unique |
+| **NULL Allowed** | ✅ Yes | Some data may be tenant-wide (not business-specific) |
+| **References** | businesses(id) | Foreign key to businesses table |
+| **ON DELETE** | SET NULL | When business deleted, records remain but business_id becomes NULL |
+| **Default** | NULL | Optional field |
+| **Index** | ✅ Required | B-tree index for filtering: `CREATE INDEX idx_table_business ON table(business_id)` |
+
+**When to Use business_id:**
+
+✅ **Use business_id for:**
+- Employee records (employees belong to specific division)
+- Payroll runs (separate payroll per division)
+- Time-off requests (policies may differ by division)
+- Department structures (IT has different depts than Healthcare)
+- Office locations (each business has its own offices)
+
+❌ **Don't use business_id for:**
+- Tenant-level configuration (applies to all businesses)
+- User profiles (users may access multiple businesses)
+- Global lookup tables shared across businesses
+
+**Example: IT Division vs Healthcare Division**
+```sql
+-- Tenant has two businesses
+INSERT INTO businesses (id, tenant_id, business_name, division_type) VALUES
+('b1111111-1111-1111-1111-111111111111', '3fa85f64-5717-4562-b3fc-2c963f66afa6', 'IT Staffing Division', 'IT'),
+('b2222222-2222-2222-2222-222222222222', '3fa85f64-5717-4562-b3fc-2c963f66afa6', 'Healthcare Staffing', 'Healthcare');
+
+-- Employees scoped to specific business
+INSERT INTO hrms_employees (tenant_id, business_id, first_name, last_name, job_title_id)
+VALUES 
+  ('3fa85f64-5717-4562-b3fc-2c963f66afa6', 'b1111111-1111-1111-1111-111111111111', 'Alice', 'Developer', 101), -- IT Division
+  ('3fa85f64-5717-4562-b3fc-2c963f66afa6', 'b2222222-2222-2222-2222-222222222222', 'Bob', 'Nurse', 201);     -- Healthcare Division
+
+-- Query employees by business
+SELECT * FROM hrms_employees 
+WHERE tenant_id = '3fa85f64-5717-4562-b3fc-2c963f66afa6' 
+  AND business_id = 'b1111111-1111-1111-1111-111111111111'; -- Only IT employees
+```
+
+---
+
+## 📊 Comprehensive Audit Tracking Fields
+
+### Standard Audit Fields for All Tables
+
+**Every HRMS table MUST include these audit tracking fields:**
+
+```sql
+CREATE TABLE example_table (
+  id BIGSERIAL PRIMARY KEY,
+  
+  -- Multi-tenancy (REQUIRED)
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
+  
+  -- Your business logic columns
+  column_name DATA_TYPE,
+  
+  -- Audit Tracking (REQUIRED)
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  
+  -- Optional: Soft delete support
+  deleted_at TIMESTAMPTZ,
+  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  is_deleted BOOLEAN DEFAULT false
+);
+
+-- Trigger to auto-update updated_at
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON example_table
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+### Audit Field Specifications
+
+#### 1. created_at (TIMESTAMPTZ)
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Purpose** | Record creation timestamp | When was this record first created? |
+| **Data Type** | TIMESTAMPTZ | Timestamp with timezone support |
+| **NOT NULL** | ✅ Required | Every record must have creation time |
+| **Default** | NOW() | Auto-populated on INSERT |
+| **Timezone** | UTC stored | PostgreSQL stores as UTC, converts on retrieval |
+| **Format** | ISO 8601 | `2025-10-25T14:30:00.123Z` |
+
+**Usage:**
+```sql
+-- Automatic population
+INSERT INTO hrms_employees (tenant_id, first_name, last_name)
+VALUES ('tenant-uuid', 'John', 'Doe');
+-- created_at is automatically set to current timestamp
+
+-- Query records created in last 30 days
+SELECT * FROM hrms_employees
+WHERE created_at >= NOW() - INTERVAL '30 days'
+  AND tenant_id = 'tenant-uuid';
+
+-- Format in application
+SELECT 
+  first_name,
+  created_at,
+  to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date
+FROM hrms_employees;
+```
+
+#### 2. updated_at (TIMESTAMPTZ)
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Purpose** | Last modification timestamp | When was this record last updated? |
+| **Data Type** | TIMESTAMPTZ | Timestamp with timezone support |
+| **NOT NULL** | ✅ Required | Always has a value (initially same as created_at) |
+| **Default** | NOW() | Set to current time on INSERT |
+| **Auto-Update** | ✅ Trigger | Automatically updated on every UPDATE |
+
+**Automatic Update Trigger:**
+```sql
+-- Function to update updated_at column
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply trigger to all tables
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON hrms_employees
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON employee_documents
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Repeat for all tables...
+```
+
+**Usage:**
+```sql
+-- Find recently modified records
+SELECT * FROM hrms_employees
+WHERE updated_at >= NOW() - INTERVAL '7 days'
+  AND tenant_id = 'tenant-uuid'
+ORDER BY updated_at DESC;
+
+-- Track stale records (not updated in 6 months)
+SELECT * FROM employee_training
+WHERE updated_at < NOW() - INTERVAL '6 months'
+  AND status = 'IN_PROGRESS';
+```
+
+#### 3. created_by (UUID)
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Purpose** | User who created the record | Which user/profile created this? |
+| **Data Type** | UUID | References profiles(id) |
+| **NULL Allowed** | ✅ Yes | System-generated records may have NULL |
+| **References** | profiles(id) | Foreign key to user profiles |
+| **ON DELETE** | SET NULL | If user deleted, keep record but NULL the reference |
+
+**Setting created_by:**
+```javascript
+// Frontend (React)
+const { user } = useAuth(); // From AuthProvider
+
+const createEmployee = async (employeeData) => {
+  const payload = {
+    tenant_id: tenant.id,
+    business_id: selectedBusiness.id,
+    created_by: user.id, // UUID of current user
+    updated_by: user.id, // Same on creation
+    ...employeeData
+  };
+  
+  await supabase.from('hrms_employees').insert(payload);
+};
+```
+
+```sql
+-- Backend (Edge Function or SQL)
+INSERT INTO hrms_employees (
+  tenant_id, 
+  business_id, 
+  first_name, 
+  last_name,
+  created_by,
+  updated_by
+)
+VALUES (
+  'tenant-uuid',
+  'business-uuid',
+  'John',
+  'Doe',
+  auth.uid(), -- Get current user ID from auth context
+  auth.uid()
+);
+
+-- Query records by creator
+SELECT 
+  e.*,
+  p.full_name as created_by_name,
+  p.email as created_by_email
+FROM hrms_employees e
+LEFT JOIN profiles p ON e.created_by = p.id
+WHERE e.tenant_id = 'tenant-uuid';
+```
+
+#### 4. updated_by (UUID)
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Purpose** | User who last modified the record | Which user made the last update? |
+| **Data Type** | UUID | References profiles(id) |
+| **NULL Allowed** | ✅ Yes | Initially same as created_by |
+| **References** | profiles(id) | Foreign key to user profiles |
+| **ON DELETE** | SET NULL | If user deleted, keep record but NULL the reference |
+
+**Usage Pattern:**
+```javascript
+// Frontend update
+const updateEmployee = async (employeeId, updates) => {
+  const { user } = useAuth();
+  
+  const payload = {
+    ...updates,
+    updated_by: user.id, // Track who made the change
+    updated_at: new Date().toISOString() // Explicit timestamp (trigger will override)
+  };
+  
+  await supabase
+    .from('hrms_employees')
+    .update(payload)
+    .eq('id', employeeId);
+};
+```
+
+#### 5. Soft Delete Fields (Optional but Recommended)
+
+**Why Soft Deletes?**
+- ✅ Maintain data integrity for audit trails
+- ✅ Allow "undo" functionality
+- ✅ Preserve historical references
+- ✅ Comply with data retention policies
+
+```sql
+-- Add soft delete columns
+ALTER TABLE hrms_employees
+ADD COLUMN deleted_at TIMESTAMPTZ,
+ADD COLUMN deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+ADD COLUMN is_deleted BOOLEAN DEFAULT false;
+
+-- Create index for filtering active records
+CREATE INDEX idx_hrms_employees_not_deleted 
+  ON hrms_employees(tenant_id, business_id) 
+  WHERE is_deleted = false;
+```
+
+**Soft Delete Implementation:**
+```javascript
+// Instead of DELETE, update is_deleted flag
+const softDeleteEmployee = async (employeeId) => {
+  const { user } = useAuth();
+  
+  await supabase
+    .from('hrms_employees')
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: user.id,
+      updated_by: user.id,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', employeeId);
+};
+
+// Query only active records
+const getActiveEmployees = async (tenantId, businessId) => {
+  const { data } = await supabase
+    .from('hrms_employees')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .eq('is_deleted', false); // Exclude soft-deleted records
+  
+  return data;
+};
+
+// Restore soft-deleted record
+const restoreEmployee = async (employeeId) => {
+  await supabase
+    .from('hrms_employees')
+    .update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null
+    })
+    .eq('id', employeeId);
+};
+```
+
+### Complete Audit Tracking Example
+
+```sql
+CREATE TABLE hrms_employees (
+  -- Primary key
+  id BIGSERIAL PRIMARY KEY,
+  
+  -- Multi-tenancy (REQUIRED)
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
+  
+  -- Employee data
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  hire_date DATE NOT NULL,
+  employment_status TEXT DEFAULT 'ACTIVE',
+  
+  -- Audit tracking (REQUIRED)
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  
+  -- Soft delete (OPTIONAL)
+  deleted_at TIMESTAMPTZ,
+  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  is_deleted BOOLEAN DEFAULT false
+);
+
+-- Indexes for performance
+CREATE INDEX idx_hrms_employees_tenant ON hrms_employees(tenant_id);
+CREATE INDEX idx_hrms_employees_business ON hrms_employees(business_id);
+CREATE INDEX idx_hrms_employees_created ON hrms_employees(created_at);
+CREATE INDEX idx_hrms_employees_updated ON hrms_employees(updated_at);
+CREATE INDEX idx_hrms_employees_active ON hrms_employees(tenant_id, business_id) 
+  WHERE is_deleted = false;
+
+-- Auto-update trigger
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON hrms_employees
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Audit log trigger (optional - logs all changes to audit table)
+CREATE TRIGGER audit_hrms_employees_changes
+  AFTER INSERT OR UPDATE OR DELETE ON hrms_employees
+  FOR EACH ROW
+  EXECUTE FUNCTION log_table_changes();
+```
+
+### Audit Query Examples
+
+```sql
+-- 1. Who created the most employees this month?
+SELECT 
+  p.full_name,
+  p.email,
+  COUNT(*) as employees_created
+FROM hrms_employees e
+JOIN profiles p ON e.created_by = p.id
+WHERE e.created_at >= date_trunc('month', NOW())
+  AND e.tenant_id = 'tenant-uuid'
+GROUP BY p.id, p.full_name, p.email
+ORDER BY employees_created DESC;
+
+-- 2. Find records modified by specific user
+SELECT 
+  e.id,
+  e.first_name,
+  e.last_name,
+  e.updated_at,
+  p.full_name as updated_by_name
+FROM hrms_employees e
+JOIN profiles p ON e.updated_by = p.id
+WHERE e.updated_by = 'user-uuid'
+  AND e.updated_at >= NOW() - INTERVAL '30 days'
+ORDER BY e.updated_at DESC;
+
+-- 3. Audit trail: Creation and modification history
+SELECT 
+  e.id,
+  e.first_name,
+  e.last_name,
+  e.created_at,
+  creator.full_name as created_by_name,
+  e.updated_at,
+  updater.full_name as updated_by_name,
+  EXTRACT(EPOCH FROM (e.updated_at - e.created_at))/3600 as hours_since_creation
+FROM hrms_employees e
+LEFT JOIN profiles creator ON e.created_by = creator.id
+LEFT JOIN profiles updater ON e.updated_by = updater.id
+WHERE e.tenant_id = 'tenant-uuid'
+ORDER BY e.updated_at DESC;
+
+-- 4. Find orphaned records (created_by user no longer exists)
+SELECT * FROM hrms_employees
+WHERE created_by IS NULL 
+  AND created_at IS NOT NULL -- Was created by someone, but they're deleted
+  AND tenant_id = 'tenant-uuid';
+
+-- 5. Soft-deleted records with details
+SELECT 
+  e.id,
+  e.first_name,
+  e.last_name,
+  e.deleted_at,
+  p.full_name as deleted_by_name,
+  EXTRACT(DAY FROM (NOW() - e.deleted_at)) as days_since_deletion
+FROM hrms_employees e
+LEFT JOIN profiles p ON e.deleted_by = p.id
+WHERE e.is_deleted = true
+  AND e.tenant_id = 'tenant-uuid'
+ORDER BY e.deleted_at DESC;
+```
+
+---
 
 ### 2. Row Level Security (RLS) Enforcement
 
@@ -1733,31 +2257,47 @@ When building HRMS to link with CRM:
 
 ---
 
-## 🔑 Quick Reference: tenant_id & business_id Pattern
+## 🔑 Quick Reference: tenant_id, business_id & Audit Tracking
 
-### Every HRMS Table Must Follow This Pattern
+### Every HRMS Table Must Follow This Complete Pattern
 
 ```sql
 CREATE TABLE table_name (
+  -- Primary Key
   id BIGSERIAL PRIMARY KEY,
   
-  -- CRITICAL: Multi-tenancy columns (ALWAYS REQUIRED)
+  -- CRITICAL: Multi-tenancy columns (ALWAYS REQUIRED - UUIDs)
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
   
   -- Your table-specific columns
   column_name DATA_TYPE,
   
-  -- Audit columns (ALWAYS REQUIRED)
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES profiles(id),
-  updated_by UUID REFERENCES profiles(id)
+  -- CRITICAL: Audit tracking columns (ALWAYS REQUIRED)
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  
+  -- OPTIONAL: Soft delete support (RECOMMENDED)
+  deleted_at TIMESTAMPTZ,
+  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  is_deleted BOOLEAN DEFAULT false
 );
 
 -- CRITICAL: Always create these indexes
 CREATE INDEX idx_table_name_tenant ON table_name(tenant_id);
 CREATE INDEX idx_table_name_business ON table_name(business_id);
+CREATE INDEX idx_table_name_created ON table_name(created_at);
+CREATE INDEX idx_table_name_updated ON table_name(updated_at);
+CREATE INDEX idx_table_name_active ON table_name(tenant_id, business_id) 
+  WHERE is_deleted = false; -- For soft delete support
+
+-- CRITICAL: Auto-update trigger for updated_at
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON table_name
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
 
 -- CRITICAL: Always enable RLS
 ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
@@ -1769,6 +2309,7 @@ CREATE POLICY "Users can view records from their tenant"
     tenant_id IN (
       SELECT tenant_id FROM profiles WHERE id = auth.uid()
     )
+    AND (is_deleted = false OR is_deleted IS NULL) -- Exclude soft-deleted
   );
 
 -- CRITICAL: Tenant-scoped INSERT policy
@@ -1779,71 +2320,491 @@ CREATE POLICY "Users can create records for their tenant"
       SELECT tenant_id FROM profiles WHERE id = auth.uid()
     )
   );
+
+-- CRITICAL: Tenant-scoped UPDATE policy
+CREATE POLICY "Users can update records from their tenant"
+  ON table_name FOR UPDATE
+  USING (
+    tenant_id IN (
+      SELECT tenant_id FROM profiles WHERE id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    tenant_id IN (
+      SELECT tenant_id FROM profiles WHERE id = auth.uid()
+    )
+  );
 ```
 
-### Column Requirements Summary
+### Complete Column Requirements Summary
 
-| Column | Required | Data Type | Foreign Key | On Delete | Purpose |
-|--------|----------|-----------|-------------|-----------|---------|
-| `tenant_id` | ✅ YES (NOT NULL) | UUID | tenants(id) | CASCADE | Multi-tenancy isolation |
-| `business_id` | ⚠️ Recommended | UUID | businesses(id) | SET NULL | Business-level filtering |
-| `created_at` | ✅ YES | TIMESTAMPTZ | - | - | Audit trail |
-| `updated_at` | ✅ YES | TIMESTAMPTZ | - | - | Audit trail |
-| `created_by` | ✅ Recommended | UUID | profiles(id) | - | User tracking |
-| `updated_by` | ✅ Recommended | UUID | profiles(id) | - | User tracking |
+| Column | Required | Data Type | Foreign Key | On Delete | Default | Purpose |
+|--------|----------|-----------|-------------|-----------|---------|---------|
+| `id` | ✅ YES | BIGSERIAL | - | - | AUTO | Primary key |
+| `tenant_id` | ✅ YES (NOT NULL) | **UUID** | tenants(id) | CASCADE | - | Multi-tenancy isolation |
+| `business_id` | ⚠️ Recommended | **UUID** | businesses(id) | SET NULL | NULL | Business-level filtering |
+| `created_at` | ✅ YES (NOT NULL) | TIMESTAMPTZ | - | - | NOW() | Creation timestamp (UTC) |
+| `updated_at` | ✅ YES (NOT NULL) | TIMESTAMPTZ | - | - | NOW() | Last update timestamp (UTC) |
+| `created_by` | ✅ Recommended | **UUID** | profiles(id) | SET NULL | - | User who created record |
+| `updated_by` | ✅ Recommended | **UUID** | profiles(id) | SET NULL | - | User who last updated |
+| `deleted_at` | ⚠️ Optional | TIMESTAMPTZ | - | - | NULL | Soft delete timestamp |
+| `deleted_by` | ⚠️ Optional | **UUID** | profiles(id) | SET NULL | NULL | User who deleted record |
+| `is_deleted` | ⚠️ Optional | BOOLEAN | - | - | false | Soft delete flag |
+
+### UUID Type Details
+
+**All UUID columns use PostgreSQL's built-in UUID type:**
+
+```sql
+-- UUID Definition
+tenant_id UUID -- 128-bit identifier, 36 characters with hyphens
+-- Example: 550e8400-e29b-41d4-a716-446655440000
+-- Storage: 16 bytes
+-- Format: 8-4-4-4-12 hexadecimal digits
+
+-- Generate UUID in PostgreSQL
+SELECT gen_random_uuid(); 
+-- Returns: a3bb189e-8bf9-3888-9912-ace4e6543002
+
+-- Generate UUID in JavaScript
+import { v4 as uuidv4 } from 'uuid';
+const id = uuidv4();
+// Returns: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+-- UUID Comparison (case-insensitive)
+WHERE tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid;
+
+-- UUID Validation
+SELECT '550e8400-e29b-41d4-a716-446655440000'::uuid; -- Valid
+SELECT 'not-a-uuid'::uuid; -- ERROR: invalid input syntax
+```
+
+### Audit Tracking Field Usage Examples
+
+**1. Setting Audit Fields on INSERT:**
+```javascript
+// Frontend (React)
+const { user } = useAuth();
+const { tenant } = useTenant();
+
+const createEmployee = async (formData) => {
+  const payload = {
+    // Multi-tenancy
+    tenant_id: tenant.id, // UUID from context
+    business_id: selectedBusiness.id, // UUID from state
+    
+    // Business data
+    first_name: formData.firstName,
+    last_name: formData.lastName,
+    email: formData.email,
+    
+    // Audit tracking (created_at/updated_at auto-set by DB)
+    created_by: user.id, // UUID of current user
+    updated_by: user.id, // Same as created_by initially
+  };
+  
+  const { data, error } = await supabase
+    .from('hrms_employees')
+    .insert(payload)
+    .select()
+    .single();
+  
+  return data;
+};
+```
+
+**2. Setting Audit Fields on UPDATE:**
+```javascript
+const updateEmployee = async (employeeId, updates) => {
+  const { user } = useAuth();
+  
+  const payload = {
+    ...updates,
+    updated_by: user.id, // Track who made the change
+    // updated_at automatically set by trigger
+  };
+  
+  const { data, error } = await supabase
+    .from('hrms_employees')
+    .update(payload)
+    .eq('id', employeeId)
+    .select()
+    .single();
+  
+  return data;
+};
+```
+
+**3. Soft Delete Implementation:**
+```javascript
+const softDeleteEmployee = async (employeeId) => {
+  const { user } = useAuth();
+  
+  const { data, error } = await supabase
+    .from('hrms_employees')
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: user.id,
+      updated_by: user.id,
+    })
+    .eq('id', employeeId)
+    .select()
+    .single();
+  
+  return data;
+};
+
+// Restore soft-deleted record
+const restoreEmployee = async (employeeId) => {
+  const { data, error } = await supabase
+    .from('hrms_employees')
+    .update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null,
+    })
+    .eq('id', employeeId)
+    .select()
+    .single();
+  
+  return data;
+};
+```
+
+**4. Querying with Audit Filters:**
+```sql
+-- Records created in last 30 days by specific user
+SELECT * FROM hrms_employees
+WHERE tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
+  AND created_by = 'user-uuid'::uuid
+  AND created_at >= NOW() - INTERVAL '30 days'
+  AND is_deleted = false
+ORDER BY created_at DESC;
+
+-- Recently modified records
+SELECT 
+  e.*,
+  creator.full_name as created_by_name,
+  updater.full_name as updated_by_name
+FROM hrms_employees e
+LEFT JOIN profiles creator ON e.created_by = creator.id
+LEFT JOIN profiles updater ON e.updated_by = updater.id
+WHERE e.tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
+  AND e.updated_at >= NOW() - INTERVAL '7 days'
+  AND e.is_deleted = false
+ORDER BY e.updated_at DESC;
+
+-- Audit trail: Who modified what and when
+SELECT 
+  e.id,
+  e.first_name,
+  e.last_name,
+  e.created_at,
+  creator.email as created_by_email,
+  e.updated_at,
+  updater.email as updated_by_email,
+  CASE 
+    WHEN e.created_at = e.updated_at THEN 'Never modified'
+    ELSE 'Modified ' || EXTRACT(DAY FROM (NOW() - e.updated_at)) || ' days ago'
+  END as modification_status
+FROM hrms_employees e
+LEFT JOIN profiles creator ON e.created_by = creator.id
+LEFT JOIN profiles updater ON e.updated_by = updater.id
+WHERE e.tenant_id = '550e8400-e29b-41d4-a716-446655440000'::uuid
+ORDER BY e.updated_at DESC;
+```
 
 ### Exceptions (Tables Without tenant_id/business_id)
 
 Only system-wide configuration tables should omit these:
-- ✅ `roles` - Global role definitions
-- ✅ `hrms_menu_permissions` - System-wide menu configuration
-- ❌ **All other tables MUST have tenant_id**
+- ✅ `roles` - Global role definitions (no tenant_id/business_id needed)
+- ✅ `hrms_menu_permissions` - System-wide menu configuration (no tenant_id/business_id needed)
+- ✅ System lookup tables that are truly global (rare)
+- ❌ **All other tables MUST have tenant_id (UUID type)**
+- ❌ **All transactional tables SHOULD have business_id (UUID type)**
 
-### Testing Checklist
+### Comprehensive Testing Checklist
 
-Before deploying any new table:
+Before deploying any new HRMS table, run these verification queries:
 
 ```sql
--- 1. Verify tenant_id exists and is NOT NULL
-SELECT column_name, is_nullable 
+-- 1. Verify tenant_id exists, is UUID type, and is NOT NULL
+SELECT 
+  column_name, 
+  data_type,
+  is_nullable,
+  column_default
 FROM information_schema.columns 
-WHERE table_name = 'your_table' AND column_name = 'tenant_id';
--- Expected: is_nullable = 'NO'
+WHERE table_name = 'your_table' 
+  AND column_name = 'tenant_id';
+-- Expected: data_type = 'uuid', is_nullable = 'NO'
 
--- 2. Verify foreign key constraint with CASCADE
+-- 2. Verify business_id exists and is UUID type
+SELECT 
+  column_name, 
+  data_type,
+  is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'your_table' 
+  AND column_name = 'business_id';
+-- Expected: data_type = 'uuid', is_nullable = 'YES' (null allowed)
+
+-- 3. Verify all audit fields exist with correct types
+SELECT 
+  column_name, 
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns 
+WHERE table_name = 'your_table' 
+  AND column_name IN ('created_at', 'updated_at', 'created_by', 'updated_by')
+ORDER BY column_name;
+-- Expected: created_at/updated_at = timestamp with time zone, NOT NULL, default now()
+-- Expected: created_by/updated_by = uuid, nullable
+
+-- 4. Verify foreign key constraints with proper CASCADE/SET NULL
 SELECT 
   tc.constraint_name,
-  rc.delete_rule
+  kcu.column_name,
+  ccu.table_name AS foreign_table_name,
+  ccu.column_name AS foreign_column_name,
+  rc.delete_rule,
+  rc.update_rule
 FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu 
+  ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage ccu 
+  ON ccu.constraint_name = tc.constraint_name
 JOIN information_schema.referential_constraints rc 
   ON tc.constraint_name = rc.constraint_name
 WHERE tc.table_name = 'your_table' 
   AND tc.constraint_type = 'FOREIGN KEY'
-  AND rc.delete_rule = 'CASCADE';
--- Expected: At least one result for tenant_id
+ORDER BY kcu.column_name;
+-- Expected for tenant_id: delete_rule = 'CASCADE'
+-- Expected for business_id: delete_rule = 'SET NULL'
+-- Expected for created_by/updated_by: delete_rule = 'SET NULL'
 
--- 3. Verify indexes exist
-SELECT indexname 
+-- 5. Verify all required indexes exist
+SELECT 
+  indexname,
+  indexdef
 FROM pg_indexes 
 WHERE tablename = 'your_table' 
-  AND (indexname LIKE '%tenant%' OR indexname LIKE '%business%');
--- Expected: At least 2 indexes (tenant_id, business_id)
+ORDER BY indexname;
+-- Expected: At least these indexes:
+--   - idx_your_table_tenant (on tenant_id)
+--   - idx_your_table_business (on business_id)
+--   - idx_your_table_created (on created_at) - optional but recommended
+--   - idx_your_table_updated (on updated_at) - optional but recommended
 
--- 4. Verify RLS is enabled
-SELECT tablename, rowsecurity 
+-- 6. Verify RLS is enabled
+SELECT 
+  schemaname,
+  tablename, 
+  rowsecurity
 FROM pg_tables 
 WHERE tablename = 'your_table';
 -- Expected: rowsecurity = true
 
--- 5. Verify RLS policies exist
-SELECT COUNT(*) 
+-- 7. Verify RLS policies exist for all operations
+SELECT 
+  policyname,
+  cmd,
+  qual,
+  with_check
 FROM pg_policies 
-WHERE tablename = 'your_table';
--- Expected: At least 2 policies (SELECT, INSERT)
+WHERE tablename = 'your_table'
+ORDER BY cmd;
+-- Expected: Policies for SELECT, INSERT, UPDATE at minimum
+-- Each should check tenant_id against auth.uid()
+
+-- 8. Verify update trigger exists for updated_at
+SELECT 
+  trigger_name,
+  event_manipulation,
+  action_statement
+FROM information_schema.triggers
+WHERE event_object_table = 'your_table'
+  AND trigger_name LIKE '%updated_at%';
+-- Expected: At least one BEFORE UPDATE trigger
+
+-- 9. Test UUID format validation
+-- This should succeed
+INSERT INTO your_table (tenant_id, business_id, ...)
+VALUES (
+  '550e8400-e29b-41d4-a716-446655440000'::uuid,
+  'b1111111-1111-1111-1111-111111111111'::uuid,
+  ...
+);
+
+-- This should fail with error
+INSERT INTO your_table (tenant_id, business_id, ...)
+VALUES (
+  'not-a-valid-uuid',  -- ERROR
+  'also-invalid',       -- ERROR
+  ...
+);
+
+-- 10. Test RLS policies prevent cross-tenant access
+-- Switch to different user/tenant and try to query
+-- Should return empty result set for other tenant's data
+SELECT * FROM your_table 
+WHERE tenant_id = 'some-other-tenant-uuid'::uuid;
+-- Expected: 0 rows (RLS blocks access)
+-- 10. Test RLS policies prevent cross-tenant access
+-- Switch to different user/tenant and try to query
+-- Should return empty result set for other tenant's data
+SELECT * FROM your_table 
+WHERE tenant_id = 'some-other-tenant-uuid'::uuid;
+-- Expected: 0 rows (RLS blocks access)
+
+-- 11. Test soft delete (if implemented)
+SELECT 
+  column_name,
+  data_type,
+  column_default
+FROM information_schema.columns 
+WHERE table_name = 'your_table' 
+  AND column_name IN ('is_deleted', 'deleted_at', 'deleted_by')
+ORDER BY column_name;
+-- Expected (if soft delete enabled):
+--   - is_deleted: boolean, default false
+--   - deleted_at: timestamp with time zone, nullable
+--   - deleted_by: uuid, nullable
+
+-- 12. Verify no missing NOT NULL constraints on critical fields
+SELECT 
+  column_name,
+  is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'your_table' 
+  AND column_name IN ('tenant_id', 'created_at', 'updated_at')
+  AND is_nullable = 'YES';  -- Should return 0 rows
+-- Expected: Empty result (all should be NOT NULL)
+```
+
+### Common Mistakes to Avoid
+
+❌ **DON'T DO THIS:**
+```sql
+-- Missing tenant_id
+CREATE TABLE bad_table (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT
+);
+
+-- Wrong data type for tenant_id (using BIGINT instead of UUID)
+CREATE TABLE bad_table (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL  -- WRONG! Should be UUID
+);
+
+-- Missing business_id on transactional table
+CREATE TABLE employee_payroll (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  -- Missing business_id!
+);
+
+-- Missing audit fields
+CREATE TABLE incomplete_table (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  -- Missing created_at, updated_at, created_by, updated_by
+);
+
+-- Wrong ON DELETE action for tenant_id (should be CASCADE)
+tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT  -- WRONG!
+
+-- Wrong ON DELETE action for business_id (should be SET NULL)
+business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE  -- WRONG!
+
+-- Not creating indexes
+-- No CREATE INDEX statements for tenant_id/business_id
+
+-- Not enabling RLS
+-- No ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+
+-- Not creating RLS policies
+-- No CREATE POLICY statements
+```
+
+✅ **DO THIS INSTEAD:**
+```sql
+-- Complete, correct table definition
+CREATE TABLE good_table (
+  id BIGSERIAL PRIMARY KEY,
+  
+  -- Multi-tenancy (UUID types)
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
+  
+  -- Business columns
+  name TEXT NOT NULL,
+  description TEXT,
+  
+  -- Audit tracking
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  
+  -- Soft delete (optional)
+  is_deleted BOOLEAN DEFAULT false,
+  deleted_at TIMESTAMPTZ,
+  deleted_by UUID REFERENCES profiles(id) ON DELETE SET NULL
+);
+
+-- Indexes
+CREATE INDEX idx_good_table_tenant ON good_table(tenant_id);
+CREATE INDEX idx_good_table_business ON good_table(business_id);
+CREATE INDEX idx_good_table_created ON good_table(created_at);
+CREATE INDEX idx_good_table_updated ON good_table(updated_at);
+CREATE INDEX idx_good_table_active ON good_table(tenant_id, business_id) 
+  WHERE is_deleted = false;
+
+-- Auto-update trigger
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON good_table
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- RLS
+ALTER TABLE good_table ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "tenant_isolation_select" ON good_table
+  FOR SELECT USING (
+    tenant_id IN (SELECT tenant_id FROM profiles WHERE id = auth.uid())
+    AND (is_deleted = false OR is_deleted IS NULL)
+  );
+
+CREATE POLICY "tenant_isolation_insert" ON good_table
+  FOR INSERT WITH CHECK (
+    tenant_id IN (SELECT tenant_id FROM profiles WHERE id = auth.uid())
+  );
+
+CREATE POLICY "tenant_isolation_update" ON good_table
+  FOR UPDATE USING (
+    tenant_id IN (SELECT tenant_id FROM profiles WHERE id = auth.uid())
+  );
 ```
 
 ---
 
-**Last Updated:** October 25, 2025
-**Version:** 2.0
+### UUID Best Practices Summary
+
+1. **Always use UUID for tenant_id, business_id, and user references** (created_by, updated_by)
+2. **Generate UUIDs using `gen_random_uuid()`** in PostgreSQL (version 13+)
+3. **Use uuid v4** format when generating on client side
+4. **Cast string literals to UUID** using `::uuid` in SQL queries
+5. **Index all UUID foreign key columns** for performance
+6. **Validate UUID format** before insertion (frontend validation)
+7. **Use parameterized queries** to prevent SQL injection with UUID values
+8. **Store UUIDs efficiently** - PostgreSQL UUID type uses 16 bytes vs 36-char string
+
+---
+
+**Last Updated:** October 25, 2025  
+**Version:** 2.1  
 **Maintainer:** Development Team
