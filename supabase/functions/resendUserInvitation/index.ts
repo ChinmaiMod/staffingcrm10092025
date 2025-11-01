@@ -36,7 +36,7 @@ serve(async (req) => {
       }
     })
 
-    const { invitationId, invitedBy } = await req.json()
+    const { invitationId, invitedBy, frontendUrl: requestFrontendUrl } = await req.json()
 
     if (!invitationId) {
       throw new Error('Missing required field: invitationId')
@@ -112,7 +112,8 @@ serve(async (req) => {
       throw new Error(`Failed to update invitation: ${updateError.message}`)
     }
 
-    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
+    // Use frontend URL from request (passed by client), fallback to env var, then default
+    const FRONTEND_URL = requestFrontendUrl || Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
     const invitationUrl = `${FRONTEND_URL}/accept-invitation?token=${token}`
 
     const emailDomain = invitation.email.split('@')[1]?.toLowerCase() ?? null

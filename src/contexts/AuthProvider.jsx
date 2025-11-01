@@ -165,9 +165,8 @@ export function AuthProvider({ children }) {
 
   const resetPassword = async (email) => {
     // Get the current origin or use environment variable
-    const redirectUrl = import.meta.env.VITE_FRONTEND_URL 
-      ? `${import.meta.env.VITE_FRONTEND_URL}/reset-password`
-      : `${window.location.origin}/reset-password`;
+    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin
+    const redirectUrl = `${frontendUrl}/reset-password`
 
     try {
       const data = await requestPasswordReset(email, redirectUrl)

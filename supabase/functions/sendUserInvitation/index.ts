@@ -39,7 +39,7 @@ serve(async (req) => {
       }
     })
 
-    const { email, fullName, message, tenantId, invitedBy } = await req.json()
+    const { email, fullName, message, tenantId, invitedBy, frontendUrl: requestFrontendUrl } = await req.json()
     console.log('Request data:', { email: !!email, fullName: !!fullName, tenantId: !!tenantId, invitedBy: !!invitedBy })
 
     if (!email || !fullName || !tenantId || !invitedBy) {
@@ -119,7 +119,8 @@ serve(async (req) => {
       throw new Error(`Failed to create invitation: ${inviteError.message}`)
     }
 
-    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
+    // Use frontend URL from request (passed by client), fallback to env var, then default
+    const FRONTEND_URL = requestFrontendUrl || Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
     const emailDomain = email.split('@')[1]?.toLowerCase() ?? null
 
     const resendConfigLookup = await getResendConfigForDomain(emailDomain, tenantId)

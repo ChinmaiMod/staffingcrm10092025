@@ -122,6 +122,9 @@ export default function InviteUsers() {
       }
 
       // Call Edge Function to create invitation and send email
+      // Get frontend URL from env var or current window location
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin
+      
       const { data: functionData, error: functionError } = await supabase.functions.invoke(
         'sendUserInvitation',
         {
@@ -130,7 +133,8 @@ export default function InviteUsers() {
             fullName: inviteForm.fullName.trim(),
             message: inviteForm.message.trim() || null,
             tenantId: tenant.tenant_id,
-            invitedBy: profile.id
+            invitedBy: profile.id,
+            frontendUrl: frontendUrl // Pass frontend URL from client
           }
         }
       )
@@ -165,12 +169,16 @@ export default function InviteUsers() {
       setError('')
       setSuccess('')
 
+      // Get frontend URL from env var or current window location
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin
+      
       const { data, error } = await supabase.functions.invoke(
         'resendUserInvitation',
         {
           body: {
             invitationId: invitation.id,
-            invitedBy: profile.id
+            invitedBy: profile.id,
+            frontendUrl: frontendUrl // Pass frontend URL from client
           }
         }
       )

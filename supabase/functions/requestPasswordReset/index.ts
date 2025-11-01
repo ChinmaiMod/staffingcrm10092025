@@ -107,7 +107,11 @@ serve(async (req) => {
       throw new Error('Email is required')
     }
 
-    const redirectTo = payload.redirectTo || `${defaultFrontendUrl.replace(/\/$/, '')}/reset-password`
+    // Use frontend URL from request (if provided), fallback to env var, then default
+    const frontendUrl = payload.redirectTo 
+      ? new URL(payload.redirectTo).origin 
+      : (Deno.env.get('FRONTEND_URL') || defaultFrontendUrl)
+    const redirectTo = payload.redirectTo || `${frontendUrl.replace(/\/$/, '')}/reset-password`
 
     // Try to infer tenant from profiles for business-specific Resend config
     const emailDomain = (email.split('@')[1] || '').toLowerCase() || null
