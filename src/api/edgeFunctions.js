@@ -67,11 +67,12 @@ export async function createCheckoutSession(priceId, tenantId, profileId, billin
 }
 
 // Bulk Email Function
-export async function sendBulkEmail(recipients, subject, body, token) {
+export async function sendBulkEmail(recipients, subject, body, token, tenantId = null) {
   return callEdgeFunction('sendBulkEmail', {
     recipients,
     subject,
     body,
+    tenantId,  // Required for domain-based Resend config lookup
   }, token)
 }
 

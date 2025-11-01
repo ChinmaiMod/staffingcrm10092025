@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getResendConfig } from '../_shared/resendConfig.ts'
+import { getResendConfig, getResendConfigForDomain } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,14 +10,15 @@ const corsHeaders = {
 interface EmailRecipient {
   email: string
   name: string
+  business_id?: string  // Optional: business_id from contact
 }
 
 interface BulkEmailRequest {
   recipients: EmailRecipient[]
   subject: string
   body: string
-  businessId?: string  // Add business ID for custom API key
-  tenantId?: string    // Add tenant ID
+  businessId?: string  // Legacy: single business ID for all (deprecated)
+  tenantId?: string    // Required: tenant ID
   useTemplate?: boolean
 }
 
@@ -61,15 +62,39 @@ serve(async (req) => {
       )
     }
 
-    // Get Resend configuration (business-specific or system default)
-    const resendConfig = await getResendConfig(businessId || null, tenantId || null)
-    
-    if (!resendConfig.apiKey) {
-      throw new Error('No Resend API key configured')
+    if (!tenantId) {
+      throw new Error('tenantId is required')
     }
 
-    // Send emails using Resend API
+    // Send emails using Resend API with per-recipient config selection
     const emailPromises = recipients.map(async (recipient) => {
+      // Determine Resend config for this recipient:
+      // 1. If recipient has business_id, try getResendConfig(business_id, tenantId)
+      // 2. Otherwise, use domain-based lookup getResendConfigForDomain(emailDomain, tenantId)
+      // 3. Fallback to system default
+      let resendConfig
+      const emailDomain = recipient.email.split('@')[1]?.toLowerCase() || null
+      
+      if (recipient.business_id) {
+        // Try business-specific config first
+        resendConfig = await getResendConfig(recipient.business_id, tenantId)
+        // If no business-specific config found, fallback to domain-based lookup
+        if (!resendConfig.apiKey && emailDomain) {
+          const domainLookup = await getResendConfigForDomain(emailDomain, tenantId)
+          resendConfig = domainLookup.config
+        }
+      } else if (emailDomain) {
+        // Use domain-based lookup
+        const domainLookup = await getResendConfigForDomain(emailDomain, tenantId)
+        resendConfig = domainLookup.config
+      } else {
+        // Fallback to legacy single businessId or system default
+        resendConfig = await getResendConfig(businessId || null, tenantId)
+      }
+      
+      if (!resendConfig.apiKey) {
+        throw new Error(`No Resend API key configured for recipient ${recipient.email}${recipient.business_id ? ` (business: ${recipient.business_id})` : emailDomain ? ` (domain: ${emailDomain})` : ''}`)
+      }
       // Personalize the message with recipient data
       let personalizedBody = body
         .replace(/{first_name}/g, recipient.name.split(' ')[0] || '')

@@ -729,10 +729,11 @@ export default function ContactsManager() {
       setSendingEmail(true)
       const selectedContactsData = contacts.filter(c => selectedContacts.includes(c.contact_id))
       
-      // Prepare recipients for Resend API
+      // Prepare recipients for Resend API with business_id for domain-based Resend config
       const recipients = selectedContactsData.map(c => ({
         email: c.email,
-        name: `${c.first_name} ${c.last_name}`
+        name: `${c.first_name} ${c.last_name}`,
+        business_id: c.business_id || undefined  // Include business_id if available
       }))
       
       // Call edge function to send emails via Resend API
@@ -740,7 +741,8 @@ export default function ContactsManager() {
         recipients,
         bulkEmailData.subject,
         bulkEmailData.body,
-        session?.access_token
+        session?.access_token,
+        tenant.tenant_id  // Pass tenantId for Resend config lookup
       )
       
       logger.log('Bulk email result:', result)
