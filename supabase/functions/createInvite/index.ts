@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { v4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts'
+import { getResendConfigForDomain } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,13 +69,15 @@ serve(async (req) => {
       details: { email: email.toLowerCase(), role: data.role }
     })
 
-    // Try to send email via Resend (https://resend.com/) if API key and FRONTEND_URL available
-    const resendKey = Deno.env.get('RESEND_API_KEY')
+    // Try to send email via Resend (https://resend.com/)
     const frontendUrl = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_FRONTEND_URL')
-    if (resendKey && frontendUrl) {
+    const emailDomain = (email.split('@')[1] || '').toLowerCase()
+    const resendLookup = await getResendConfigForDomain(emailDomain || null, tenant_id)
+    const resendCfg = resendLookup.config
+    if (resendCfg.apiKey && frontendUrl) {
       const inviteLink = `${frontendUrl.replace(/\/$/, '')}/register?invite=${data.token}`
-      const fromAddr = Deno.env.get('INVITE_FROM') || 'no-reply@example.com'
-      const subject = Deno.env.get('INVITE_SUBJECT') || 'You are invited'
+      const fromAddr = `${resendCfg.fromName} <${resendCfg.fromEmail}>`
+      const subject = Deno.env.get('INVITE_SUBJECT') || `You are invited to join`
 
       // Load HTML template and substitute variables
       let template = ''
@@ -92,14 +95,14 @@ serve(async (req) => {
         await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${resendKey}`,
+            Authorization: `Bearer ${resendCfg.apiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             from: fromAddr,
             to: [data.email],
             subject,
-            html
+            html: template
           })
         })
 

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getResendConfig, getSystemResendConfig } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,11 +41,11 @@ serve(async (req) => {
 
   try {
     // Get environment variables
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    // Will resolve per-notification using business-specific config
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing environment variables')
     }
 
@@ -215,6 +216,11 @@ serve(async (req) => {
           continue
         }
 
+        // Resolve Resend config per notification (business-specific when available)
+        const resendCfg = notification.business_id
+          ? await getResendConfig(notification.business_id, notification.tenant_id)
+          : getSystemResendConfig()
+
         // Send emails to all recipients
         let successCount = 0
         let failCount = 0
@@ -227,7 +233,7 @@ serve(async (req) => {
 
             // Send email via Resend
             const emailData = {
-              from: 'noreply@yourdomain.com', // TODO: Configure your verified domain
+              from: `${resendCfg.fromName} <${resendCfg.fromEmail}>`,
               to: [recipient.email],
               subject: personalizedSubject,
               html: `
@@ -253,7 +259,7 @@ serve(async (req) => {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RESEND_API_KEY}`,
+                'Authorization': `Bearer ${resendCfg.apiKey}`,
               },
               body: JSON.stringify(emailData),
             })

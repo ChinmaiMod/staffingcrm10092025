@@ -139,6 +139,15 @@ export default function InviteUsers() {
         throw new Error(functionData?.error || functionError?.message || 'Failed to send invitation')
       }
 
+      // Check if email was actually sent
+      if (!functionData?.emailSent) {
+        const errorMsg = functionData?.emailError || 'Email could not be sent. Please configure Resend API keys in Data Administration > Resend API Keys.'
+        setError(`${errorMsg}${functionData?.invitationUrl ? ` You can manually share this invitation link: ${functionData.invitationUrl}` : ''}`)
+        // Still reload to show the invitation was created
+        await loadInvitations()
+        return
+      }
+
       setSuccess(`Invitation sent successfully to ${inviteForm.email}`)
       setInviteForm({ email: '', fullName: '', message: '' })
       setShowInviteForm(false)
@@ -168,6 +177,14 @@ export default function InviteUsers() {
 
       if (error || data?.error) {
         throw new Error(data?.error || error?.message || 'Failed to resend invitation')
+      }
+
+      // Check if email was actually sent
+      if (!data?.emailSent) {
+        const errorMsg = data?.emailError || 'Email could not be sent. Please configure Resend API keys in Data Administration > Resend API Keys.'
+        setError(`${errorMsg}${data?.invitationUrl ? ` You can manually share this invitation link: ${data.invitationUrl}` : ''}`)
+        await loadInvitations()
+        return
       }
 
       setSuccess(`Invitation resent to ${invitation.email}`)

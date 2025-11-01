@@ -127,6 +127,9 @@ serve(async (req) => {
       hasApiKey: Boolean(resendConfig.apiKey)
     })
 
+    let emailSent = false
+    let emailError = null
+
     if (resendConfig.apiKey) {
       try {
         const subject = `Reminder: You're invited to join ${tenant.company_name} on Staffing CRM`
@@ -191,17 +194,21 @@ serve(async (req) => {
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text()
           console.error('Failed to send resend email via Resend:', errorText)
-          throw new Error(`Email sending failed: ${errorText}`)
+          emailError = `Email sending failed: ${errorText}`
+          throw new Error(emailError)
         }
 
         const emailResult = await emailResponse.json()
         console.log('Invitation resent successfully via Resend:', emailResult)
-      } catch (emailError) {
-        console.error('Error sending resend email:', emailError)
+        emailSent = true
+      } catch (emailErr) {
+        console.error('Error sending resend email:', emailErr)
+        emailError = emailErr instanceof Error ? emailErr.message : 'Unknown email error'
         // Continue - the invitation is still valid with refreshed token
       }
     } else {
-      console.log('Resend email skipped - Resend configuration missing. Invitation URL:', invitationUrl)
+      emailError = `No Resend API key configured. Please configure a Resend API key in Data Administration > Resend API Keys.`
+      console.error(emailError, 'Invitation URL:', invitationUrl)
     }
 
     await supabase.from('audit_logs').insert({
@@ -221,11 +228,14 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         invitationId,
-        expiresAt
+        expiresAt,
+        emailSent,
+        emailError: emailError || null,
+        invitationUrl: emailSent ? undefined : invitationUrl
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+        status: emailSent ? 200 : 207
       }
     )
   } catch (error) {

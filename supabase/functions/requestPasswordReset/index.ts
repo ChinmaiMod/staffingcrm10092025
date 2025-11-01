@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSystemResendConfig, getResendConfigForDomain } from '../_shared/resendConfig.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,8 +84,9 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'no-reply@staffing-crm.local'
+    // Resolve Resend config: prefer business-specific by email domain + tenant; fallback to system
+    let resendApiKey = ''
+    let resendFromEmail = ''
     const defaultFrontendUrl = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
 
     if (!supabaseUrl || !supabaseServiceKey) {
@@ -106,6 +108,32 @@ serve(async (req) => {
     }
 
     const redirectTo = payload.redirectTo || `${defaultFrontendUrl.replace(/\/$/, '')}/reset-password`
+
+    // Try to infer tenant from profiles for business-specific Resend config
+    const emailDomain = (email.split('@')[1] || '').toLowerCase() || null
+    let tenantId: string | null = null
+    try {
+      const { data: prof, error: profErr } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('email', email)
+        .maybeSingle()
+      if (!profErr && prof?.tenant_id) tenantId = prof.tenant_id as string
+    } catch (_) { /* ignore */ }
+
+    try {
+      const lookup = await getResendConfigForDomain(emailDomain, tenantId)
+      if (lookup?.config?.apiKey) {
+        resendApiKey = lookup.config.apiKey
+        resendFromEmail = `${lookup.config.fromName} <${lookup.config.fromEmail}>`
+      }
+    } catch (_) { /* ignore */ }
+
+    if (!resendApiKey || !resendFromEmail) {
+      const systemResend = getSystemResendConfig()
+      resendApiKey = systemResend.apiKey
+      resendFromEmail = `${systemResend.fromName} <${systemResend.fromEmail}>`
+    }
 
     if (resendApiKey) {
       const { data, error } = await supabase.auth.admin.generateLink({
@@ -133,20 +161,28 @@ serve(async (req) => {
         throw error
       }
 
-      const actionLink = data?.action_link
-      const hashedToken = data?.hashed_token || data?.properties?.hashed_token
+      const actionLink = data?.action_link || ''
+      let hashedToken = data?.hashed_token || data?.properties?.hashed_token
 
-      let resetUrl = actionLink
-      if (!resetUrl && hashedToken) {
-        const url = new URL(redirectTo)
-        url.searchParams.set('code', hashedToken)
-        url.searchParams.set('type', 'recovery')
-        resetUrl = url.toString()
+      // Try to parse token_hash from action_link if hashedToken missing
+      if (!hashedToken && actionLink) {
+        try {
+          const linkUrl = new URL(actionLink)
+          hashedToken = linkUrl.searchParams.get('token_hash') || linkUrl.searchParams.get('code') || ''
+        } catch (_) {
+          // ignore
+        }
       }
 
-      if (!resetUrl) {
-        throw new Error('Failed to generate password reset link')
+      if (!hashedToken) {
+        throw new Error('Failed to generate password reset token')
       }
+
+      // Always build a FRONTEND_URL-based reset URL for trust and routing
+      const url = new URL(redirectTo)
+      url.searchParams.set('code', hashedToken)
+      url.searchParams.set('type', 'recovery')
+      const resetUrl = url.toString()
 
       await sendResetEmail(resendApiKey, resendFromEmail, email, resetUrl)
 

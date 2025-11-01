@@ -151,6 +151,9 @@ serve(async (req) => {
     })
 
     // Send email using Resend API
+    let emailSent = false
+    let emailError = null
+    
     if (resendConfig.apiKey) {
       try {
         const emailData = {
@@ -230,18 +233,21 @@ If you didn't expect this invitation, you can safely ignore this email.`,
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text()
           console.error('Failed to send email via Resend:', errorText)
-          throw new Error(`Email sending failed: ${errorText}`)
+          emailError = `Email sending failed: ${errorText}`
+          throw new Error(emailError)
         }
 
         const emailResult = await emailResponse.json()
         console.log('Email sent successfully via Resend:', emailResult)
-      } catch (emailError) {
-        console.error('Error sending email:', emailError)
-        // Don't throw - invitation is still created in database
-        // Admin can manually share the link or resend
+        emailSent = true
+      } catch (emailErr) {
+        console.error('Error sending email:', emailErr)
+        emailError = emailErr instanceof Error ? emailErr.message : 'Unknown email error'
+        // Continue - invitation is still created in database
       }
     } else {
-      console.log('Email not sent - Resend configuration missing. Invitation URL:', invitationUrl)
+      emailError = `No Resend API key configured for domain ${emailDomain || 'unknown'}. Please configure a Resend API key in Data Administration > Resend API Keys.`
+      console.error(emailError, 'Invitation URL:', invitationUrl)
     }
 
     // Create audit log
@@ -267,11 +273,14 @@ If you didn't expect this invitation, you can safely ignore this email.`,
           id: invitation.id,
           email: email,
           expiresAt: expiresAt
-        }
+        },
+        emailSent,
+        emailError: emailError || null,
+        invitationUrl: emailSent ? undefined : invitationUrl // Include URL if email failed for manual sharing
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: emailSent ? 200 : 207, // 207 Multi-Status to indicate partial success
       }
     )
   } catch (error) {
