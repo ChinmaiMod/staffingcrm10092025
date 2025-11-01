@@ -125,61 +125,23 @@ export default function AcceptInvitation() {
         throw new Error('Failed to create account')
       }
 
-      // Create profile for the user
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: invitation.email.toLowerCase(),
-          full_name: invitation.invited_user_name,
-          tenant_id: invitation.tenant_id,
-          role: 'USER', // Legacy role field
-          status: 'ACTIVE' // Set to ACTIVE since user completed signup
-        })
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError)
-        throw new Error('Failed to create user profile')
-      }
-
-      // Assign READ_ONLY role (role_id = 1) as default for invited users
-      const { error: roleError } = await supabase
-        .from('user_role_assignments')
-        .insert({
-          user_id: authData.user.id,
-          role_id: 1, // READ_ONLY role
-          tenant_id: invitation.tenant_id,
-          assigned_by: invitation.invited_by,
-          is_active: true
-        })
-
-      if (roleError) {
-        console.error('Role assignment error:', roleError)
-        // Don't throw - user is created, admin can assign role later
-      }
-
-      // Mark invitation as accepted
-      await supabase
-        .from('user_invitations')
-        .update({
-          status: 'ACCEPTED',
-          accepted_at: new Date().toISOString()
-        })
-        .eq('id', invitation.id)
-
-      // Create audit log
-      await supabase
-        .from('audit_logs')
-        .insert({
-          user_id: authData.user.id,
-          tenant_id: invitation.tenant_id,
-          action: 'INVITATION_ACCEPTED',
-          resource_type: 'invitation',
-          resource_id: invitation.id,
-          details: {
-            email: invitation.email
+      // Use Edge Function to create profile, assign role, and mark invitation as accepted
+      // This bypasses RLS issues since Edge Function uses service_role
+      const { data: acceptData, error: acceptError } = await supabase.functions.invoke(
+        'acceptInvitation',
+        {
+          body: {
+            token: invitation.token,
+            userId: authData.user.id,
+            password: formData.password // Not needed but kept for consistency
           }
-        })
+        }
+      )
+
+      if (acceptError || acceptData?.error) {
+        console.error('Accept invitation error:', acceptError || acceptData?.error)
+        throw new Error(acceptData?.error || acceptError?.message || 'Failed to create user profile')
+      }
 
       setSuccess(
         'Account created successfully! You have been assigned READ_ONLY access. An admin can upgrade your permissions if needed. Redirecting to login...'
