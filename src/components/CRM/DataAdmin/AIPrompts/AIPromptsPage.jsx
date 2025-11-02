@@ -16,7 +16,7 @@ export default function AIPromptsPage() {
     name: '',
     prompt_text: '',
     description: '',
-    model: 'anthropic/claude-3.5-sonnet',
+    model: 'anthropic/claude-sonnet-4-5',
     is_active: true
   })
 
@@ -38,7 +38,7 @@ export default function AIPromptsPage() {
       console.error('Error loading AI models:', error)
       // Set default models if API fails
       setAiModels([
-        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Latest Claude model' },
+        { id: 'anthropic/claude-sonnet-4-5', name: 'Claude Sonnet 4.5', description: 'Latest Claude model' },
         { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
         { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced Claude model' },
         { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'Latest GPT-4 model' },
@@ -109,7 +109,7 @@ export default function AIPromptsPage() {
       name: prompt.name,
       prompt_text: prompt.prompt_text,
       description: prompt.description || '',
-      model: prompt.model || 'anthropic/claude-3.5-sonnet',
+      model: prompt.model || 'anthropic/claude-sonnet-4-5',
       is_active: prompt.is_active
     })
     setShowForm(true)

@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     // Get the model to use - prioritize model from request, then env var, then default
-    const aiModel = model || Deno.env.get('AI_MODEL') || 'anthropic/claude-3.5-sonnet'
+    const aiModel = model || Deno.env.get('AI_MODEL') || 'anthropic/claude-sonnet-4-5'
 
     // Call OpenRouter API (compatible with OpenAI format)
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {

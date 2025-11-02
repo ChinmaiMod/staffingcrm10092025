@@ -9,7 +9,7 @@ The following environment variables need to be configured in the Supabase dashbo
 
 ### Optional:
 - **OPENROUTER_REFERRER**: `https://staffingcrm10092025.vercel.app` (frontend URL)
-- **AI_MODEL**: `anthropic/claude-3.5-sonnet` (default model if not specified in prompt)
+- **AI_MODEL**: `anthropic/claude-sonnet-4-5` (default model if not specified in prompt)
 
 ## How to Configure:
 

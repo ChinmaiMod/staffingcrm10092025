@@ -226,7 +226,7 @@ export async function fetchOpenRouterModels() {
     console.error('Error fetching OpenRouter models:', error)
     // Return a default set of popular models if API fails
     return [
-      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Latest Claude model' },
+      { id: 'anthropic/claude-sonnet-4-5', name: 'Claude Sonnet 4.5', description: 'Latest Claude model' },
       { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
       { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced Claude model' },
       { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'Latest GPT-4 model' },
