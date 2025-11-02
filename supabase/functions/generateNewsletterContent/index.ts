@@ -63,7 +63,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openrouterApiKey}`,
-        'HTTP-Referer': Deno.env.get('OPENROUTER_REFERRER') || 'https://staffingcrm.app',
+        'HTTP-Referer': Deno.env.get('OPENROUTER_REFERRER') || 'https://staffingcrm10092025.vercel.app',
         'X-Title': 'Staffing CRM Newsletter'
       },
       body: JSON.stringify({
