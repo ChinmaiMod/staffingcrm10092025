@@ -29,7 +29,7 @@ serve(async (req) => {
       }
     })
 
-    const { email } = await req.json()
+    const { email, frontendUrl: requestFrontendUrl } = await req.json()
 
     if (!email) {
       throw new Error('Email is required')
@@ -67,10 +67,11 @@ serve(async (req) => {
 
     if (tokenError) throw tokenError
 
-    // TODO: Send email via SendGrid
-    // For now, return the verification URL
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
-    const verificationUrl = `${frontendUrl}/verify?token=${token}`
+    // Get frontend URL from request, fallback to env, or default
+    const frontendUrl = requestFrontendUrl 
+      ? new URL(requestFrontendUrl).origin 
+      : (Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_FRONTEND_URL') || 'http://localhost:5173')
+    const verificationUrl = `${frontendUrl.replace(/\/$/, '')}/verify?token=${token}`
 
     // In production, you would send this via SendGrid:
     // await sendEmail({

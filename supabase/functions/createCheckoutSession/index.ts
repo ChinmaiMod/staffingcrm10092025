@@ -19,13 +19,16 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
-    const { priceId, tenantId, profileId, billingCycle, promoCode } = await req.json()
+    const { priceId, tenantId, profileId, billingCycle, promoCode, frontendUrl: requestFrontendUrl } = await req.json()
 
     if (!priceId || !tenantId || !profileId) {
       throw new Error('Missing required fields')
     }
 
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'http://localhost:5173'
+    // Get frontend URL from request, fallback to env, or default
+    const frontendUrl = requestFrontendUrl 
+      ? new URL(requestFrontendUrl).origin 
+      : (Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_FRONTEND_URL') || 'http://localhost:5173')
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',

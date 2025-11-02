@@ -9,12 +9,14 @@ import ResendApiKeysPage from './ResendApiKeys/ResendApiKeysPage'
 import UserRolesManagement from '../../DataAdministration/UserRoles/UserRolesManagement'
 import AssignUserRoles from '../../DataAdministration/UserRoles/AssignUserRoles'
 import InviteUsers from '../../DataAdministration/UserInvitations/InviteUsers'
+import AIPromptsPage from './AIPrompts/AIPromptsPage'
 
 const REFERENCE_TABLES = [
   { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
   { id: 'assign_roles', label: 'Assign User Roles', icon: '🛡️', path: 'assign-roles' },
   { id: 'invite_users', label: 'Invite Users', icon: '📧', path: 'invite-users' },
   { id: 'resend_api_keys', label: 'Configure Resend API Keys', icon: '🔑', path: 'resend-api-keys' },
+  { id: 'ai_prompts', label: 'AI Prompts for Newsletter', icon: '🤖', path: 'ai-prompts' },
   { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: 'pipelines' },
   { id: 'businesses', label: 'Businesses', icon: '🏢', path: 'businesses' },
   { id: 'internal_staff', label: 'Internal Staff', icon: '👥', path: 'internal-staff' },
@@ -50,6 +52,7 @@ export default function DataAdministration() {
       <Route path="assign-roles" element={<AssignUserRoles />} />
       <Route path="invite-users" element={<InviteUsers />} />
       <Route path="resend-api-keys" element={<ResendApiKeysPage />} />
+      <Route path="ai-prompts" element={<AIPromptsPage />} />
       <Route path="businesses" element={<BusinessesPage />} />
       <Route path="internal-staff" element={<InternalStaffPage />} />
       <Route path="teams" element={<TeamsPage />} />

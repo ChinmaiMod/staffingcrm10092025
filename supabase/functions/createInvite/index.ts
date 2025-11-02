@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { tenant_id, email, role } = await req.json()
+    const { tenant_id, email, role, frontendUrl: requestFrontendUrl } = await req.json()
     if (!tenant_id || !email) throw new Error('Missing tenant_id or email')
 
     // Validate caller: expect Authorization: Bearer <access_token>
@@ -70,7 +70,10 @@ serve(async (req) => {
     })
 
     // Try to send email via Resend (https://resend.com/)
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_FRONTEND_URL')
+    // Get frontend URL from request, fallback to env, or default
+    const frontendUrl = requestFrontendUrl 
+      ? new URL(requestFrontendUrl).origin 
+      : (Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_FRONTEND_URL') || 'http://localhost:5173')
     const emailDomain = (email.split('@')[1] || '').toLowerCase()
     const resendLookup = await getResendConfigForDomain(emailDomain || null, tenant_id)
     const resendCfg = resendLookup.config
@@ -80,16 +83,38 @@ serve(async (req) => {
       const subject = Deno.env.get('INVITE_SUBJECT') || `You are invited to join`
 
       // Load HTML template and substitute variables
-      let template = ''
-      try {
-        const filePath = new URL('../templates/invite_template.html', import.meta.url)
-        template = await Deno.readTextFile(filePath)
-        template = template.replace(/{{INVITE_LINK}}/g, inviteLink)
-        template = template.replace(/{{COMPANY_NAME}}/g, (await supabase.from('tenants').select('company_name').eq('tenant_id', tenant_id).maybeSingle()).data?.company_name || 'your company')
-        template = template.replace(/{{INVITER_EMAIL}}/g, (await supabase.from('profiles').select('email').eq('id', callerId).maybeSingle()).data?.email || '')
-      } catch (tmplErr) {
-        console.error('Template load error', tmplErr)
-      }
+      // Inline template to avoid file system access issues in deployment
+      const tenantData = await supabase.from('tenants').select('company_name').eq('tenant_id', tenant_id).maybeSingle()
+      const callerData = await supabase.from('profiles').select('email').eq('id', callerId).maybeSingle()
+      const companyName = tenantData?.data?.company_name || 'your company'
+      const inviterEmail = callerData?.data?.email || ''
+      
+      let template = `
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>You're invited</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; line-height:1.5; color:#111;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="max-width:600px; margin:0 auto; padding:20px;">
+          <h2 style="color:#0b5cff;">You've been invited to join ${companyName}</h2>
+          <p>Hi,</p>
+          <p>${inviterEmail} has invited you to join <strong>${companyName}</strong> on our platform.</p>
+          <p style="text-align:center; margin:24px 0;">
+            <a href="${inviteLink}" style="background:#0b5cff;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Accept Invitation</a>
+          </p>
+          <p>If the button doesn't work, copy and paste the following link into your browser:</p>
+          <p style="word-break:break-all">${inviteLink}</p>
+          <hr />
+          <p style="font-size:12px;color:#666;">If you did not expect this invitation, you can ignore this email.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
 
       try {
         await fetch('https://api.resend.com/emails', {

@@ -7,6 +7,7 @@ import PipelineView from './Pipelines/PipelineView'
 import DataAdministration from './DataAdmin/DataAdministration'
 import NotificationsManager from './Notifications/NotificationsManager'
 import EmailTemplates from './EmailTemplates/EmailTemplates'
+import Newsletter from './Newsletter/Newsletter'
 import Feedback from '../Feedback/Feedback'
 import IssueReport from '../IssueReport/IssueReport'
 import './CRM.css'
@@ -30,6 +31,7 @@ export default function CRMApp() {
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/crm' },
     { id: 'contacts', label: 'Contacts', icon: '👥', path: '/crm/contacts' },
     { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: '/crm/pipelines' },
+    { id: 'newsletter', label: 'Newsletter', icon: '📰', path: '/crm/newsletter' },
     { id: 'data-admin', label: 'Data Administration', icon: '⚙️', path: '/crm/data-admin' },
     { id: 'notifications', label: 'Notifications', icon: '🔔', path: '/crm/notifications' },
     { id: 'email-templates', label: 'Email Templates', icon: '📧', path: '/crm/email-templates' },
@@ -76,6 +78,7 @@ export default function CRMApp() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/contacts" element={<ContactsManager />} />
           <Route path="/pipelines" element={<PipelineView />} />
+          <Route path="/newsletter" element={<Newsletter />} />
           <Route path="/data-admin/*" element={<DataAdministration />} />
           <Route path="/notifications" element={<NotificationsManager />} />
           <Route path="/email-templates" element={<EmailTemplates />} />
