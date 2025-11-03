@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../../../contexts/AuthProvider'
-import supabaseClient from '../../../../api/supabaseClient'
+import { supabase as supabaseClient } from '../../../../api/supabaseClient'
 import { fetchOpenRouterModels } from '../../../../api/edgeFunctions'
 import './AIPromptsPage.css'
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../../contexts/AuthProvider'
-import supabaseClient from '../../../api/supabaseClient'
+import { supabase as supabaseClient } from '../../../api/supabaseClient'
 import { generateNewsletterContent, sendNewsletter } from '../../../api/edgeFunctions'
 import './Newsletter.css'
 

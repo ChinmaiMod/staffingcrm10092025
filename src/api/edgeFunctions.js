@@ -187,8 +187,23 @@ export async function generateNewsletterContent(content, promptText, tenantId, t
   }, token)
 }
 
+// Default model list (used as fallback)
+const DEFAULT_AI_MODELS = [
+  { id: 'anthropic/claude-sonnet-4-5', name: 'Claude Sonnet 4.5', description: 'Latest Claude model' },
+  { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
+  { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced Claude model' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'Latest GPT-4 model' },
+  { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Fast GPT-4 model' },
+  { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and economical' }
+]
+
 // Fetch available models from OpenRouter API
 export async function fetchOpenRouterModels() {
+  // Only run in browser environment
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') {
+    return DEFAULT_AI_MODELS
+  }
+
   try {
     const response = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
@@ -224,15 +239,8 @@ export async function fetchOpenRouterModels() {
     return models
   } catch (error) {
     console.error('Error fetching OpenRouter models:', error)
-    // Return a default set of popular models if API fails
-    return [
-      { id: 'anthropic/claude-sonnet-4-5', name: 'Claude Sonnet 4.5', description: 'Latest Claude model' },
-      { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', description: 'Most capable Claude model' },
-      { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced Claude model' },
-      { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'Latest GPT-4 model' },
-      { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Fast GPT-4 model' },
-      { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and economical' }
-    ]
+    // Return default models if API fails
+    return DEFAULT_AI_MODELS
   }
 }
 
