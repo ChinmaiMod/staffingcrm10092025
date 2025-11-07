@@ -796,20 +796,7 @@ export default function ContactsManager() {
       (filterBusiness === 'global' && !contact.business_id) ||
       (contact.business_id && String(contact.business_id) === String(filterBusiness))
     
-    // Debug logging for business filter (can be removed after testing)
-    if (filterBusiness !== 'all' && filterBusiness !== 'global') {
-      const isMatch = contact.business_id && String(contact.business_id) === String(filterBusiness)
-      if (!isMatch && contact.business_id) {
-        console.log('Business filter mismatch:', {
-          contactName: `${contact.first_name} ${contact.last_name}`,
-          contactBusinessId: contact.business_id,
-          filterBusinessId: filterBusiness,
-          areEqual: String(contact.business_id) === String(filterBusiness)
-        })
-      }
-    }
-    
-    // Timeframe filter (mock implementation - in production, filter by created_at date)
+    // Timeframe filter
     let matchesTimeframe = true
     if (filterTimeframe !== 'all') {
       const createdAt = contact.created_at ? new Date(contact.created_at) : null
@@ -829,6 +816,14 @@ export default function ContactsManager() {
     }
 
     return matchesSearch && matchesStatus && matchesType && matchesTimeframe && matchesBusiness
+  })
+
+  // Log filter results for debugging
+  console.log('Filter applied:', {
+    filterBusiness,
+    totalContacts: contacts.length,
+    filteredCount: filteredContacts.length,
+    businessIds: [...new Set(filteredContacts.map(c => c.business_id))].filter(Boolean)
   })
 
   // Apply advanced filters if active
@@ -987,7 +982,15 @@ export default function ContactsManager() {
           </select>
           <select
             value={filterBusiness}
-            onChange={(e) => setFilterBusiness(e.target.value)}
+            onChange={(e) => {
+              console.log('Business filter changed:', {
+                oldValue: filterBusiness,
+                newValue: e.target.value,
+                totalContacts: contacts.length,
+                businesses: businesses.map(b => ({ id: b.business_id, name: b.business_name }))
+              })
+              setFilterBusiness(e.target.value)
+            }}
             style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
           >
             <option value="all">All Businesses</option>
