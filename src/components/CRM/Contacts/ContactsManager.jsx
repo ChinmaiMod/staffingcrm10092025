@@ -380,12 +380,16 @@ export default function ContactsManager() {
     // Apply filters from URL parameters
     const statusParam = searchParams.get('status')
     const timeframeParam = searchParams.get('timeframe')
+    const businessParam = searchParams.get('business')
     
     if (statusParam) {
       setFilterStatus(statusParam)
     }
     if (timeframeParam) {
       setFilterTimeframe(timeframeParam)
+    }
+    if (businessParam) {
+      setFilterBusiness(businessParam)
     }
 
     // Load contacts once on mount and when search params change
@@ -790,7 +794,20 @@ export default function ContactsManager() {
     const matchesBusiness =
       filterBusiness === 'all' ||
       (filterBusiness === 'global' && !contact.business_id) ||
-      contact.business_id === filterBusiness
+      (contact.business_id && String(contact.business_id) === String(filterBusiness))
+    
+    // Debug logging for business filter (can be removed after testing)
+    if (filterBusiness !== 'all' && filterBusiness !== 'global') {
+      const isMatch = contact.business_id && String(contact.business_id) === String(filterBusiness)
+      if (!isMatch && contact.business_id) {
+        console.log('Business filter mismatch:', {
+          contactName: `${contact.first_name} ${contact.last_name}`,
+          contactBusinessId: contact.business_id,
+          filterBusinessId: filterBusiness,
+          areEqual: String(contact.business_id) === String(filterBusiness)
+        })
+      }
+    }
     
     // Timeframe filter (mock implementation - in production, filter by created_at date)
     let matchesTimeframe = true
