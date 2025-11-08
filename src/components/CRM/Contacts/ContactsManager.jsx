@@ -820,18 +820,34 @@ export default function ContactsManager() {
 
   // Enhanced debugging for business filter
   console.log('=== BUSINESS FILTER DEBUG ===')
-  console.log('Selected filterBusiness:', filterBusiness, typeof filterBusiness)
-  console.log('Available businesses:', businesses.map(b => ({ id: b.business_id, name: b.business_name, type: typeof b.business_id })))
-  console.log('Sample contact business_ids:', contacts.slice(0, 5).map(c => ({ 
+  console.log('Selected filterBusiness:', filterBusiness, '(type:', typeof filterBusiness, ')')
+  console.log('Available businesses:', businesses)
+  console.log('Sample contacts with business_id:', contacts.slice(0, 5).map(c => ({ 
     name: `${c.first_name} ${c.last_name}`,
-    business_id: c.business_id, 
-    type: typeof c.business_id 
+    business_id: c.business_id,
+    business_id_type: typeof c.business_id,
+    matches: filterBusiness === 'all' ? 'N/A' : String(c.business_id) === String(filterBusiness)
   })))
+  
+  // Test the filter logic manually
+  if (filterBusiness !== 'all') {
+    const testContact = contacts[0]
+    if (testContact) {
+      console.log('Manual filter test on first contact:', {
+        contact: `${testContact.first_name} ${testContact.last_name}`,
+        contact_business_id: testContact.business_id,
+        filterBusiness: filterBusiness,
+        stringMatch: String(testContact.business_id) === String(filterBusiness),
+        directMatch: testContact.business_id === filterBusiness
+      })
+    }
+  }
+  
   console.log('Filter results:', {
     filterBusiness,
     totalContacts: contacts.length,
     filteredCount: filteredContacts.length,
-    businessIdsInFiltered: [...new Set(filteredContacts.map(c => c.business_id))].filter(Boolean)
+    businessIdsInFiltered: [...new Set(filteredContacts.map(c => c.business_id))]
   })
   console.log('===========================')
 
