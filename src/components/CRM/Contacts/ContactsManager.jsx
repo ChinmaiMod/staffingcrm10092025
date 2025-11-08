@@ -818,13 +818,22 @@ export default function ContactsManager() {
     return matchesSearch && matchesStatus && matchesType && matchesTimeframe && matchesBusiness
   })
 
-  // Log filter results for debugging
-  console.log('Filter applied:', {
+  // Enhanced debugging for business filter
+  console.log('=== BUSINESS FILTER DEBUG ===')
+  console.log('Selected filterBusiness:', filterBusiness, typeof filterBusiness)
+  console.log('Available businesses:', businesses.map(b => ({ id: b.business_id, name: b.business_name, type: typeof b.business_id })))
+  console.log('Sample contact business_ids:', contacts.slice(0, 5).map(c => ({ 
+    name: `${c.first_name} ${c.last_name}`,
+    business_id: c.business_id, 
+    type: typeof c.business_id 
+  })))
+  console.log('Filter results:', {
     filterBusiness,
     totalContacts: contacts.length,
     filteredCount: filteredContacts.length,
-    businessIds: [...new Set(filteredContacts.map(c => c.business_id))].filter(Boolean)
+    businessIdsInFiltered: [...new Set(filteredContacts.map(c => c.business_id))].filter(Boolean)
   })
+  console.log('===========================')
 
   // Apply advanced filters if active
   const finalContacts = isAdvancedFilterActive 
