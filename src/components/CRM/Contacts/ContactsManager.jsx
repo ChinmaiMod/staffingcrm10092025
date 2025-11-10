@@ -153,6 +153,10 @@ export default function ContactsManager() {
   const [advancedFilterConfig, setAdvancedFilterConfig] = useState(null)
   const [isAdvancedFilterActive, setIsAdvancedFilterActive] = useState(false)
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const CONTACTS_PER_PAGE = 20
+
   // Bug #13 fix: Add refs for cleanup to prevent memory leaks
   const isMountedRef = useRef(true)
   const abortControllerRef = useRef(null)
@@ -717,14 +721,6 @@ export default function ContactsManager() {
     })
   }
 
-  const handleSelectAll = () => {
-    if (selectedContacts.length === finalContacts.length) {
-      setSelectedContacts([])
-    } else {
-      setSelectedContacts(finalContacts.map(c => c.contact_id))
-    }
-  }
-
   const handleBulkEmail = () => {
     if (selectedContacts.length === 0) {
       alert('Please select at least one contact')
@@ -833,6 +829,17 @@ export default function ContactsManager() {
     ? applyAdvancedFilters(filteredContacts, advancedFilterConfig)
     : filteredContacts
 
+  // Pagination calculations
+  const totalPages = Math.ceil(finalContacts.length / CONTACTS_PER_PAGE)
+  const startIndex = (currentPage - 1) * CONTACTS_PER_PAGE
+  const endIndex = startIndex + CONTACTS_PER_PAGE
+  const paginatedContacts = finalContacts.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterStatus, filterType, filterTimeframe, filterBusiness, isAdvancedFilterActive])
+
   const clearFilters = () => {
     setSearchTerm('')
     setFilterStatus('all')
@@ -841,6 +848,7 @@ export default function ContactsManager() {
     setFilterBusiness('all')
     setSearchParams({}) // Clear URL parameters
     handleClearAdvancedFilters() // Clear advanced filters
+    setCurrentPage(1)
   }
 
   const hasActiveFilters =
@@ -850,6 +858,21 @@ export default function ContactsManager() {
     filterTimeframe !== 'all' ||
     filterBusiness !== 'all' ||
     isAdvancedFilterActive
+
+  // Handle select all for current page
+  const handleSelectAll = () => {
+    // Check if all contacts on current page are selected
+    const currentPageContactIds = paginatedContacts.map(c => c.contact_id)
+    const allCurrentPageSelected = currentPageContactIds.every(id => selectedContacts.includes(id))
+    
+    if (allCurrentPageSelected) {
+      // Deselect all contacts on current page
+      setSelectedContacts(prev => prev.filter(id => !currentPageContactIds.includes(id)))
+    } else {
+      // Select all contacts on current page
+      setSelectedContacts(prev => [...new Set([...prev, ...currentPageContactIds])])
+    }
+  }
 
   if (loading) {
     return <div className="loading">Loading contacts...</div>
@@ -1086,9 +1109,10 @@ export default function ContactsManager() {
               <th style={{ width: '40px' }}>
                 <input
                   type="checkbox"
-                  checked={selectedContacts.length === finalContacts.length && finalContacts.length > 0}
+                  checked={paginatedContacts.length > 0 && paginatedContacts.every(c => selectedContacts.includes(c.contact_id))}
                   onChange={handleSelectAll}
                   style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                  title="Select/deselect all contacts on this page"
                 />
               </th>
               <th>Name</th>
@@ -1102,7 +1126,7 @@ export default function ContactsManager() {
             </tr>
           </thead>
           <tbody>
-            {finalContacts.length === 0 ? (
+            {paginatedContacts.length === 0 ? (
               <tr>
                 <td colSpan="9">
                   <div className="empty-state">
@@ -1122,7 +1146,7 @@ export default function ContactsManager() {
                 </td>
               </tr>
             ) : (
-              finalContacts.map((contact) => (
+              paginatedContacts.map((contact) => (
                 <tr key={contact.contact_id}>
                   <td>
                     <input
@@ -1187,6 +1211,85 @@ export default function ContactsManager() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '8px',
+          marginTop: '24px',
+          marginBottom: '24px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              background: currentPage === 1 ? '#f1f5f9' : 'white',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              color: currentPage === 1 ? '#94a3b8' : '#334155'
+            }}
+          >
+            ← Previous
+          </button>
+
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  background: currentPage === page 
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                    : 'white',
+                  color: currentPage === page ? 'white' : '#334155',
+                  cursor: 'pointer',
+                  fontWeight: currentPage === page ? '600' : '500',
+                  minWidth: '40px'
+                }}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              background: currentPage === totalPages ? '#f1f5f9' : 'white',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              color: currentPage === totalPages ? '#94a3b8' : '#334155'
+            }}
+          >
+            Next →
+          </button>
+
+          <div style={{
+            marginLeft: '16px',
+            padding: '8px 12px',
+            background: '#f8fafc',
+            borderRadius: '6px',
+            fontSize: '14px',
+            color: '#64748b'
+          }}>
+            Showing {startIndex + 1}-{Math.min(endIndex, finalContacts.length)} of {finalContacts.length} contacts
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <>
