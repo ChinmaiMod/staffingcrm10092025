@@ -384,13 +384,16 @@ CREATE TABLE hrms_projects (
   physical_location_state_id UUID REFERENCES states(state_id),
   physical_location_country_id UUID REFERENCES countries(country_id),
   
-  -- Rates & Financials
+  -- Rates & Financials (Current/Latest - See hrms_project_rate_history for full history)
   actual_client_bill_rate DECIMAL(10,2),
   informed_rate_to_candidate DECIMAL(10,2),
   candidate_percentage DECIMAL(5,2), -- 80%, 70%, etc.
   rate_paid_to_candidate DECIMAL(10,2),
   lca_rate DECIMAL(10,2),
   vms_charges DECIMAL(10,2),
+  
+  -- NOTE: Rate changes are tracked in hrms_project_rate_history with effective dates
+  -- These fields store CURRENT rates for quick access
   
   -- Tenure Discounts (5 levels)
   tenure_discount_1 DECIMAL(5,2),
@@ -441,7 +444,150 @@ CREATE INDEX idx_hrms_projects_dates ON hrms_projects(project_start_date, projec
 
 ---
 
-### 3.2 hrms_project_vendors (Vendor Chain)
+### 3.2 hrms_project_rate_history (Rate Change History) ⭐ NEW
+**Tracks rate changes over time within the same project with effective dates.**
+
+```sql
+CREATE TABLE hrms_project_rate_history (
+  rate_history_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+  business_id UUID REFERENCES businesses(business_id),
+  project_id UUID NOT NULL REFERENCES hrms_projects(project_id) ON DELETE CASCADE,
+  
+  -- Rate Details
+  actual_client_bill_rate DECIMAL(10,2) NOT NULL,
+  informed_rate_to_candidate DECIMAL(10,2),
+  candidate_percentage DECIMAL(5,2),
+  rate_paid_to_candidate DECIMAL(10,2),
+  lca_rate DECIMAL(10,2),
+  vms_charges DECIMAL(10,2),
+  
+  -- Tenure Discounts (5 levels)
+  tenure_discount_1 DECIMAL(5,2),
+  tenure_discount_1_period VARCHAR(50),
+  tenure_discount_2 DECIMAL(5,2),
+  tenure_discount_2_period VARCHAR(50),
+  tenure_discount_3 DECIMAL(5,2),
+  tenure_discount_3_period VARCHAR(50),
+  tenure_discount_4 DECIMAL(5,2),
+  tenure_discount_4_period VARCHAR(50),
+  tenure_discount_5 DECIMAL(5,2),
+  tenure_discount_5_period VARCHAR(50),
+  current_applicable_tenure_discount DECIMAL(5,2),
+  
+  -- Volume Discounts (3 levels)
+  volume_discount_1 DECIMAL(5,2),
+  volume_discount_1_period VARCHAR(50),
+  volume_discount_2 DECIMAL(5,2),
+  volume_discount_2_period VARCHAR(50),
+  volume_discount_3 DECIMAL(5,2),
+  volume_discount_3_period VARCHAR(50),
+  current_applicable_volume_discount DECIMAL(5,2),
+  
+  -- Effective Date Range
+  effective_from_date DATE NOT NULL,
+  effective_to_date DATE, -- NULL means currently active
+  
+  -- Change Reason
+  change_reason TEXT, -- 'initial_rate', 'client_reduction', 'client_increase', 'discount_applied', 'amendment', etc.
+  change_notes TEXT,
+  
+  -- Status
+  is_current_rate BOOLEAN DEFAULT false, -- Only one record per project should be true
+  
+  -- Audit
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  
+  CONSTRAINT valid_effective_date_range CHECK (effective_to_date IS NULL OR effective_to_date >= effective_from_date),
+  CONSTRAINT no_overlapping_dates EXCLUDE USING gist (
+    project_id WITH =,
+    daterange(effective_from_date, COALESCE(effective_to_date, 'infinity'::date), '[]') WITH &&
+  )
+);
+
+CREATE INDEX idx_hrms_rate_history_project ON hrms_project_rate_history(project_id);
+CREATE INDEX idx_hrms_rate_history_effective ON hrms_project_rate_history(effective_from_date, effective_to_date);
+CREATE INDEX idx_hrms_rate_history_current ON hrms_project_rate_history(is_current_rate) WHERE is_current_rate = true;
+CREATE INDEX idx_hrms_rate_history_tenant ON hrms_project_rate_history(tenant_id);
+
+-- Trigger to maintain is_current_rate flag
+CREATE OR REPLACE FUNCTION fn_update_current_rate()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- When a new rate is inserted or updated with NULL effective_to_date
+  IF NEW.effective_to_date IS NULL THEN
+    -- Mark all other rates for this project as not current
+    UPDATE hrms_project_rate_history
+    SET is_current_rate = false
+    WHERE project_id = NEW.project_id
+      AND rate_history_id != NEW.rate_history_id;
+    
+    -- Mark this rate as current
+    NEW.is_current_rate := true;
+  ELSE
+    -- If effective_to_date is set, this is not current
+    NEW.is_current_rate := false;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_current_rate
+BEFORE INSERT OR UPDATE ON hrms_project_rate_history
+FOR EACH ROW
+EXECUTE FUNCTION fn_update_current_rate();
+```
+
+**Usage Examples:**
+
+```sql
+-- Initial rate when project starts
+INSERT INTO hrms_project_rate_history (
+  project_id, actual_client_bill_rate, effective_from_date, change_reason
+) VALUES (
+  'project-uuid', 85.00, '2025-01-01', 'initial_rate'
+);
+-- Result: effective_from_date='2025-01-01', effective_to_date=NULL, is_current_rate=true
+
+-- Client reduces rate effective March 1st
+INSERT INTO hrms_project_rate_history (
+  project_id, actual_client_bill_rate, effective_from_date, change_reason, change_notes
+) VALUES (
+  'project-uuid', 78.00, '2025-03-01', 'client_reduction', 'Client budget cuts'
+);
+-- Trigger automatically:
+-- 1. Sets old rate: effective_to_date='2025-02-28', is_current_rate=false
+-- 2. Sets new rate: effective_to_date=NULL, is_current_rate=true
+
+-- Get current rate for a project
+SELECT * FROM hrms_project_rate_history
+WHERE project_id = 'project-uuid'
+  AND is_current_rate = true;
+
+-- Get rate effective on specific date
+SELECT * FROM hrms_project_rate_history
+WHERE project_id = 'project-uuid'
+  AND effective_from_date <= '2025-02-15'
+  AND (effective_to_date IS NULL OR effective_to_date >= '2025-02-15');
+
+-- Get full rate history for a project
+SELECT 
+  effective_from_date,
+  effective_to_date,
+  actual_client_bill_rate,
+  rate_paid_to_candidate,
+  change_reason,
+  change_notes
+FROM hrms_project_rate_history
+WHERE project_id = 'project-uuid'
+ORDER BY effective_from_date DESC;
+```
+
+---
+
+### 3.3 hrms_project_vendors (Vendor Chain)
 Supports up to 10 vendors in the chain from employee to end client.
 
 ```sql
@@ -1327,7 +1473,7 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 
 ## 13. SUMMARY
 
-### Table Count: 27 Core Tables (Optimized from original 29)
+### Table Count: 28 Core Tables (Optimized from original 29)
 1. hrms_employees
 2. hrms_employee_addresses
 3. **hrms_checklist_types** (**NEW:** Admin-configurable checklist type definitions)
@@ -1336,25 +1482,26 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 6. hrms_checklist_items
 7. hrms_documents (**RENAMED & ENHANCED:** Was hrms_employee_documents, now universal)
 8. hrms_projects
-8. hrms_project_vendors
-9. ~~hrms_project_msa_po~~ (**REMOVED:** Now via checklist)
-10. ~~hrms_project_coi~~ (**REMOVED:** Now via checklist)
-11. hrms_timesheets
-12. hrms_timesheet_entries
-13. hrms_visa_statuses
-14. hrms_dependents
-15. hrms_compliance_items
-16. hrms_compliance_reminders
-17. hrms_employee_resumes
-18. hrms_background_checks
-19. hrms_performance_reports
-20. hrms_notifications
-21. hrms_email_templates
-22. hrms_newsletters
-23. hrms_suggestions
-24. hrms_issue_reports
-25. hrms_crm_bridge
-26. Bridge tables (in both databases)
+9. **hrms_project_rate_history** (**NEW:** Tracks rate changes with effective dates)
+10. hrms_project_vendors
+11. ~~hrms_project_msa_po~~ (**REMOVED:** Now via checklist)
+12. ~~hrms_project_coi~~ (**REMOVED:** Now via checklist)
+13. hrms_timesheets
+14. hrms_timesheet_entries
+15. hrms_visa_statuses
+16. hrms_dependents
+17. hrms_compliance_items
+18. hrms_compliance_reminders
+19. hrms_employee_resumes
+20. hrms_background_checks
+21. hrms_performance_reports
+22. hrms_notifications
+23. hrms_email_templates
+24. hrms_newsletters
+25. hrms_suggestions
+26. hrms_issue_reports
+27. hrms_crm_bridge
+28. Bridge tables (in both databases)
 
 ### Key Architectural Improvements
 - ✅ **Admin-Configurable Checklist Types:** New `hrms_checklist_types` table for dynamic type definitions
@@ -1362,6 +1509,7 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 - ✅ **Zero Hardcoding:** No hardcoded checklist types - all defined through admin UI
 - ✅ **Universal Checklist System:** Single architecture for ALL document types (immigration, project, timesheet, compliance)
 - ✅ **Polymorphic Document Storage:** `hrms_documents` table supports employee, project, timesheet, and compliance contexts
+- ✅ **Rate Change History:** New `hrms_project_rate_history` table tracks rate changes with effective dates
 - ✅ **Reduced Complexity:** Eliminated 2 specialized tables (MSA/PO/COI) in favor of flexible checklist approach
 - ✅ **Extreme Scalability:** Add new checklist types without code changes, only admin configuration
 
