@@ -30,9 +30,11 @@ Multi-tenant SaaS CRM built with React (Vite) + Supabase (PostgreSQL + Edge Func
 ## Development Workflows
 - **Local Setup**: `npm run dev` (Vite) + `supabase start` (local DB/functions)
 - **Testing**: `npm run test` with Vitest + MSW for API mocking
+- **TDD Workflow**: Follow TDD-guard best practices for all code changes (write tests first, run tests, implement, verify, document)
 - **Database**: `supabase db reset` to reset; `supabase db push` to apply migrations
 - **Edge Functions**: `supabase functions deploy functionName` to deploy
 - **Build**: `npm run build` (Vite) outputs to `dist/`
+- **Deployment**: After every code change, push to main branch (`git push origin main`) to trigger auto-deployment
 
 ## Security & RBAC
 - **Hierarchical Roles**: 5-level system (Read-only → CEO) with subordinate access
