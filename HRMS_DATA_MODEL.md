@@ -116,10 +116,71 @@ CREATE INDEX idx_hrms_addresses_dates ON hrms_employee_addresses(valid_from, val
 
 ## 2. UNIVERSAL DOCUMENT CHECKLIST SYSTEM
 
-**Key Enhancement:** Generalized checklist architecture for ALL document types (immigration, project, timesheet, compliance, etc.)
+**Key Enhancement:** Fully dynamic, admin-configurable checklist architecture for ANY document type.
 
-### 2.1 hrms_checklist_templates (Universal Checklist Templates)
-Master templates for ANY type of checklist - reusable across the entire system.
+### 2.1 hrms_checklist_types (Checklist Type Definitions) ⭐ NEW
+**Admin-configurable checklist types with entity mapping definitions.**
+
+```sql
+CREATE TABLE hrms_checklist_types (
+  checklist_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+  
+  -- Type Definition
+  type_code VARCHAR(100) UNIQUE NOT NULL, -- 'immigration', 'project', 'timesheet', etc.
+  type_name VARCHAR(255) NOT NULL, -- 'Immigration Documents', 'Project Documents', etc.
+  type_description TEXT,
+  
+  -- Entity Mapping Configuration
+  target_entity_type VARCHAR(100) NOT NULL, -- 'employee', 'project', 'timesheet', 'compliance', 'custom'
+  target_table_name VARCHAR(100) NOT NULL, -- 'hrms_employees', 'hrms_projects', 'hrms_timesheets', etc.
+  target_id_column VARCHAR(100) NOT NULL, -- 'employee_id', 'project_id', 'timesheet_id', etc.
+  
+  -- Display Configuration
+  icon VARCHAR(50), -- UI icon name: 'document', 'project', 'clock', 'shield', etc.
+  color_code VARCHAR(20), -- Hex color for UI: '#3B82F6', '#10B981', etc.
+  display_order INTEGER DEFAULT 0,
+  
+  -- Behavior Flags
+  allow_multiple_templates BOOLEAN DEFAULT true, -- Can have multiple templates of this type
+  require_employee_type BOOLEAN DEFAULT false, -- Must specify employee_type for templates
+  enable_ai_parsing BOOLEAN DEFAULT true, -- Enable AI parsing for this checklist type
+  enable_compliance_tracking BOOLEAN DEFAULT true, -- Enable expiry/compliance tracking
+  
+  -- Status
+  is_active BOOLEAN DEFAULT true,
+  is_system_type BOOLEAN DEFAULT false, -- System types cannot be deleted
+  
+  -- Audit
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  
+  CONSTRAINT valid_target_entity CHECK (target_entity_type IN ('employee', 'project', 'timesheet', 'compliance', 'visa', 'background_check', 'performance', 'custom'))
+);
+
+CREATE INDEX idx_hrms_checklist_types_tenant ON hrms_checklist_types(tenant_id);
+CREATE INDEX idx_hrms_checklist_types_code ON hrms_checklist_types(type_code);
+CREATE INDEX idx_hrms_checklist_types_entity ON hrms_checklist_types(target_entity_type);
+CREATE INDEX idx_hrms_checklist_types_active ON hrms_checklist_types(is_active) WHERE is_active = true;
+
+-- Seed Default System Types
+INSERT INTO hrms_checklist_types (type_code, type_name, type_description, target_entity_type, target_table_name, target_id_column, icon, color_code, require_employee_type, is_system_type) VALUES
+('immigration', 'Immigration Documents', 'Employee immigration and visa documents', 'employee', 'hrms_employees', 'employee_id', 'passport', '#3B82F6', true, true),
+('project', 'Project Documents', 'Project-related documents (MSA, PO, COI, SOW)', 'project', 'hrms_projects', 'project_id', 'briefcase', '#10B981', false, true),
+('timesheet', 'Timesheet Documents', 'Timesheet supporting documents and attachments', 'timesheet', 'hrms_timesheets', 'timesheet_id', 'clock', '#F59E0B', false, true),
+('compliance', 'Compliance Documents', 'Regulatory and compliance documents', 'compliance', 'hrms_compliance_items', 'compliance_item_id', 'shield-check', '#EF4444', false, true),
+('onboarding', 'Employee Onboarding', 'New hire onboarding documents', 'employee', 'hrms_employees', 'employee_id', 'user-plus', '#8B5CF6', false, true),
+('offboarding', 'Employee Offboarding', 'Employee exit and offboarding documents', 'employee', 'hrms_employees', 'employee_id', 'user-minus', '#6B7280', false, true),
+('background_check', 'Background Checks', 'Background verification documents', 'background_check', 'hrms_background_checks', 'background_check_id', 'search', '#EC4899', false, true),
+('performance', 'Performance Reviews', 'Performance review supporting documents', 'performance', 'hrms_performance_reports', 'report_id', 'chart-bar', '#14B8A6', false, true);
+```
+
+---
+
+### 2.2 hrms_checklist_templates (Universal Checklist Templates)
+Master templates linked to admin-defined checklist types.
 
 ```sql
 CREATE TABLE hrms_checklist_templates (
@@ -129,14 +190,11 @@ CREATE TABLE hrms_checklist_templates (
   
   template_name VARCHAR(255) NOT NULL,
   
-  -- Universal Checklist Type
-  checklist_type VARCHAR(100) NOT NULL, -- 'immigration', 'project', 'timesheet', 'compliance', 'employee_onboarding', 'employee_offboarding', 'background_check', 'performance_review', etc.
+  -- Link to Checklist Type (Dynamic, Admin-Defined)
+  checklist_type_id UUID NOT NULL REFERENCES hrms_checklist_types(checklist_type_id),
   
-  -- Optional: Employee Type (for immigration checklists)
-  employee_type VARCHAR(50), -- 'internal_india', 'internal_usa', 'it_usa', 'healthcare_usa', NULL for non-employee checklists
-  
-  -- Optional: Context Reference
-  context_entity VARCHAR(100), -- 'employee', 'project', 'timesheet', NULL
+  -- Optional: Employee Type (required if checklist_type.require_employee_type = true)
+  employee_type VARCHAR(50), -- 'internal_india', 'internal_usa', 'it_usa', 'healthcare_usa'
   
   description TEXT,
   
@@ -146,24 +204,23 @@ CREATE TABLE hrms_checklist_templates (
   created_by UUID REFERENCES auth.users(id),
   updated_by UUID REFERENCES auth.users(id),
   
-  CONSTRAINT valid_checklist_type CHECK (checklist_type IN ('immigration', 'project', 'timesheet', 'compliance', 'employee_onboarding', 'employee_offboarding', 'background_check', 'performance_review', 'msa_po', 'coi', 'custom'))
+  CONSTRAINT valid_employee_type CHECK (employee_type IS NULL OR employee_type IN ('internal_india', 'internal_usa', 'it_usa', 'healthcare_usa'))
 );
 
-CREATE INDEX idx_hrms_checklist_templates_type ON hrms_checklist_templates(checklist_type);
+CREATE INDEX idx_hrms_checklist_templates_tenant ON hrms_checklist_templates(tenant_id);
+CREATE INDEX idx_hrms_checklist_templates_type ON hrms_checklist_templates(checklist_type_id);
 CREATE INDEX idx_hrms_checklist_templates_employee_type ON hrms_checklist_templates(employee_type);
-CREATE INDEX idx_hrms_checklist_templates_context ON hrms_checklist_templates(context_entity);
+CREATE INDEX idx_hrms_checklist_templates_active ON hrms_checklist_templates(is_active) WHERE is_active = true;
 
 -- Examples:
--- Immigration Checklist: checklist_type='immigration', employee_type='it_usa', context_entity='employee'
--- Project Checklist: checklist_type='project', employee_type=NULL, context_entity='project'
--- MSA/PO Checklist: checklist_type='msa_po', employee_type=NULL, context_entity='project'
--- COI Checklist: checklist_type='coi', employee_type=NULL, context_entity='project'
--- Timesheet Checklist: checklist_type='timesheet', employee_type=NULL, context_entity='timesheet'
+-- Immigration Checklist for IT USA: template_name='IT USA Immigration', checklist_type_id=(immigration), employee_type='it_usa'
+-- Project Checklist: template_name='Project Documents', checklist_type_id=(project), employee_type=NULL
+-- Custom Checklist: template_name='Client Onboarding', checklist_type_id=(custom_type), employee_type=NULL
 ```
 
 ---
 
-### 2.2 hrms_checklist_groups (Document Groups)
+### 2.3 hrms_checklist_groups (Document Groups)
 Grouping mechanism for organizing checklist items (e.g., Educational Documents, Immigration Documents).
 
 ```sql
@@ -185,7 +242,7 @@ CREATE INDEX idx_hrms_checklist_groups_template ON hrms_checklist_groups(templat
 
 ---
 
-### 2.3 hrms_checklist_items (Checklist Item Definitions)
+### 2.5 hrms_checklist_items (Checklist Item Definitions)
 Individual checklist items within groups (e.g., Bachelor's Degree, Master's Degree, H1B Copy, BLS License).
 
 ```sql
@@ -218,7 +275,7 @@ CREATE INDEX idx_hrms_checklist_items_compliance ON hrms_checklist_items(complia
 
 ---
 
-### 2.4 hrms_documents (Universal Document Storage)
+### 2.6 hrms_documents (Universal Document Storage)
 **GENERALIZED:** Stores ALL documents (employee, project, timesheet, compliance) with version history and AI-parsed metadata.
 
 ```sql
@@ -1270,14 +1327,15 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 
 ## 13. SUMMARY
 
-### Table Count: 26 Core Tables (Reduced from 29)
+### Table Count: 27 Core Tables (Optimized from original 29)
 1. hrms_employees
 2. hrms_employee_addresses
-3. hrms_checklist_templates (**ENHANCED:** Universal checklist system)
-4. hrms_checklist_groups
-5. hrms_checklist_items
-6. hrms_documents (**RENAMED & ENHANCED:** Was hrms_employee_documents, now universal)
-7. hrms_projects
+3. **hrms_checklist_types** (**NEW:** Admin-configurable checklist type definitions)
+4. hrms_checklist_templates (**ENHANCED:** Links to dynamic checklist types)
+5. hrms_checklist_groups
+6. hrms_checklist_items
+7. hrms_documents (**RENAMED & ENHANCED:** Was hrms_employee_documents, now universal)
+8. hrms_projects
 8. hrms_project_vendors
 9. ~~hrms_project_msa_po~~ (**REMOVED:** Now via checklist)
 10. ~~hrms_project_coi~~ (**REMOVED:** Now via checklist)
@@ -1299,10 +1357,13 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 26. Bridge tables (in both databases)
 
 ### Key Architectural Improvements
+- ✅ **Admin-Configurable Checklist Types:** New `hrms_checklist_types` table for dynamic type definitions
+- ✅ **Dynamic Entity Mapping:** Admin defines which table/column each checklist type maps to
+- ✅ **Zero Hardcoding:** No hardcoded checklist types - all defined through admin UI
 - ✅ **Universal Checklist System:** Single architecture for ALL document types (immigration, project, timesheet, compliance)
 - ✅ **Polymorphic Document Storage:** `hrms_documents` table supports employee, project, timesheet, and compliance contexts
-- ✅ **Reduced Complexity:** Eliminated 3 specialized tables (MSA/PO/COI) in favor of flexible checklist approach
-- ✅ **Scalability:** Easy to add new document types without schema changes
+- ✅ **Reduced Complexity:** Eliminated 2 specialized tables (MSA/PO/COI) in favor of flexible checklist approach
+- ✅ **Extreme Scalability:** Add new checklist types without code changes, only admin configuration
 
 ### Key Features
 - ✅ Multi-tenant with RLS
