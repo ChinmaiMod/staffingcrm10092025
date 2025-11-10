@@ -99,21 +99,21 @@ D:\Staffing-HRMS\
 
 ## 🗄️ Database Schema
 
-**29 Core Tables** (all prefixed with `hrms_`)
+**26 Core Tables** (all prefixed with `hrms_`) - Reduced from 29 via universal checklist architecture
 
 ### Core Tables
 - `hrms_employees` - Employee master data
 - `hrms_employee_addresses` - Time-based address history
-- `hrms_checklist_templates` - Document checklists per employee type
-- `hrms_checklist_groups` - Document grouping (e.g., Educational Docs)
+- `hrms_checklist_templates` - **UNIVERSAL** checklist templates for ALL document types
+- `hrms_checklist_groups` - Document grouping (e.g., Educational Docs, Project Docs)
 - `hrms_checklist_items` - Individual checklist items
-- `hrms_employee_documents` - Documents with AI parsing & versions
+- `hrms_documents` - **UNIVERSAL** document storage (employee, project, timesheet, compliance)
 
 ### Project Management
 - `hrms_projects` - Employee projects with financials
 - `hrms_project_vendors` - Vendor chain (up to 10 levels)
-- `hrms_project_msa_po` - MSA and Purchase Orders
-- `hrms_project_coi` - Certificate of Insurance
+- ~~`hrms_project_msa_po`~~ - **REMOVED:** Now via universal checklist (MSA/PO documents)
+- ~~`hrms_project_coi`~~ - **REMOVED:** Now via universal checklist (COI documents)
 - `hrms_timesheets` - Time tracking
 - `hrms_timesheet_entries` - Daily time entries
 
@@ -139,45 +139,102 @@ D:\Staffing-HRMS\
 
 ## 🎯 Core Features
 
-### 1. Document Checklist System
-Create customizable checklists for each employee type:
+### 1. Universal Document Checklist System ⭐ NEW ARCHITECTURE
+**Key Innovation:** Single, reusable checklist system for ALL document types across the entire HRMS.
 
-**IT Employee Checklist:**
+**Supported Checklist Types:**
+- 📋 **Immigration Checklists** - I9, W4, H1B, Passport, Visa documents
+- 📋 **Project Checklists** - MSA, PO, COI, Vendor agreements
+- 📋 **Timesheet Checklists** - Supporting documents, receipts
+- 📋 **Compliance Checklists** - Regulatory documents, certifications
+- 📋 **Onboarding Checklists** - Employee onboarding documents
+- 📋 **Offboarding Checklists** - Exit documents
+- 📋 **Background Check Checklists** - Verification documents
+- 📋 **Performance Review Checklists** - Review supporting documents
+- 📋 **Custom Checklists** - Any other document workflow
+
+Create customizable checklists for each context:
+
+**Example 1: IT Employee Immigration Checklist** (`checklist_type='immigration'`)
 - Group 1: Immigration Documents (I9, W4, H1B Copy, Passport)
 - Group 2: Educational Documents (Bachelor's, Master's)
 
-**Healthcare Employee Checklist:**
+**Example 2: Healthcare Employee Immigration Checklist** (`checklist_type='immigration'`)
 - Group 1: Licenses (BLS, Nursing License)
 - Group 2: Certifications (Dementia Training, Physical Fit Test)
 - Group 3: Background Checks (NH Police Report, Background Check)
 
-**Features:**
-- Optional checklist items (not all apply to all employees)
-- AI-powered date extraction from documents
-- Automatic compliance item creation for items with expiry dates
-- Version control (track old passports, renewed licenses, etc.)
+**Example 3: Project Document Checklist** (`checklist_type='project'`)
+- Group 1: Legal Agreements (MSA, Purchase Order)
+- Group 2: Insurance (Certificate of Insurance, Liability Coverage)
+- Group 3: Client Documents (SOW, Rate Sheet)
 
-### 2. AI Document Parsing
+**Example 4: Timesheet Document Checklist** (`checklist_type='timesheet'`)
+- Group 1: Supporting Documents (Receipts, Expense Reports)
+- Group 2: Approvals (Manager Approval, Client Approval)
+
+**Universal Features:**
+- ✅ Optional checklist items (not all apply to all contexts)
+- ✅ AI-powered date extraction from ALL documents
+- ✅ Automatic compliance item creation for items with expiry dates
+- ✅ Version control (track renewals: passports, MSAs, COIs, etc.)
+- ✅ Polymorphic document storage (employee, project, timesheet, compliance)
+- ✅ Metadata flexibility (JSONB for document numbers, policy numbers, etc.)
+
+### 2. Universal Document Storage Architecture
+
+**Key Benefits of Generalized Checklist System:**
+
+#### Before (29 tables):
+- Separate tables for MSA/PO (`hrms_project_msa_po`)
+- Separate table for COI (`hrms_project_coi`)
+- Employee-specific documents (`hrms_employee_documents`)
+- Rigid structure, hard to extend
+
+#### After (26 tables): ⭐
+- **Single document table** (`hrms_documents`) for ALL contexts
+- **Single checklist system** for ALL workflows
+- **Polymorphic storage:** `entity_type` + `entity_id` pattern
+- **Easy to extend:** Add new `checklist_type` without schema changes
+
+**Usage Examples:**
+```sql
+-- Employee H1B document
+entity_type='employee', entity_id=employee_id, document_type='h1b'
+
+-- Project MSA
+entity_type='project', entity_id=project_id, document_type='msa'
+
+-- Project COI
+entity_type='project', entity_id=project_id, document_type='coi'
+
+-- Timesheet attachment
+entity_type='timesheet', entity_id=timesheet_id, document_type='timesheet'
+```
+
+### 3. AI Document Parsing
 Upload any document → AI extracts:
 - Document type
 - Start date
 - Expiry date
+- Document numbers (MSA #, PO #, Policy #)
 - Other metadata
 
-Uses **OpenRouter Claude** for high accuracy.
+Uses **OpenRouter Claude** for high accuracy across ALL document types.
 
-### 3. Compliance Reminders
+### 4. Compliance Reminders
 
-**Automated Alerts:**
-1. **Document Expiry** → 30 days before
+**Automated Alerts (Works for ALL document types):**
+1. **Employee Document Expiry** → 30 days before (passport, visa, license, etc.)
 2. **Visa Renewal** → 60 days before H1B expiry
-3. **PO Extension** → 30 days before project end
+3. **Project Document Expiry** → 30 days before MSA/PO/COI end date
 4. **I9/E-Verify** → Triggered when new visa uploaded
 5. **Amendment Required** → New project added for visa holder
+6. **Timesheet Document Expiry** → If timesheet supporting docs have expiry dates
 
-**Recipients:** Employee + HRMS administrators
+**Recipients:** Employee + HRMS administrators + Project managers
 
-### 4. Project Vendor Chain
+### 5. Project Vendor Chain
 Visual representation of complex vendor chains:
 
 ```
@@ -191,7 +248,7 @@ Employee (Your Company)
 
 Track contact details for each vendor (CEO, HR, Finance, Invoicing).
 
-### 5. LCA Project Tracking
+### 6. LCA Project Tracking
 Special handling for visa holders:
 - Only ONE LCA project allowed at a time
 - Adding new LCA project triggers amendment alert

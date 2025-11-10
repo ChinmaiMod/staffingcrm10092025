@@ -114,10 +114,12 @@ CREATE INDEX idx_hrms_addresses_dates ON hrms_employee_addresses(valid_from, val
 
 ---
 
-## 2. DOCUMENT CHECKLIST SYSTEM
+## 2. UNIVERSAL DOCUMENT CHECKLIST SYSTEM
 
-### 2.1 hrms_checklist_templates (Employee Type Checklists)
-Master templates for different employee types.
+**Key Enhancement:** Generalized checklist architecture for ALL document types (immigration, project, timesheet, compliance, etc.)
+
+### 2.1 hrms_checklist_templates (Universal Checklist Templates)
+Master templates for ANY type of checklist - reusable across the entire system.
 
 ```sql
 CREATE TABLE hrms_checklist_templates (
@@ -126,17 +128,37 @@ CREATE TABLE hrms_checklist_templates (
   business_id UUID REFERENCES businesses(business_id),
   
   template_name VARCHAR(255) NOT NULL,
-  employee_type VARCHAR(50) NOT NULL,
+  
+  -- Universal Checklist Type
+  checklist_type VARCHAR(100) NOT NULL, -- 'immigration', 'project', 'timesheet', 'compliance', 'employee_onboarding', 'employee_offboarding', 'background_check', 'performance_review', etc.
+  
+  -- Optional: Employee Type (for immigration checklists)
+  employee_type VARCHAR(50), -- 'internal_india', 'internal_usa', 'it_usa', 'healthcare_usa', NULL for non-employee checklists
+  
+  -- Optional: Context Reference
+  context_entity VARCHAR(100), -- 'employee', 'project', 'timesheet', NULL
+  
   description TEXT,
   
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id),
-  updated_by UUID REFERENCES auth.users(id)
+  updated_by UUID REFERENCES auth.users(id),
+  
+  CONSTRAINT valid_checklist_type CHECK (checklist_type IN ('immigration', 'project', 'timesheet', 'compliance', 'employee_onboarding', 'employee_offboarding', 'background_check', 'performance_review', 'msa_po', 'coi', 'custom'))
 );
 
-CREATE INDEX idx_hrms_checklist_templates_type ON hrms_checklist_templates(employee_type);
+CREATE INDEX idx_hrms_checklist_templates_type ON hrms_checklist_templates(checklist_type);
+CREATE INDEX idx_hrms_checklist_templates_employee_type ON hrms_checklist_templates(employee_type);
+CREATE INDEX idx_hrms_checklist_templates_context ON hrms_checklist_templates(context_entity);
+
+-- Examples:
+-- Immigration Checklist: checklist_type='immigration', employee_type='it_usa', context_entity='employee'
+-- Project Checklist: checklist_type='project', employee_type=NULL, context_entity='project'
+-- MSA/PO Checklist: checklist_type='msa_po', employee_type=NULL, context_entity='project'
+-- COI Checklist: checklist_type='coi', employee_type=NULL, context_entity='project'
+-- Timesheet Checklist: checklist_type='timesheet', employee_type=NULL, context_entity='timesheet'
 ```
 
 ---
@@ -196,21 +218,26 @@ CREATE INDEX idx_hrms_checklist_items_compliance ON hrms_checklist_items(complia
 
 ---
 
-### 2.4 hrms_employee_documents (Actual Employee Documents)
-Stores employee documents with version history and AI-parsed metadata.
+### 2.4 hrms_documents (Universal Document Storage)
+**GENERALIZED:** Stores ALL documents (employee, project, timesheet, compliance) with version history and AI-parsed metadata.
 
 ```sql
-CREATE TABLE hrms_employee_documents (
+CREATE TABLE hrms_documents (
   document_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
   business_id UUID REFERENCES businesses(business_id),
-  employee_id UUID NOT NULL REFERENCES hrms_employees(employee_id) ON DELETE CASCADE,
+  
+  -- Universal Context References (polymorphic)
+  entity_type VARCHAR(50) NOT NULL, -- 'employee', 'project', 'timesheet', 'compliance', 'system'
+  entity_id UUID NOT NULL, -- References employee_id, project_id, timesheet_id, etc.
+  
+  -- Checklist Association
   checklist_item_id UUID REFERENCES hrms_checklist_items(item_id),
   
   -- Document Info
   document_name VARCHAR(255) NOT NULL,
   document_description TEXT,
-  document_type VARCHAR(100), -- 'passport', 'visa', 'i9', 'w4', 'h1b', 'license', 'bls', 'degree', etc.
+  document_type VARCHAR(100), -- 'passport', 'visa', 'i9', 'w4', 'h1b', 'license', 'bls', 'degree', 'msa', 'po', 'coi', 'timesheet', etc.
   
   -- File Storage
   file_path TEXT NOT NULL,
@@ -235,7 +262,10 @@ CREATE TABLE hrms_employee_documents (
   
   -- Version Control
   version_number INTEGER DEFAULT 1,
-  parent_document_id UUID REFERENCES hrms_employee_documents(document_id),
+  parent_document_id UUID REFERENCES hrms_documents(document_id),
+  
+  -- Additional Metadata (JSONB for flexibility)
+  metadata JSONB, -- Can store document_number, receipt_number, policy_number, etc.
   
   -- Status
   document_status VARCHAR(50) DEFAULT 'active', -- 'active', 'expired', 'superseded', 'archived'
@@ -246,15 +276,23 @@ CREATE TABLE hrms_employee_documents (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
-  CONSTRAINT valid_expiry_date CHECK (expiry_date IS NULL OR expiry_date >= start_date)
+  CONSTRAINT valid_expiry_date CHECK (expiry_date IS NULL OR expiry_date >= start_date),
+  CONSTRAINT valid_entity_type CHECK (entity_type IN ('employee', 'project', 'timesheet', 'compliance', 'system'))
 );
 
-CREATE INDEX idx_hrms_employee_docs_employee ON hrms_employee_documents(employee_id);
-CREATE INDEX idx_hrms_employee_docs_checklist ON hrms_employee_documents(checklist_item_id);
-CREATE INDEX idx_hrms_employee_docs_type ON hrms_employee_documents(document_type);
-CREATE INDEX idx_hrms_employee_docs_expiry ON hrms_employee_documents(expiry_date) WHERE expiry_date IS NOT NULL;
-CREATE INDEX idx_hrms_employee_docs_compliance ON hrms_employee_documents(compliance_tracking_flag, expiry_date) WHERE compliance_tracking_flag = true;
-CREATE INDEX idx_hrms_employee_docs_current ON hrms_employee_documents(is_current_version) WHERE is_current_version = true;
+CREATE INDEX idx_hrms_docs_entity ON hrms_documents(entity_type, entity_id);
+CREATE INDEX idx_hrms_docs_checklist ON hrms_documents(checklist_item_id);
+CREATE INDEX idx_hrms_docs_type ON hrms_documents(document_type);
+CREATE INDEX idx_hrms_docs_expiry ON hrms_documents(expiry_date) WHERE expiry_date IS NOT NULL;
+CREATE INDEX idx_hrms_docs_compliance ON hrms_documents(compliance_tracking_flag, expiry_date) WHERE compliance_tracking_flag = true;
+CREATE INDEX idx_hrms_docs_current ON hrms_documents(is_current_version) WHERE is_current_version = true;
+
+-- Usage Examples:
+-- Employee Immigration Doc: entity_type='employee', entity_id=employee_id, document_type='h1b'
+-- Project MSA: entity_type='project', entity_id=project_id, document_type='msa'
+-- Project PO: entity_type='project', entity_id=project_id, document_type='po'
+-- Project COI: entity_type='project', entity_id=project_id, document_type='coi'
+-- Timesheet Attachment: entity_type='timesheet', entity_id=timesheet_id, document_type='timesheet'
 ```
 
 ---
@@ -390,71 +428,33 @@ CREATE INDEX idx_hrms_project_vendors_level ON hrms_project_vendors(vendor_level
 
 ---
 
-### 3.3 hrms_project_msa_po (MSA & Purchase Orders)
+### 3.3 Project Documents via Universal Checklist System
 
+**MSA, PO, and COI documents are now managed through the universal checklist system:**
+
+**Setup Process:**
+1. Create checklist template: `checklist_type='msa_po'` or `checklist_type='coi'`
+2. Add checklist items: "Master Service Agreement", "Purchase Order", "Certificate of Insurance"
+3. Associate documents via `hrms_documents` table with `entity_type='project'`
+
+**Advantages:**
+- Unified document management interface
+- AI parsing for all project documents
+- Automatic compliance tracking
+- Version control for MSA/PO/COI renewals
+- Flexible metadata storage (document numbers, policy numbers)
+
+**Query Example for Project MSAs:**
 ```sql
-CREATE TABLE hrms_project_msa_po (
-  msa_po_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
-  project_id UUID NOT NULL REFERENCES hrms_projects(project_id) ON DELETE CASCADE,
-  
-  document_type VARCHAR(50) NOT NULL, -- 'MSA', 'PO'
-  document_number VARCHAR(100),
-  
-  -- File Storage
-  file_path TEXT,
-  file_name VARCHAR(255),
-  
-  -- Dates
-  start_date DATE,
-  end_date DATE,
-  
-  -- Status
-  is_active BOOLEAN DEFAULT true,
-  
-  -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  uploaded_by UUID REFERENCES auth.users(id)
-);
-
-CREATE INDEX idx_hrms_msa_po_project ON hrms_project_msa_po(project_id);
-CREATE INDEX idx_hrms_msa_po_type ON hrms_project_msa_po(document_type);
-CREATE INDEX idx_hrms_msa_po_dates ON hrms_project_msa_po(end_date) WHERE is_active = true;
-```
-
----
-
-### 3.4 hrms_project_coi (Certificate of Insurance)
-
-```sql
-CREATE TABLE hrms_project_coi (
-  coi_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
-  project_id UUID NOT NULL REFERENCES hrms_projects(project_id) ON DELETE CASCADE,
-  
-  coi_number VARCHAR(100),
-  
-  -- File Storage
-  file_path TEXT NOT NULL,
-  file_name VARCHAR(255),
-  
-  -- Dates
-  issue_date DATE,
-  expiry_date DATE,
-  
-  -- Status
-  is_current BOOLEAN DEFAULT true,
-  
-  -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  uploaded_by UUID REFERENCES auth.users(id)
-);
-
-CREATE INDEX idx_hrms_coi_project ON hrms_project_coi(project_id);
-CREATE INDEX idx_hrms_coi_current ON hrms_project_coi(is_current) WHERE is_current = true;
-CREATE INDEX idx_hrms_coi_expiry ON hrms_project_coi(expiry_date);
+SELECT d.*
+FROM hrms_documents d
+JOIN hrms_checklist_items ci ON d.checklist_item_id = ci.item_id
+JOIN hrms_checklist_templates ct ON ci.template_id = ct.template_id
+WHERE d.entity_type = 'project'
+  AND d.entity_id = :project_id
+  AND ct.checklist_type = 'msa_po'
+  AND d.document_type = 'msa'
+  AND d.is_current_version = true;
 ```
 
 ---
@@ -1270,17 +1270,17 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 
 ## 13. SUMMARY
 
-### Table Count: 29 Core Tables
+### Table Count: 26 Core Tables (Reduced from 29)
 1. hrms_employees
 2. hrms_employee_addresses
-3. hrms_checklist_templates
+3. hrms_checklist_templates (**ENHANCED:** Universal checklist system)
 4. hrms_checklist_groups
 5. hrms_checklist_items
-6. hrms_employee_documents
+6. hrms_documents (**RENAMED & ENHANCED:** Was hrms_employee_documents, now universal)
 7. hrms_projects
 8. hrms_project_vendors
-9. hrms_project_msa_po
-10. hrms_project_coi
+9. ~~hrms_project_msa_po~~ (**REMOVED:** Now via checklist)
+10. ~~hrms_project_coi~~ (**REMOVED:** Now via checklist)
 11. hrms_timesheets
 12. hrms_timesheet_entries
 13. hrms_visa_statuses
@@ -1296,14 +1296,21 @@ GROUP BY p.project_id, p.project_name, p.employee_id, e.first_name, e.last_name,
 23. hrms_suggestions
 24. hrms_issue_reports
 25. hrms_crm_bridge
-26-29. Bridge tables (in both databases)
+26. Bridge tables (in both databases)
+
+### Key Architectural Improvements
+- ✅ **Universal Checklist System:** Single architecture for ALL document types (immigration, project, timesheet, compliance)
+- ✅ **Polymorphic Document Storage:** `hrms_documents` table supports employee, project, timesheet, and compliance contexts
+- ✅ **Reduced Complexity:** Eliminated 3 specialized tables (MSA/PO/COI) in favor of flexible checklist approach
+- ✅ **Scalability:** Easy to add new document types without schema changes
 
 ### Key Features
 - ✅ Multi-tenant with RLS
 - ✅ Complete audit trail
 - ✅ Document version control
 - ✅ AI-powered document parsing (OpenRouter Claude)
-- ✅ Flexible checklist system
+- ✅ **Universal checklist system for ALL documents**
+- ✅ **Polymorphic document storage (employee, project, timesheet, compliance)**
 - ✅ Complex vendor chain tracking (up to 10 levels)
 - ✅ Comprehensive compliance management
 - ✅ Time-based address history
