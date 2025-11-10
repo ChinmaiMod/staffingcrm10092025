@@ -215,6 +215,12 @@ export default function ContactsManager() {
       }
 
       const normalizedContacts = (data || []).map((contact) => {
+        const rawBusinessId = contact.business_id
+        const resolvedBusinessId = typeof rawBusinessId === 'string'
+          ? rawBusinessId
+          : rawBusinessId?.business_id || rawBusinessId?.id || contact.businesses?.business_id || null
+        const normalizedBusinessId = resolvedBusinessId ? String(resolvedBusinessId) : null
+
         const contactTypeKey = mapContactTypeToKey(contact.contact_type)
         const contactTypeLabel = CONTACT_TYPE_LABELS[contactTypeKey] || contact.contact_type || null
 
@@ -226,7 +232,7 @@ export default function ContactsManager() {
 
         return {
           contact_id: contact.id,
-          business_id: contact.business_id || null,
+          business_id: normalizedBusinessId,
           business_name: contact.businesses?.business_name || null,
           first_name: contact.first_name,
           last_name: contact.last_name,
@@ -342,9 +348,13 @@ export default function ContactsManager() {
         }
 
         if (!isCancelled) {
-          setBusinesses(data || [])
+          const normalizedBusinesses = (data || []).map((biz) => ({
+            ...biz,
+            business_id: biz?.business_id ? String(biz.business_id) : null
+          }))
+          setBusinesses(normalizedBusinesses)
           // Set default business if available
-          const defaultBiz = data?.find(b => b.is_default)
+          const defaultBiz = normalizedBusinesses.find(b => b.is_default)
           if (defaultBiz) {
             setSelectedNewContactBusiness(defaultBiz.business_id)
           }
@@ -818,39 +828,6 @@ export default function ContactsManager() {
     return matchesSearch && matchesStatus && matchesType && matchesTimeframe && matchesBusiness
   })
 
-  // Enhanced debugging for business filter
-  console.log('=== BUSINESS FILTER DEBUG ===')
-  console.log('Selected filterBusiness:', filterBusiness, '(type:', typeof filterBusiness, ')')
-  console.log('Available businesses:', businesses)
-  console.log('Sample contacts with business_id:', contacts.slice(0, 5).map(c => ({ 
-    name: `${c.first_name} ${c.last_name}`,
-    business_id: c.business_id,
-    business_id_type: typeof c.business_id,
-    matches: filterBusiness === 'all' ? 'N/A' : String(c.business_id) === String(filterBusiness)
-  })))
-  
-  // Test the filter logic manually
-  if (filterBusiness !== 'all') {
-    const testContact = contacts[0]
-    if (testContact) {
-      console.log('Manual filter test on first contact:', {
-        contact: `${testContact.first_name} ${testContact.last_name}`,
-        contact_business_id: testContact.business_id,
-        filterBusiness: filterBusiness,
-        stringMatch: String(testContact.business_id) === String(filterBusiness),
-        directMatch: testContact.business_id === filterBusiness
-      })
-    }
-  }
-  
-  console.log('Filter results:', {
-    filterBusiness,
-    totalContacts: contacts.length,
-    filteredCount: filteredContacts.length,
-    businessIdsInFiltered: [...new Set(filteredContacts.map(c => c.business_id))]
-  })
-  console.log('===========================')
-
   // Apply advanced filters if active
   const finalContacts = isAdvancedFilterActive 
     ? applyAdvancedFilters(filteredContacts, advancedFilterConfig)
@@ -1008,12 +985,6 @@ export default function ContactsManager() {
           <select
             value={filterBusiness}
             onChange={(e) => {
-              console.log('Business filter changed:', {
-                oldValue: filterBusiness,
-                newValue: e.target.value,
-                totalContacts: contacts.length,
-                businesses: businesses.map(b => ({ id: b.business_id, name: b.business_name }))
-              })
               setFilterBusiness(e.target.value)
             }}
             style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '180px' }}
