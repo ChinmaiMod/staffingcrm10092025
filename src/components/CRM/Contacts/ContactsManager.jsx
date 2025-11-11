@@ -123,6 +123,15 @@ export default function ContactsManager() {
       }
 
       setLookupMaps(maps)
+      
+      // Also populate workflow statuses array for dropdown
+      if (maps.workflow_status) {
+        const statusArray = Object.entries(maps.workflow_status).map(([id, label]) => ({
+          id: parseInt(id),
+          label
+        }))
+        setWorkflowStatuses(statusArray)
+      }
     }
 
     fetchAllLookups()
@@ -146,6 +155,7 @@ export default function ContactsManager() {
   const [savingContact, setSavingContact] = useState(false)
   const [defaultBusinessId, setDefaultBusinessId] = useState(null)
   const [businesses, setBusinesses] = useState([])
+  const [workflowStatuses, setWorkflowStatuses] = useState([])
   
   // Advanced filter state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
@@ -781,9 +791,9 @@ export default function ContactsManager() {
     const firstName = (contact.first_name || '').toLowerCase()
     const lastName = (contact.last_name || '').toLowerCase()
     const email = (contact.email || '').toLowerCase()
-    const searchTermLower = searchTerm.toLowerCase()
+    const searchTermLower = searchTerm.toLowerCase().trim()
     
-    const matchesSearch = 
+    const matchesSearch = !searchTermLower || 
       firstName.includes(searchTermLower) ||
       lastName.includes(searchTermLower) ||
       email.includes(searchTermLower)
@@ -959,13 +969,11 @@ export default function ContactsManager() {
             style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
           >
             <option value="all">All Statuses</option>
-            <option value="Initial Contact">Initial Contact</option>
-            <option value="Spoke to candidate">Spoke to candidate</option>
-            <option value="Resume needs to be prepared">Resume needs prep</option>
-            <option value="Resume prepared and sent for review">Resume prepared</option>
-            <option value="Assigned to Recruiter">Assigned to Recruiter</option>
-            <option value="Recruiter started marketing">Marketing</option>
-            <option value="Placed into Job">Placed</option>
+            {workflowStatuses.map((status) => (
+              <option key={status.id} value={status.label}>
+                {status.label}
+              </option>
+            ))}
           </select>
           <select 
             value={filterTimeframe}
