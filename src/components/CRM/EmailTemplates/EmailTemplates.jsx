@@ -241,8 +241,8 @@ export default function EmailTemplates() {
       </div>
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal">
             <div className="modal-header">
               <h2>{selectedTemplate ? 'Edit Template' : 'New Email Template'}</h2>
               <button className="btn btn-icon btn-secondary" onClick={() => setShowForm(false)}>
