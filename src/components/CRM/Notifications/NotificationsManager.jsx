@@ -37,6 +37,7 @@ export default function NotificationsManager() {
       loadBusinesses()
       loadTemplates()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id])
 
   const loadNotifications = async () => {
@@ -684,3 +685,4 @@ export default function NotificationsManager() {
     </div>
   )
 }
+

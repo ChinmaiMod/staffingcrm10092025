@@ -39,6 +39,7 @@ export default function TeamsPage() {
       loadBusinesses();
       loadTeams();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id]);
 
   const loadBusinesses = async () => {
@@ -562,3 +563,4 @@ export default function TeamsPage() {
     </div>
   );
 }
+

@@ -5,7 +5,7 @@ import { supabase } from '../../../../api/supabaseClient'
 import { useTenant } from '../../../../contexts/TenantProvider'
 import { useAuth } from '../../../../contexts/AuthProvider'
 
-const BUSINESSES_SKELETON_ROWS = 4
+// const BUSINESSES_SKELETON_ROWS = 4 // Unused - for future skeleton loading UI
 
 const normalizeBusiness = (business) => {
   const identifier = business.business_id || business.id

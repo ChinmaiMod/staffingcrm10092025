@@ -63,17 +63,7 @@ const nullIfEmpty = (value) => {
   return value
 }
 
-const normalizeStringArray = (value) => {
-  if (!value) return null
-  const arrayValue = Array.isArray(value) ? value : [value]
-  const cleaned = arrayValue
-    .map((item) => (typeof item === 'string' ? item.trim() : item))
-    .filter(Boolean)
-  return cleaned.length > 0 ? cleaned : null
-}
-
 export default function ContactsManager() {
-  const [runtimeError, setRuntimeError] = useState(null)
   // Lookup maps for contact list rendering
   const [lookupMaps, setLookupMaps] = useState({})
   const { tenant } = useTenant()
@@ -289,6 +279,7 @@ export default function ContactsManager() {
       setContacts([])
       setLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id])
 
   useEffect(() => {
@@ -497,9 +488,9 @@ export default function ContactsManager() {
       statusChanged,
       workflow_status_id,
       reason_for_contact_id,
-      role_types,
-      years_experience,
-      referral_source,
+      role_types, // eslint-disable-line no-unused-vars
+      years_experience, // eslint-disable-line no-unused-vars
+      referral_source, // eslint-disable-line no-unused-vars
       referral_source_label,
       ...formFields
     } = contactData
@@ -1272,11 +1263,6 @@ export default function ContactsManager() {
 
       {showForm && (
         <>
-          {runtimeError && (
-            <div style={{ color: 'red', background: '#fee2e2', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-              <strong>Runtime Error:</strong> {runtimeError.toString()}
-            </div>
-          )}
           <div className="modal-overlay" onClick={() => setShowForm(false)}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">

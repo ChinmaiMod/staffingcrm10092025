@@ -109,6 +109,7 @@ export default function AutocompleteSelect({
     } else {
       setInputValue('')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, options, labelGetter, valueGetter, allowCustomValue])
 
   useEffect(() => {
@@ -227,3 +228,4 @@ export default function AutocompleteSelect({
     </div>
   )
 }
+

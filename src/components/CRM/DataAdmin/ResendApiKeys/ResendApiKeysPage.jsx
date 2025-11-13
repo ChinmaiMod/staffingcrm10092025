@@ -27,6 +27,7 @@ export default function ResendApiKeysPage() {
       loadBusinesses();
       loadApiConfigs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id]);
 
   const loadBusinesses = async () => {
@@ -583,7 +584,7 @@ export default function ResendApiKeysPage() {
         </h4>
         <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#1e3a8a', lineHeight: '1.6' }}>
           <li>Configure a Resend API key for each business to send emails from your own domain</li>
-          <li>The "From Email" must be verified in your Resend account</li>
+          <li>The &quot;From Email&quot; must be verified in your Resend account</li>
           <li>System will use business-specific API keys for all business-related emails</li>
           <li>Registration and password reset emails will use the system default API key</li>
           <li>If no business API key is configured, the system will fall back to the default</li>
@@ -592,3 +593,4 @@ export default function ResendApiKeysPage() {
     </div>
   );
 }
+

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useTenant } from '../../../contexts/TenantProvider'
-import MultiSelect from '../common/MultiSelect'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
 import { formatFileSize } from '../../../utils/fileUtils'
@@ -131,7 +130,6 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(FALLBACK_STATUS_RECORDS)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
-  const [initialWorkflowStatusId, setInitialWorkflowStatusId] = useState(contact?.workflow_status_id || null)
   const getIdValue = (val, defaultKey = 'id') => {
     if (val == null) return null
     if (typeof val === 'object') {
@@ -261,7 +259,6 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [attachments, setAttachments] = useState([])
   const [fieldErrors, setFieldErrors] = useState({})
   const [yearsExperienceOptions, setYearsExperienceOptions] = useState(FALLBACK_YEARS_EXPERIENCE_RECORDS)
-  const [loadingYearsExperience, setLoadingYearsExperience] = useState(false)
   
   useEffect(() => {
     async function loadVisaStatuses() {
@@ -384,6 +381,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       setAvailableCities([])
       setFormData(prev => ({ ...prev, state_id: '', city_id: '' }))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.country_id])
 
   // Load cities when state changes
@@ -401,6 +399,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     if (tenant?.tenant_id) {
       loadTeamLeads()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id])
 
   // Load recruiters when team lead changes or on mount
@@ -409,6 +408,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       // Pass the selected team lead name to filter recruiters
       loadRecruiters(formData.recruiting_team_lead)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id, formData.recruiting_team_lead])
 
   useEffect(() => {
@@ -465,10 +465,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         remarks: contact.remarks || ''
       }))
       initialStatus.current = contact.workflow_status_id || null
-      setInitialWorkflowStatusId(contact.workflow_status_id || null)
     } else {
       initialStatus.current = null
-      setInitialWorkflowStatusId(null)
     }
   }, [contact])
 
@@ -487,9 +485,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
     const loadYearsExperience = async () => {
       try {
-        setLoadingYearsExperience(true)
-
-        const { data: yearsData, error } = await supabase
+        const { data: yearsData, error} = await supabase
           .from('years_of_experience')
           .select('id, years_of_experience, business_id')
           .eq('tenant_id', tenant.tenant_id)
@@ -523,10 +519,6 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         }
         console.error('Error loading years of experience options:', err)
         setYearsExperienceOptions(FALLBACK_YEARS_EXPERIENCE_RECORDS)
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingYearsExperience(false)
-        }
       }
     }
 

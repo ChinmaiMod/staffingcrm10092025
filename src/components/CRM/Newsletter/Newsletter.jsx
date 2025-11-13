@@ -12,7 +12,6 @@ export default function Newsletter() {
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [aiPrompts, setAiPrompts] = useState([])
   const [selectedPrompt, setSelectedPrompt] = useState('')
-  const [loading, setLoading] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -57,6 +56,7 @@ export default function Newsletter() {
       loadAiPrompts()
       loadLookups()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant])
 
   const loadBusinesses = async () => {
@@ -348,7 +348,7 @@ export default function Newsletter() {
               </button>
             </div>
             <small style={{ color: '#64748b', display: 'block', marginTop: '4px' }}>
-              Describe what you want to write below, then select a prompt and click "Write with AI"
+              Describe what you want to write below, then select a prompt and click &quot;Write with AI&quot;
             </small>
             <textarea
               value={formData.businessDescription}

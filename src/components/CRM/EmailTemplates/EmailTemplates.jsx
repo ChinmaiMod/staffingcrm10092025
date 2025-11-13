@@ -27,6 +27,7 @@ export default function EmailTemplates() {
     if (tenant?.tenant_id) {
       loadTemplates()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id])
 
   const loadTemplates = async () => {
@@ -323,3 +324,4 @@ export default function EmailTemplates() {
     </div>
   )
 }
+

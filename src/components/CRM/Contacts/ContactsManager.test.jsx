@@ -2,10 +2,7 @@
 import { vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ContactsManager from './ContactsManager';
-import ContactForm from './ContactForm';
 import ContactDetail from './ContactDetail';
-import { AuthProvider } from '../../../contexts/AuthProvider';
-import { TenantProvider } from '../../../contexts/TenantProvider';
 import { supabase } from '../../../api/supabaseClient';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -154,7 +151,6 @@ beforeAll(() => {
 import { AuthContext } from '../../../contexts/AuthProvider';
 import { TenantContext } from '../../../contexts/TenantProvider';
 const mockTenant = { tenant_id: 'tenant-123' };
-const mockBusinesses = [{ business_id: 'biz-1', business_name: 'Acme Inc', is_default: true }];
 
 function MockTenantProvider({ children }) {
   return (

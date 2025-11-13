@@ -20,6 +20,7 @@ const TeamMembersModal = ({ team, onClose }) => {
       loadMembers();
       loadAvailableStaff();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team?.team_id, tenant?.tenant_id]);
 
   const loadMembers = async () => {
@@ -439,7 +440,7 @@ const TeamMembersModal = ({ team, onClose }) => {
             }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>👥</div>
               <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
-                No team members yet. Click "Add Team Member" to get started.
+                No team members yet. Click &quot;Add Team Member&quot; to get started.
               </p>
             </div>
           ) : (
@@ -748,3 +749,4 @@ const TeamMembersModal = ({ team, onClose }) => {
 };
 
 export default TeamMembersModal;
+

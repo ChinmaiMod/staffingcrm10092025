@@ -5,7 +5,7 @@ import { fetchOpenRouterModels } from '../../../../api/edgeFunctions'
 import './AIPromptsPage.css'
 
 export default function AIPromptsPage() {
-  const { session, profile } = useAuth()
+  const { profile } = useAuth()
   const [prompts, setPrompts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -27,6 +27,7 @@ export default function AIPromptsPage() {
       loadPrompts()
       loadAiModels()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant])
 
   const loadAiModels = async () => {
@@ -213,7 +214,7 @@ export default function AIPromptsPage() {
                 style={{ fontFamily: 'monospace', fontSize: '13px' }}
               />
               <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
-                Tip: Use {"{content}"} placeholder where the user's current content should be inserted
+                Tip: Use {"{content}"} placeholder where the user&apos;s current content should be inserted
               </small>
             </div>
 
