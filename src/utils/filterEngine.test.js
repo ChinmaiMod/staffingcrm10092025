@@ -171,6 +171,74 @@ describe('filterEngine.js', () => {
       expect(result.map(c => c.contact_id)).toEqual([1])
     })
 
+    it('should be case-insensitive for all text operators', () => {
+      // Test equals operator
+      let filter = {
+        groups: [{
+          conditions: [
+            { field: 'status', operator: 'equals', value: 'ACTIVE' }
+          ]
+        }]
+      }
+      let result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(2) // 'active' matches 'ACTIVE'
+
+      // Test contains operator
+      filter = {
+        groups: [{
+          conditions: [
+            { field: 'email', operator: 'contains', value: 'EXAMPLE' }
+          ]
+        }]
+      }
+      result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(2) // john@example.com, jane@example.com
+
+      // Test starts_with operator
+      filter = {
+        groups: [{
+          conditions: [
+            { field: 'first_name', operator: 'starts_with', value: 'JO' }
+          ]
+        }]
+      }
+      result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(1) // John
+
+      // Test ends_with operator
+      filter = {
+        groups: [{
+          conditions: [
+            { field: 'email', operator: 'ends_with', value: '.COM' }
+          ]
+        }]
+      }
+      result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(3) // All emails end with .com
+
+      // Test not_equals operator
+      filter = {
+        groups: [{
+          conditions: [
+            { field: 'status', operator: 'not_equals', value: 'ACTIVE' }
+          ]
+        }]
+      }
+      result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(2) // inactive, pending
+
+      // Test not_contains operator
+      filter = {
+        groups: [{
+          conditions: [
+            { field: 'last_name', operator: 'not_contains', value: 'JOHN' }
+          ]
+        }]
+      }
+      result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(3) // Doe, Smith, Williams (excludes Johnson)
+    })
+
     it('should handle logicalOperator property from AdvancedFilterBuilder', () => {
       // AdvancedFilterBuilder sends 'logicalOperator' but filterEngine expects 'operator'
       const filter = {
