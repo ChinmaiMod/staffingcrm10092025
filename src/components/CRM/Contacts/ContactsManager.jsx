@@ -1014,6 +1014,17 @@ export default function ContactsManager() {
           )}
         </div>
 
+        {/* Advanced Filter Builder - Inline */}
+        {showAdvancedFilter && (
+          <div className="advanced-filter-inline" style={{ marginBottom: '16px' }}>
+            <AdvancedFilterBuilder
+              onApplyFilters={handleApplyAdvancedFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+              initialFilters={advancedFilterConfig}
+            />
+          </div>
+        )}
+
         {isAdvancedFilterActive && (
           <div style={{
             padding: '12px 16px',
@@ -1352,14 +1363,6 @@ export default function ContactsManager() {
             </div>
           </div>
         </div>
-      )}
-
-      {showAdvancedFilter && (
-        <AdvancedFilterBuilder
-          onApplyFilters={handleApplyAdvancedFilters}
-          onClose={() => setShowAdvancedFilter(false)}
-          initialFilters={advancedFilterConfig}
-        />
       )}
     </div>
   )

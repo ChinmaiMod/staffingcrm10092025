@@ -1,6 +1,6 @@
 
 import { vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ContactsManager from './ContactsManager';
 import ContactDetail from './ContactDetail';
 import { supabase } from '../../../api/supabaseClient';
@@ -279,6 +279,72 @@ describe('ContactsManager Search and Filter', () => {
       // Jane has workflow_status_id: 32
       expect(screen.queryByText(/Jane\s+Smith/)).not.toBeInTheDocument();
     });
+  });
+
+  it('should show Advanced Filter Builder inline when button is clicked', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    // Advanced Filter Builder should not be visible initially
+    expect(screen.queryByText(/Advanced Filter Builder/i)).not.toBeInTheDocument();
+    
+    // Click Advanced Filter button
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+    
+    // Advanced Filter Builder should appear inline (not as modal)
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+    
+    // Should appear below the filter controls (not at bottom of page)
+    const filterBuilder = screen.getByText(/Advanced Filter Builder/i).closest('.advanced-filter-inline');
+    expect(filterBuilder).toBeInTheDocument();
+  });
+
+  it('should hide Advanced Filter Builder when close button is clicked', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    // Open Advanced Filter
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+    
+    // Close Advanced Filter (get the close button in the header, not the remove condition button)
+    const filterBuilder = screen.getByText(/Advanced Filter Builder/i).closest('.advanced-filter-builder');
+    const header = within(filterBuilder).getByText(/Advanced Filter Builder/i).closest('.filter-builder-header');
+    const closeBtn = within(header).getByRole('button', { name: '✕' });
+    fireEvent.click(closeBtn);
+    
+    // Should be hidden
+    await waitFor(() => {
+      expect(screen.queryByText(/Advanced Filter Builder/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('should keep table visible when Advanced Filter Builder is shown', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    // Verify contacts table is visible
+    expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
+    
+    // Open Advanced Filter
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+    
+    // Table should still be visible (not hidden by modal overlay)
+    expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
   });
 });
 
