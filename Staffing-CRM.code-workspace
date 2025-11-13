@@ -3,6 +3,9 @@
     {
       "path": ".",
       "name": "Staffing CRM"
+    },
+    {
+      "path": "../Staffing-HRMS"
     }
   ],
   "settings": {

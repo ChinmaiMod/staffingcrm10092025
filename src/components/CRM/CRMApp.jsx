@@ -3,6 +3,8 @@ import { useNavigate, Routes, Route } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
 import Dashboard from './Dashboard/Dashboard'
 import ContactsManager from './Contacts/ContactsManager'
+import ClientDashboard from './Clients/ClientDashboard'
+import ClientsManager from './Clients/ClientsManager'
 import PipelineView from './Pipelines/PipelineView'
 import DataAdministration from './DataAdmin/DataAdministration'
 import NotificationsManager from './Notifications/NotificationsManager'
@@ -16,10 +18,18 @@ export default function CRMApp() {
   const navigate = useNavigate()
   const { signOut, profile } = useAuth()
   const [activeMenu, setActiveMenu] = useState('dashboard')
+  const [expandedMenus, setExpandedMenus] = useState({})
 
   const handleNavigation = (path, menuId) => {
     setActiveMenu(menuId)
     navigate(path)
+  }
+
+  const toggleMenu = (menuId) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuId]: !prev[menuId]
+    }))
   }
 
   const handleSignOut = async () => {
@@ -30,6 +40,16 @@ export default function CRMApp() {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/crm' },
     { id: 'contacts', label: 'Contacts', icon: '👥', path: '/crm/contacts' },
+    { 
+      id: 'clients', 
+      label: 'Clients', 
+      icon: '🏢', 
+      path: '/crm/clients',
+      subItems: [
+        { id: 'client-dashboard', label: 'Client Dashboard', path: '/crm/clients/dashboard' },
+        { id: 'client-information', label: 'Client Information', path: '/crm/clients' },
+      ]
+    },
     { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: '/crm/pipelines' },
     { id: 'newsletter', label: 'Newsletter', icon: '📰', path: '/crm/newsletter' },
     { id: 'data-admin', label: 'Data Administration', icon: '⚙️', path: '/crm/data-admin' },
@@ -49,13 +69,38 @@ export default function CRMApp() {
         </div>
         <nav className="crm-nav">
           {menuItems.map((item) => (
-            <div
-              key={item.id}
-              className={`crm-nav-item ${activeMenu === item.id ? 'active' : ''}`}
-              onClick={() => handleNavigation(item.path, item.id)}
-            >
-              <span className="crm-nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
+            <div key={item.id}>
+              <div
+                className={`crm-nav-item ${activeMenu === item.id ? 'active' : ''}`}
+                onClick={() => {
+                  if (item.subItems) {
+                    toggleMenu(item.id)
+                  } else {
+                    handleNavigation(item.path, item.id)
+                  }
+                }}
+              >
+                <span className="crm-nav-icon">{item.icon}</span>
+                <span>{item.label}</span>
+                {item.subItems && (
+                  <span className="crm-nav-arrow">
+                    {expandedMenus[item.id] ? '▼' : '▶'}
+                  </span>
+                )}
+              </div>
+              {item.subItems && expandedMenus[item.id] && (
+                <div className="crm-nav-submenu">
+                  {item.subItems.map((subItem) => (
+                    <div
+                      key={subItem.id}
+                      className={`crm-nav-subitem ${activeMenu === subItem.id ? 'active' : ''}`}
+                      onClick={() => handleNavigation(subItem.path, subItem.id)}
+                    >
+                      {subItem.label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </nav>
@@ -77,6 +122,8 @@ export default function CRMApp() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/contacts" element={<ContactsManager />} />
+          <Route path="/clients/dashboard" element={<ClientDashboard />} />
+          <Route path="/clients" element={<ClientsManager />} />
           <Route path="/pipelines" element={<PipelineView />} />
           <Route path="/newsletter" element={<Newsletter />} />
           <Route path="/data-admin/*" element={<DataAdministration />} />

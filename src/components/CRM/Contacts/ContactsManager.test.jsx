@@ -11,6 +11,16 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../../api/supabaseClient');
 
+const createSelectResponse = (rows) => ({
+  select: () => {
+    const result = { data: rows, error: null };
+    return {
+      ...result,
+      eq: () => result
+    };
+  }
+});
+
 beforeAll(() => {
   // Mock supabase.auth.getSession for AuthProvider
   if (!supabase.auth) supabase.auth = {};
@@ -37,6 +47,7 @@ beforeAll(() => {
                     phone: '+1 (555) 123-4567',
                     contact_type: 'IT Candidate',
                     workflow_status_id: 31,
+                    workflow_status: { workflow_status: 'Initial Contact' },
                     visa_status_id: 34,
                     job_title_id: 26,
                     type_of_roles_id: 13,
@@ -56,6 +67,7 @@ beforeAll(() => {
                     phone: '+1 (555) 987-6543',
                     contact_type: 'Healthcare Candidate',
                     workflow_status_id: 32,
+                    workflow_status: { workflow_status: 'Spoke to Candidate' },
                     visa_status_id: 32,
                     job_title_id: 55,
                     type_of_roles_id: 14,
@@ -76,65 +88,65 @@ beforeAll(() => {
       };
     }
     if (table === 'job_title') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 26, job_title: 'Java Full Stack Developer', field: 'IT' },
         { id: 44, job_title: 'Automation QA', field: 'IT' },
         { id: 55, job_title: 'Registered Nurse (RN)', field: 'Healthcare' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'visa_status') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 32, visa_status: 'OPT' },
         { id: 34, visa_status: 'H1B' },
         { id: 36, visa_status: 'H4 EAD' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'type_of_roles') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 13, type_of_roles: 'Remote' },
         { id: 14, type_of_roles: 'Hybrid Local' },
         { id: 16, type_of_roles: 'Open to Relocate' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'years_of_experience') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 2, years_of_experience: '1 to 3' },
         { id: 3, years_of_experience: '4 to 6' },
         { id: 4, years_of_experience: '7 to 9' },
         { id: 6, years_of_experience: '15+' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'referral_sources') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 16, referral_source: 'Facebook' },
         { id: 17, referral_source: 'Google' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'workflow_status') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { id: 31, workflow_status: 'Initial Contact' },
         { id: 32, workflow_status: 'Spoke to Candidate' },
         { id: 36, workflow_status: 'Recruiter Started Marketing' },
         { id: 60, workflow_status: 'Candidate declined Marketing' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'cities') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { city_id: 'beb5e123-ea4e-4319-a7b7-48dace651336', name: 'Dallas' },
         { city_id: 'd4f09289-bc61-44f4-8934-ca2780ab243c', name: 'Atlanta' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'countries') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { country_id: '7fefe296-e5e2-415c-8f3c-262dac8093d9', code: 'USA', name: 'United States of America' },
-      ], error: null }) };
+      ]);
     }
     if (table === 'states') {
-      return { select: () => ({ data: [
+      return createSelectResponse([
         { state_id: '815df504-6b8b-427b-b9af-fed61d9b7403', code: 'CA', name: 'California' },
-      ], error: null }) };
+      ]);
     }
-    return { select: () => ({ data: [], error: null }) };
+    return createSelectResponse([]);
   });
 });
 
@@ -176,41 +188,101 @@ describe('ContactsManager', () => {
   });
 
   it('renders contacts table and allows creating a new contact', async () => {
-    supabase.from.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            abortSignal: () => ({
-              data: [
-                {
-                  id: 1,
-                  first_name: 'John',
-                  last_name: 'Doe',
-                  email: 'john@example.com',
-                  phone: '1234567890',
-                  contact_type: 'it_candidate',
-                  workflow_status_id: 1,
-                  job_title_id: 1,
-                  reason_for_contact_id: 2,
-                  businesses: { business_name: 'Acme Inc' },
-                },
-              ],
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    });
-
-  renderWithProviders(<ContactsManager />);
+    renderWithProviders(<ContactsManager />);
   // Wait for contacts table to render (not loading)
   await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
   // Check for contact row content
-  expect(screen.getByText((content) => content.includes('John') && content.includes('Doe'))).toBeInTheDocument();
+    expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
   expect(screen.getAllByText(/Global/).length).toBeGreaterThan(0);
   expect(screen.getByRole('button', { name: /New Contact/i })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /New Contact/i }));
   await waitFor(() => expect(screen.getAllByText(/New Contact/i).length).toBeGreaterThan(0));
+  });
+});
+
+describe('ContactsManager Search and Filter', () => {
+  beforeEach(() => {
+    supabase.from.mockClear();
+  });
+
+  it('should show all contacts when search is empty', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    // Both John and Jane should be visible
+    expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
+  });
+
+  it('should filter contacts by first name search', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    const searchInput = screen.getByPlaceholderText(/Search by name or email/i);
+    fireEvent.change(searchInput, { target: { value: 'John' } });
+    
+    await waitFor(() => {
+      expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+      expect(screen.queryByText(/Jane\s+Smith/)).not.toBeInTheDocument();
+    });
+  });
+
+  it('should filter contacts by last name search', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    const searchInput = screen.getByPlaceholderText(/Search by name or email/i);
+    fireEvent.change(searchInput, { target: { value: 'Smith' } });
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/John\s+Doe/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
+    });
+  });
+
+  it('should filter contacts by email search', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    const searchInput = screen.getByPlaceholderText(/Search by name or email/i);
+    fireEvent.change(searchInput, { target: { value: 'jane.smith' } });
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/John\s+Doe/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
+    });
+  });
+
+  it('should populate status dropdown from database', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    
+    // Status dropdown should show "All" option
+    const statusSelect = screen.getByDisplayValue('All Statuses');
+    expect(statusSelect).toBeInTheDocument();
+    
+    // Should have options from workflow_status table
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Initial Contact' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Spoke to Candidate' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Recruiter Started Marketing' })).toBeInTheDocument();
+    });
+  });
+
+  it('should filter contacts by workflow status', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Initial Contact' })).toBeInTheDocument());
+    
+    const statusSelect = screen.getByDisplayValue('All Statuses');
+    fireEvent.change(statusSelect, { target: { value: 'Initial Contact' } });
+    
+    await waitFor(() => {
+      // John has workflow_status_id: 31
+      expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+      // Jane has workflow_status_id: 32
+      expect(screen.queryByText(/Jane\s+Smith/)).not.toBeInTheDocument();
+    });
   });
 });
 

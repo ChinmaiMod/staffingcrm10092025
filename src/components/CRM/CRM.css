@@ -67,6 +67,36 @@
   font-size: 18px;
 }
 
+.crm-nav-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.crm-nav-submenu {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 0;
+}
+
+.crm-nav-subitem {
+  padding: 10px 20px 10px 52px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.crm-nav-subitem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.crm-nav-subitem.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-weight: 600;
+}
+
 /* Main Content */
 .crm-main {
   flex: 1;

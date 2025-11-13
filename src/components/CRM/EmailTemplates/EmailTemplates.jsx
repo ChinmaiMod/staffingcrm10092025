@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { supabase } from '../../../api/supabaseClient'
 import { useTenant } from '../../../contexts/TenantProvider'
 import { useAuth } from '../../../contexts/AuthProvider'
@@ -18,6 +18,10 @@ export default function EmailTemplates() {
     body: '',
     is_active: true,
   })
+  const templateNameId = useId()
+  const subjectId = useId()
+  const bodyId = useId()
+  const activeId = useId()
 
   useEffect(() => {
     if (tenant?.tenant_id) {
@@ -252,8 +256,9 @@ export default function EmailTemplates() {
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label>Template Name</label>
+                  <label htmlFor={templateNameId}>Template Name</label>
                   <input
+                    id={templateNameId}
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -263,8 +268,9 @@ export default function EmailTemplates() {
                 </div>
 
                 <div className="form-group">
-                  <label>Email Subject</label>
+                  <label htmlFor={subjectId}>Email Subject</label>
                   <input
+                    id={subjectId}
                     type="text"
                     value={formData.subject}
                     onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
@@ -275,8 +281,9 @@ export default function EmailTemplates() {
                 </div>
 
                 <div className="form-group">
-                  <label>Email Body</label>
+                  <label htmlFor={bodyId}>Email Body</label>
                   <textarea
+                    id={bodyId}
                     value={formData.body}
                     onChange={(e) => setFormData(prev => ({ ...prev, body: e.target.value }))}
                     placeholder={'Dear {first_name},\n\nYour message here...\n\nBest regards,\nYour Team'}
@@ -287,15 +294,18 @@ export default function EmailTemplates() {
                 </div>
 
                 <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
+                      id={activeId}
                       type="checkbox"
                       checked={formData.is_active}
                       onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
                       style={{ width: 'auto' }}
                     />
-                    Active (available for notifications)
-                  </label>
+                    <label htmlFor={activeId} style={{ margin: 0 }}>
+                      Active (available for notifications)
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">
