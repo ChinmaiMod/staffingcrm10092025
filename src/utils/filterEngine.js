@@ -52,9 +52,11 @@ function applyCondition(contact, condition) {
  * Apply all conditions in a group with AND/OR logic
  */
 function applyGroup(contact, group) {
-  const { conditions, operator = 'AND' } = group  // Default to AND if not specified
+  const { conditions, operator, logicalOperator } = group
+  // Support both 'operator' and 'logicalOperator' properties (AdvancedFilterBuilder uses logicalOperator)
+  const groupOperator = operator || logicalOperator || 'AND'
 
-  if (operator === 'and' || operator === 'AND') {
+  if (groupOperator === 'and' || groupOperator === 'AND') {
     // All conditions must match
     return conditions.every(condition => applyCondition(contact, condition))
   } else {

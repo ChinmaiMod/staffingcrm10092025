@@ -170,6 +170,52 @@ describe('filterEngine.js', () => {
       expect(result).toHaveLength(1)
       expect(result.map(c => c.contact_id)).toEqual([1])
     })
+
+    it('should handle logicalOperator property from AdvancedFilterBuilder', () => {
+      // AdvancedFilterBuilder sends 'logicalOperator' but filterEngine expects 'operator'
+      const filter = {
+        groups: [{
+          logicalOperator: 'AND',  // This is what AdvancedFilterBuilder sends
+          conditions: [
+            { field: 'status', operator: 'equals', value: 'active' },
+            { field: 'first_name', operator: 'contains', value: 'john' }
+          ]
+        }]
+      }
+      const result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(1)
+      expect(result[0].contact_id).toBe(1)
+    })
+
+    it('should handle multiple conditions with AND using logicalOperator', () => {
+      const filter = {
+        groups: [{
+          logicalOperator: 'AND',
+          conditions: [
+            { field: 'status', operator: 'equals', value: 'active' },
+            { field: 'last_name', operator: 'contains', value: 'john' }
+          ]
+        }]
+      }
+      const result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(1)
+      expect(result[0].contact_id).toBe(3) // Bob Johnson
+    })
+
+    it('should handle multiple conditions with OR using logicalOperator', () => {
+      const filter = {
+        groups: [{
+          logicalOperator: 'OR',
+          conditions: [
+            { field: 'first_name', operator: 'equals', value: 'John' },
+            { field: 'first_name', operator: 'equals', value: 'Jane' }
+          ]
+        }]
+      }
+      const result = applyAdvancedFilters(mockContacts, filter)
+      expect(result).toHaveLength(2)
+      expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+    })
   })
 
   describe('describeFilter', () => {
