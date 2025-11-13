@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTenant } from '../../../contexts/TenantProvider'
-import { supabase } from '../../../supabaseClient'
-import logger from '../../../logger'
+import { supabase } from '../../../api/supabaseClient'
+import { logger } from '../../../utils/logger'
 
 export default function JobOrdersManager() {
   const { tenant } = useTenant()
