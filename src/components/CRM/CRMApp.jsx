@@ -5,6 +5,7 @@ import Dashboard from './Dashboard/Dashboard'
 import ContactsManager from './Contacts/ContactsManager'
 import ClientDashboard from './Clients/ClientDashboard'
 import ClientsManager from './Clients/ClientsManager'
+import JobOrdersManager from './Clients/JobOrdersManager'
 import PipelineView from './Pipelines/PipelineView'
 import DataAdministration from './DataAdmin/DataAdministration'
 import NotificationsManager from './Notifications/NotificationsManager'
@@ -48,6 +49,7 @@ export default function CRMApp() {
       subItems: [
         { id: 'client-dashboard', label: 'Client Dashboard', path: '/crm/clients/dashboard' },
         { id: 'client-information', label: 'Client Information', path: '/crm/clients' },
+        { id: 'job-orders', label: 'Job Orders', path: '/crm/clients/job-orders' },
       ]
     },
     { id: 'pipelines', label: 'Pipelines', icon: '🔄', path: '/crm/pipelines' },
@@ -123,6 +125,7 @@ export default function CRMApp() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/contacts" element={<ContactsManager />} />
           <Route path="/clients/dashboard" element={<ClientDashboard />} />
+          <Route path="/clients/job-orders" element={<JobOrdersManager />} />
           <Route path="/clients" element={<ClientsManager />} />
           <Route path="/pipelines" element={<PipelineView />} />
           <Route path="/newsletter" element={<Newsletter />} />
