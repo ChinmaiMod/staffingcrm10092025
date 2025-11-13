@@ -273,6 +273,18 @@ export default function ContactsManager() {
         }
       })
 
+      // Debug: Log first contact to verify job_title field
+      if (normalizedContacts.length > 0) {
+        logger.log('Sample contact data for debugging:', {
+          contact_id: normalizedContacts[0].contact_id,
+          first_name: normalizedContacts[0].first_name,
+          job_title_id: normalizedContacts[0].job_title_id,
+          job_title: normalizedContacts[0].job_title,
+          visa_status_id: normalizedContacts[0].visa_status_id,
+          visa_status: normalizedContacts[0].visa_status
+        })
+      }
+
       setContacts(normalizedContacts)
       setLoading(false)
     } catch (err) {

@@ -28,10 +28,10 @@ describe('filterEngine.js', () => {
 
   describe('applyAdvancedFilters', () => {
     const mockContacts = [
-      { contact_id: 1, first_name: 'John', last_name: 'Doe', email: 'john@example.com', status: 'active' },
-      { contact_id: 2, first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com', status: 'inactive' },
-      { contact_id: 3, first_name: 'Bob', last_name: 'Johnson', email: 'bob@test.com', status: 'active' },
-      { contact_id: 4, first_name: 'Alice', last_name: 'Williams', email: null, status: 'pending' },
+      { contact_id: 1, first_name: 'John', last_name: 'Doe', email: 'john@example.com', status: 'active', job_title: 'Java Developer' },
+      { contact_id: 2, first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com', status: 'inactive', job_title: 'JavaScript Engineer' },
+      { contact_id: 3, first_name: 'Bob', last_name: 'Johnson', email: 'bob@test.com', status: 'active', job_title: 'Python Developer' },
+      { contact_id: 4, first_name: 'Alice', last_name: 'Williams', email: null, status: 'pending', job_title: '' },
     ]
 
     it('should return all contacts when filter is empty', () => {
@@ -283,6 +283,143 @@ describe('filterEngine.js', () => {
       const result = applyAdvancedFilters(mockContacts, filter)
       expect(result).toHaveLength(2)
       expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+    })
+
+    describe('job_title field - ALL operators', () => {
+      it('should filter job_title with CONTAINS operator for "java"', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'contains', value: 'java' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('CONTAINS "java" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // Should match "Java Developer" and "JavaScript Engineer"
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+      })
+
+      it('should filter job_title with CONTAINS operator for "Java" (exact case)', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'contains', value: 'Java' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('CONTAINS "Java" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // Should be case-insensitive
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+      })
+
+      it('should filter job_title with EQUALS operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'equals', value: 'Java Developer' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('EQUALS "Java Developer" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(1)
+        expect(result[0].contact_id).toBe(1)
+      })
+
+      it('should filter job_title with NOT_EQUALS operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'not_equals', value: 'Java Developer' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('NOT_EQUALS "Java Developer" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // JavaScript Engineer and Python Developer (empty is excluded)
+        expect(result.map(c => c.contact_id).sort()).toEqual([2, 3])
+      })
+
+      it('should filter job_title with STARTS_WITH operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'starts_with', value: 'Java' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('STARTS_WITH "Java" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // Java Developer and JavaScript Engineer
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+      })
+
+      it('should filter job_title with ENDS_WITH operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'ends_with', value: 'Developer' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('ENDS_WITH "Developer" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // Java Developer and Python Developer
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 3])
+      })
+
+      it('should filter job_title with NOT_CONTAINS operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'not_contains', value: 'Python' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('NOT_CONTAINS "Python" results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(2) // Java Developer and JavaScript Engineer (empty is excluded)
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 2])
+      })
+
+      it('should filter job_title with IS_EMPTY operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'is_empty', value: '' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('IS_EMPTY results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(1) // Alice with empty job_title
+        expect(result[0].contact_id).toBe(4)
+      })
+
+      it('should filter job_title with IS_NOT_EMPTY operator', () => {
+        const filter = {
+          groups: [{
+            logicalOperator: 'AND',
+            conditions: [
+              { field: 'job_title', operator: 'is_not_empty', value: '' }
+            ]
+          }]
+        }
+        const result = applyAdvancedFilters(mockContacts, filter)
+        console.log('IS_NOT_EMPTY results:', result.map(c => ({ id: c.contact_id, job_title: c.job_title })))
+        expect(result).toHaveLength(3) // All except Alice
+        expect(result.map(c => c.contact_id).sort()).toEqual([1, 2, 3])
+      })
     })
   })
 
