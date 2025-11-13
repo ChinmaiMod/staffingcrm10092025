@@ -246,10 +246,10 @@ beforeAll(() => {
           
           return {
             ...result,
-            eq: (field) => ({
+            eq: () => ({
               ...result,
               eq: () => result,
-              not: (field2, op) => ({
+              not: () => ({
                 is: () => result,
               }),
             }),

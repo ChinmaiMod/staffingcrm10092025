@@ -28,4 +28,23 @@ module.exports = {
       version: 'detect',
     },
   },
+  overrides: [
+    {
+      files: ['**/*.test.js', '**/*.test.jsx', '**/*.spec.js', '**/*.spec.jsx'],
+      env: {
+        jest: true,
+      },
+      globals: {
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        beforeEach: 'readonly',
+        afterAll: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
+  ],
 };

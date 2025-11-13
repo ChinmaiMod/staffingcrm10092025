@@ -66,7 +66,7 @@ export default function ProtectedRoute({ children, requireRole }) {
           textAlign: 'center'
         }}>
           <h2>Access Denied</h2>
-          <p>You don't have permission to access this page.</p>
+          <p>You don&apos;t have permission to access this page.</p>
           <p>Required role: <strong>{requireRole}</strong></p>
           <p>Your role: <strong>{userRole || 'None'}</strong></p>
         </div>

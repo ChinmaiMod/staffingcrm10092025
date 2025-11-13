@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../api/supabaseClient'
-import { validateEmail, validatePassword, validatePasswordConfirmation } from '../../utils/validators'
+import { validatePassword, validatePasswordConfirmation } from '../../utils/validators'
 import '../Auth/Auth.css'
 
 export default function AcceptInvitation() {
@@ -205,7 +205,7 @@ export default function AcceptInvitation() {
       <div className="auth-card">
         <h1>Accept Invitation</h1>
         <p className="auth-subtitle">
-          You've been invited to join <strong>{invitation?.tenants?.company_name}</strong>
+          You&apos;ve been invited to join <strong>{invitation?.tenants?.company_name}</strong>
         </p>
 
         {error && <div className="alert alert-error">{error}</div>}
