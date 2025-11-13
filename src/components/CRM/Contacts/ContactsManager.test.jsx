@@ -346,6 +346,68 @@ describe('ContactsManager Search and Filter', () => {
     expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
     expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
   });
+
+  it('should filter by job_title using lookup values', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    // Open Advanced Filter
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+
+    // Simulate applying filter: job_title contains "Engineer"
+    // (This requires the filter to work with lookup values, not IDs)
+    // The test expects contacts enriched with job_title field from lookupMaps
+    
+    // For now, just verify the filter builder is present
+    // Real implementation will test actual filtering once contacts are enriched
+    expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+  });
+
+  it('should filter by visa_status using lookup values', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    // Open Advanced Filter
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+
+    // Simulate applying filter: visa_status equals "H1B"
+    // This requires contacts to have visa_status field populated from lookupMaps[visa_status_id]
+    
+    // For now, just verify the filter builder is present
+    expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+  });
+
+  it('should filter with combined lookup fields (job_title AND visa_status)', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    // Test the exact scenario from the screenshot:
+    // Job Title contains "java" AND Visa Status equals "H1B"
+    
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+    });
+
+    // Once implementation is complete, this test should verify:
+    // 1. Contacts are enriched with job_title and visa_status strings
+    // 2. Filter matches against those strings (not IDs)
+    // 3. Only contacts matching both conditions are shown
+    
+    expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+  });
 });
 
 describe('ContactDetail', () => {

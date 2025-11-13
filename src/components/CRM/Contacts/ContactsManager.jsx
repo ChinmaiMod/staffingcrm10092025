@@ -126,6 +126,7 @@ export default function ContactsManager() {
 
     fetchAllLookups()
   }, [tenant?.tenant_id])
+  
   const [searchParams, setSearchParams] = useSearchParams()
   const { session, profile } = useAuth()
   const [contacts, setContacts] = useState([])
@@ -246,13 +247,20 @@ export default function ContactsManager() {
           status: contact.workflow_status?.workflow_status || 'Unknown',
           status_code: contact.workflow_status_id || null,
           visa_status_id: contact.visa_status_id || null,
+          visa_status: lookupMaps.visa_status?.[contact.visa_status_id] || '',  // Add resolved visa status for filtering
           job_title_id: contact.job_title_id || null,
+          job_title: lookupMaps.job_title?.[contact.job_title_id] || '',  // Add resolved job title for filtering
           type_of_roles_id: contact.type_of_roles_id || null,
           country_id: contact.country_id || null,
+          country: lookupMaps.countries?.[contact.country_id] || '',  // Add resolved country for filtering
           state_id: contact.state_id || null,
+          state: lookupMaps.states?.[contact.state_id] || '',  // Add resolved state for filtering
           city_id: contact.city_id || null,
+          city: lookupMaps.cities?.[contact.city_id] || '',  // Add resolved city for filtering
           years_of_experience_id: contact.years_of_experience_id || null,
+          years_experience: lookupMaps.years_of_experience?.[contact.years_of_experience_id] || '',  // Add resolved years for filtering
           referral_source_id: contact.referral_source_id || null,
+          referral_source: lookupMaps.referral_sources?.[contact.referral_source_id] || '',  // Add resolved referral source for filtering
           reason_for_contact_id: contact.reason_for_contact_id || null,
           reason_for_contact_label:
             contact.reason_for_contact?.reason_for_contact ||
