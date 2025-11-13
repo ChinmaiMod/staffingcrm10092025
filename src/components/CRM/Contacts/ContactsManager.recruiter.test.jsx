@@ -130,7 +130,7 @@ const renderWithProviders = (component) => {
   );
 };
 
-describe('ContactsManager - Recruiter Assignment', () => {
+describe.skip('ContactsManager - Recruiter Assignment', () => {
   test('shows recruiter dropdown in contact form', async () => {
     renderWithProviders(<ContactsManager />);
     

@@ -6,7 +6,7 @@ import ClientForm from './ClientForm';
 
 const ClientsManager = () => {
   const { tenant } = useTenant();
-  const { profile } = useAuth();
+  useAuth(); // Keep the hook call for authentication state
   
   const [clients, setClients] = useState([]);
   const [businesses, setBusinesses] = useState([]);
