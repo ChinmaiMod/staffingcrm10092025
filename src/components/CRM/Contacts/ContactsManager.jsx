@@ -73,6 +73,7 @@ export default function ContactsManager() {
     async function fetchAllLookups() {
       if (!tenant?.tenant_id) {
         setLookupMaps({})
+        lookupMapsRef.current = {}
         return
       }
 
@@ -112,7 +113,8 @@ export default function ContactsManager() {
         }
       }
 
-      setLookupMaps(maps)
+  setLookupMaps(maps)
+  lookupMapsRef.current = maps
       
       // Also populate workflow statuses array for dropdown
       if (maps.workflow_status) {
@@ -160,6 +162,7 @@ export default function ContactsManager() {
   // Bug #13 fix: Add refs for cleanup to prevent memory leaks
   const isMountedRef = useRef(true)
   const abortControllerRef = useRef(null)
+  const lookupMapsRef = useRef({})
 
   const loadContacts = useCallback(async () => {
     // Bug #13 fix: Abort previous request if still pending
@@ -218,7 +221,9 @@ export default function ContactsManager() {
         throw contactsError
       }
 
-      const normalizedContacts = (data || []).map((contact) => {
+  const currentLookups = lookupMapsRef.current || {}
+
+  const normalizedContacts = (data || []).map((contact) => {
         const rawBusinessId = contact.business_id
         const resolvedBusinessId = typeof rawBusinessId === 'string'
           ? rawBusinessId
@@ -247,24 +252,24 @@ export default function ContactsManager() {
           status: contact.workflow_status?.workflow_status || 'Unknown',
           status_code: contact.workflow_status_id || null,
           visa_status_id: contact.visa_status_id || null,
-          visa_status: lookupMaps.visa_status?.[contact.visa_status_id] || '',  // Add resolved visa status for filtering
+          visa_status: currentLookups.visa_status?.[contact.visa_status_id] || '',  // Add resolved visa status for filtering
           job_title_id: contact.job_title_id || null,
-          job_title: lookupMaps.job_title?.[contact.job_title_id] || '',  // Add resolved job title for filtering
+          job_title: currentLookups.job_title?.[contact.job_title_id] || '',  // Add resolved job title for filtering
           type_of_roles_id: contact.type_of_roles_id || null,
           country_id: contact.country_id || null,
-          country: lookupMaps.countries?.[contact.country_id] || '',  // Add resolved country for filtering
+          country: currentLookups.countries?.[contact.country_id] || '',  // Add resolved country for filtering
           state_id: contact.state_id || null,
-          state: lookupMaps.states?.[contact.state_id] || '',  // Add resolved state for filtering
+          state: currentLookups.states?.[contact.state_id] || '',  // Add resolved state for filtering
           city_id: contact.city_id || null,
-          city: lookupMaps.cities?.[contact.city_id] || '',  // Add resolved city for filtering
+          city: currentLookups.cities?.[contact.city_id] || '',  // Add resolved city for filtering
           years_of_experience_id: contact.years_of_experience_id || null,
-          years_experience: lookupMaps.years_of_experience?.[contact.years_of_experience_id] || '',  // Add resolved years for filtering
+          years_experience: currentLookups.years_of_experience?.[contact.years_of_experience_id] || '',  // Add resolved years for filtering
           referral_source_id: contact.referral_source_id || null,
-          referral_source: lookupMaps.referral_sources?.[contact.referral_source_id] || '',  // Add resolved referral source for filtering
+          referral_source: currentLookups.referral_sources?.[contact.referral_source_id] || '',  // Add resolved referral source for filtering
           reason_for_contact_id: contact.reason_for_contact_id || null,
           reason_for_contact_label:
             contact.reason_for_contact?.reason_for_contact ||
-            (contact.reason_for_contact_id ? lookupMaps.reason_for_contact?.[contact.reason_for_contact_id] || '' : ''),
+            (contact.reason_for_contact_id ? currentLookups.reason_for_contact?.[contact.reason_for_contact_id] || '' : ''),
           role_types: roleTypes,
           remarks: contact.remarks,
           referred_by: contact.referred_by || null,
@@ -299,8 +304,51 @@ export default function ContactsManager() {
       setContacts([])
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    if (!lookupMaps || Object.keys(lookupMaps).length === 0) {
+      return
+    }
+
+    setContacts((prevContacts) => {
+      if (!Array.isArray(prevContacts) || prevContacts.length === 0) {
+        return prevContacts
+      }
+
+      return prevContacts.map((contact) => {
+        const updatedReasonLabel = contact.reason_for_contact_id
+          ? lookupMaps.reason_for_contact?.[contact.reason_for_contact_id] || contact.reason_for_contact_label || ''
+          : contact.reason_for_contact_label || ''
+
+        return {
+          ...contact,
+          visa_status: contact.visa_status_id
+            ? lookupMaps.visa_status?.[contact.visa_status_id] || ''
+            : '',
+          job_title: contact.job_title_id
+            ? lookupMaps.job_title?.[contact.job_title_id] || ''
+            : '',
+          country: contact.country_id
+            ? lookupMaps.countries?.[contact.country_id] || ''
+            : '',
+          state: contact.state_id
+            ? lookupMaps.states?.[contact.state_id] || ''
+            : '',
+          city: contact.city_id
+            ? lookupMaps.cities?.[contact.city_id] || ''
+            : '',
+          years_experience: contact.years_of_experience_id
+            ? lookupMaps.years_of_experience?.[contact.years_of_experience_id] || ''
+            : '',
+          referral_source: contact.referral_source_id
+            ? lookupMaps.referral_sources?.[contact.referral_source_id] || ''
+            : '',
+          reason_for_contact_label: updatedReasonLabel
+        }
+      })
+    })
+  }, [lookupMaps])
 
   useEffect(() => {
     if (!tenant?.tenant_id) {

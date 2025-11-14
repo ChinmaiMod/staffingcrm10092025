@@ -372,6 +372,40 @@ describe('ContactsManager Search and Filter', () => {
     expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
   });
 
+  it('filters contacts by job title via advanced filter builder', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    // Both contacts visible initially
+    expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Jane\s+Smith/)).toBeInTheDocument();
+
+    // Open Advanced Filter
+    const advancedFilterBtn = screen.getByRole('button', { name: /advanced filter/i });
+    fireEvent.click(advancedFilterBtn);
+
+    const filterHeading = await screen.findByText(/Advanced Filter Builder/i);
+    const filterBuilder = filterHeading.closest('.advanced-filter-builder');
+    const conditionRow = filterBuilder.querySelector('.condition-row');
+
+    const fieldSelect = within(conditionRow).getByDisplayValue('First Name');
+    fireEvent.change(fieldSelect, { target: { value: 'job_title' } });
+
+  const operatorSelect = within(conditionRow).getByDisplayValue('Equals');
+    fireEvent.change(operatorSelect, { target: { value: 'contains' } });
+
+    const valueInput = within(conditionRow).getByPlaceholderText(/Enter value/i);
+    fireEvent.change(valueInput, { target: { value: 'java' } });
+
+    const applyButton = within(filterBuilder).getByRole('button', { name: /Apply Filters/i });
+    fireEvent.click(applyButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/John\s+Doe/)).toBeInTheDocument();
+      expect(screen.queryByText(/Jane\s+Smith/)).not.toBeInTheDocument();
+    });
+  });
+
   it('should filter by visa_status using lookup values', async () => {
     renderWithProviders(<ContactsManager />);
     await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
@@ -431,6 +465,7 @@ describe('ContactDetail', () => {
     renderWithProviders(<ContactDetail contact={contact} onClose={() => {}} />);
     expect(screen.getByText(/Jane/)).toBeInTheDocument();
     expect(screen.getByText(/Smith/)).toBeInTheDocument();
+
     expect(screen.getByText(/jane@example.com/)).toBeInTheDocument();
     expect(screen.getByText(/Beta LLC/)).toBeInTheDocument();
     expect(screen.getByText(/Initial Contact/)).toBeInTheDocument();
