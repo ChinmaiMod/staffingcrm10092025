@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthProvider'
 import { TenantProvider } from './contexts/TenantProvider'
+import { PermissionsProvider } from './contexts/PermissionsProvider'
 
 // Auth Components
 import Login from './components/Auth/Login'
@@ -33,7 +34,8 @@ function App() {
   return (
     <AuthProvider>
       <TenantProvider>
-        <Routes>
+        <PermissionsProvider>
+          <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
@@ -124,7 +126,8 @@ function App() {
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+          </Routes>
+        </PermissionsProvider>
       </TenantProvider>
     </AuthProvider>
   )

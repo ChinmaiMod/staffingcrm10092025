@@ -30,6 +30,30 @@ vi.mock('../../../contexts/AuthProvider', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
+const baseClientPermissions = {
+  canViewSection: true,
+  canAccessDashboard: true,
+  canAccessInfo: true,
+  canAccessJobOrders: true,
+  canViewLinkedContacts: true,
+  canCreateClients: true,
+  canEditClients: true,
+  canDeleteClients: true,
+  canCreateJobOrders: true,
+  canEditJobOrders: true,
+  canDeleteJobOrders: true,
+};
+
+const mockUsePermissions = vi.fn(() => ({
+  loading: false,
+  clientPermissions: { ...baseClientPermissions },
+}));
+
+vi.mock('../../../contexts/PermissionsProvider', () => ({
+  usePermissions: () => mockUsePermissions(),
+  PermissionsProvider: ({ children }) => children,
+}));
+
 const createSelectResponse = (rows) => ({
   select: () => {
     const result = { data: rows, error: null };
@@ -126,6 +150,13 @@ const renderWithProviders = (component) => {
 };
 
 describe('ClientsManager', () => {
+  beforeEach(() => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: { ...baseClientPermissions },
+    });
+  });
+
   test('renders clients list with title', async () => {
     renderWithProviders(<ClientsManager />);
     
@@ -257,6 +288,44 @@ describe('ClientsManager', () => {
     await waitFor(() => {
       expect(screen.getByText(/Edit Client/i)).toBeInTheDocument();
       expect(screen.getByDisplayValue(/Acme Corporation/i)).toBeInTheDocument();
+    });
+  });
+
+  test('hides client actions when user lacks permissions', async () => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: {
+        ...baseClientPermissions,
+        canCreateClients: false,
+        canEditClients: false,
+        canDeleteClients: false,
+      },
+    });
+
+    renderWithProviders(<ClientsManager />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Add Client/i })).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /Edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Delete/i })).not.toBeInTheDocument();
+  });
+
+  test('shows access denied when client info permission missing', async () => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: {
+        ...baseClientPermissions,
+        canAccessInfo: false,
+        canViewSection: false,
+      },
+    });
+
+    renderWithProviders(<ClientsManager />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/You do not have permission to view client information/i)).toBeInTheDocument();
     });
   });
 });

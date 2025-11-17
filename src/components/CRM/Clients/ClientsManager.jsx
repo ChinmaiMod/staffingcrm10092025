@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo, useId } from 'react';
 import { useTenant } from '../../../contexts/TenantProvider';
 import { useAuth } from '../../../contexts/AuthProvider';
+import { usePermissions } from '../../../contexts/PermissionsProvider';
 import { supabase } from '../../../api/supabaseClient';
 import ClientForm from './ClientForm';
 
 const ClientsManager = () => {
   const { tenant } = useTenant();
   useAuth(); // Keep the hook call for authentication state
+  const { clientPermissions, loading: permissionsLoading } = usePermissions();
   
   const [clients, setClients] = useState([]);
   const [businesses, setBusinesses] = useState([]);
@@ -23,9 +25,19 @@ const ClientsManager = () => {
   const statusFilterId = useId();
   const businessFilterId = useId();
 
+  const canViewClients = clientPermissions.canAccessInfo;
+  const canCreateClients = clientPermissions.canCreateClients;
+  const canEditClients = clientPermissions.canEditClients;
+  const canDeleteClients = clientPermissions.canDeleteClients;
+
   // Load clients
   useEffect(() => {
-    if (!tenant?.tenant_id) return;
+    if (!tenant?.tenant_id || !canViewClients) {
+      if (!canViewClients) {
+        setLoading(false);
+      }
+      return;
+    }
     
     const loadClients = async () => {
       try {
@@ -51,11 +63,11 @@ const ClientsManager = () => {
     };
 
     loadClients();
-  }, [tenant?.tenant_id]);
+  }, [tenant?.tenant_id, canViewClients]);
 
   // Load businesses
   useEffect(() => {
-    if (!tenant?.tenant_id) return;
+  if (!tenant?.tenant_id || !canViewClients) return;
     
     const loadBusinesses = async () => {
       try {
@@ -73,7 +85,7 @@ const ClientsManager = () => {
     };
 
     loadBusinesses();
-  }, [tenant?.tenant_id]);
+  }, [tenant?.tenant_id, canViewClients]);
 
   // Filter clients
   const filteredClients = useMemo(() => {
@@ -101,16 +113,28 @@ const ClientsManager = () => {
   }, [clients, searchTerm, statusFilter, businessFilter]);
 
   const handleAddClient = () => {
+    if (!canCreateClients) {
+      setError('You do not have permission to create clients.');
+      return;
+    }
     setEditingClient(null);
     setShowModal(true);
   };
 
   const handleEditClient = (client) => {
+    if (!canEditClients) {
+      setError('You do not have permission to edit clients.');
+      return;
+    }
     setEditingClient(client);
     setShowModal(true);
   };
 
   const handleDeleteClient = async (clientId) => {
+    if (!canDeleteClients) {
+      setError('You do not have permission to delete clients.');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this client?')) return;
 
     try {
@@ -132,6 +156,10 @@ const ClientsManager = () => {
   const handleSubmitClient = async (clientData) => {
     try {
       if (editingClient) {
+        if (!canEditClients) {
+          setError('You do not have permission to edit clients.');
+          return;
+        }
         // Update existing client
         const { error } = await supabase
           .from('clients')
@@ -150,6 +178,10 @@ const ClientsManager = () => {
             : c
         ));
       } else {
+        if (!canCreateClients) {
+          setError('You do not have permission to create clients.');
+          return;
+        }
         // Insert new client
         const { data, error } = await supabase
           .from('clients')
@@ -181,6 +213,21 @@ const ClientsManager = () => {
     setEditingClient(null);
   };
 
+  if (permissionsLoading) {
+    return <div className="loading">Loading permissions...</div>;
+  }
+
+  if (!canViewClients) {
+    return (
+      <div className="clients-manager">
+        <div className="error">
+          <h2>Access Restricted</h2>
+          <p>You do not have permission to view client information.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return <div className="loading">Loading clients...</div>;
   }
@@ -193,9 +240,11 @@ const ClientsManager = () => {
     <div className="clients-manager">
       <div className="header">
         <h1>Client Management</h1>
-        <button onClick={handleAddClient} className="btn btn-primary">
-          Add Client
-        </button>
+        {canCreateClients && (
+          <button onClick={handleAddClient} className="btn btn-primary">
+            Add Client
+          </button>
+        )}
       </div>
 
       <div className="filters">
@@ -297,18 +346,22 @@ const ClientsManager = () => {
                     )}
                   </td>
                   <td className="actions">
-                    <button
-                      onClick={() => handleEditClient(client)}
-                      className="btn btn-sm btn-edit"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClient(client.client_id)}
-                      className="btn btn-sm btn-delete"
-                    >
-                      Delete
-                    </button>
+                    {canEditClients && (
+                      <button
+                        onClick={() => handleEditClient(client)}
+                        className="btn btn-sm btn-edit"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {canDeleteClients && (
+                      <button
+                        onClick={() => handleDeleteClient(client.client_id)}
+                        className="btn btn-sm btn-delete"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

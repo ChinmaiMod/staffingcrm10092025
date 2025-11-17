@@ -30,6 +30,30 @@ vi.mock('../../../contexts/AuthProvider', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
+const baseClientPermissions = {
+  canViewSection: true,
+  canAccessDashboard: true,
+  canAccessInfo: true,
+  canAccessJobOrders: true,
+  canViewLinkedContacts: true,
+  canCreateClients: true,
+  canEditClients: true,
+  canDeleteClients: true,
+  canCreateJobOrders: true,
+  canEditJobOrders: true,
+  canDeleteJobOrders: true,
+};
+
+const mockUsePermissions = vi.fn(() => ({
+  loading: false,
+  clientPermissions: { ...baseClientPermissions },
+}));
+
+vi.mock('../../../contexts/PermissionsProvider', () => ({
+  usePermissions: () => mockUsePermissions(),
+  PermissionsProvider: ({ children }) => children,
+}));
+
 const createSelectResponse = (rows) => ({
   select: () => {
     const result = { data: rows, error: null };
@@ -339,6 +363,13 @@ beforeAll(() => {
   });
 });
 
+beforeEach(() => {
+  mockUsePermissions.mockReturnValue({
+    loading: false,
+    clientPermissions: { ...baseClientPermissions },
+  });
+});
+
 const renderWithProviders = (component) => {
   return render(
     <MemoryRouter>
@@ -445,6 +476,24 @@ describe('ClientDashboard', () => {
     await waitFor(() => {
       // Should update stats based on date range
       expect(screen.getByText(/New Clients This Week/i)).toBeInTheDocument();
+    });
+  });
+
+  test('shows access denied message when dashboard permission missing', async () => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: {
+        ...baseClientPermissions,
+        canAccessDashboard: false,
+      },
+    });
+
+    renderWithProviders(<ClientDashboard />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/You do not have permission to view the client dashboard/i)
+      ).toBeInTheDocument();
     });
   });
 

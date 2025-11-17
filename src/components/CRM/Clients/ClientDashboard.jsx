@@ -1,9 +1,11 @@
 import { useState, useEffect, useId } from 'react';
 import { useTenant } from '../../../contexts/TenantProvider';
+import { usePermissions } from '../../../contexts/PermissionsProvider';
 import { supabase } from '../../../api/supabaseClient';
 
 const ClientDashboard = () => {
   const { tenant } = useTenant();
+  const { clientPermissions, loading: permissionsLoading } = usePermissions();
   
   const [loading, setLoading] = useState(true);
   const [businesses, setBusinesses] = useState([]);
@@ -32,9 +34,16 @@ const ClientDashboard = () => {
   const startDateId = useId();
   const endDateId = useId();
 
+  const canViewDashboard = clientPermissions.canAccessDashboard && clientPermissions.canViewLinkedContacts;
+
   // Load businesses and teams
   useEffect(() => {
-    if (!tenant?.tenant_id) return;
+    if (!tenant?.tenant_id || !canViewDashboard) {
+      if (!canViewDashboard) {
+        setLoading(false);
+      }
+      return;
+    }
     
     const loadOptions = async () => {
       try {
@@ -51,11 +60,16 @@ const ClientDashboard = () => {
     };
 
     loadOptions();
-  }, [tenant?.tenant_id]);
+  }, [tenant?.tenant_id, canViewDashboard]);
 
   // Load dashboard statistics
   useEffect(() => {
-    if (!tenant?.tenant_id) return;
+    if (!tenant?.tenant_id || !canViewDashboard) {
+      if (!canViewDashboard) {
+        setLoading(false);
+      }
+      return;
+    }
     
     const loadStats = async () => {
       try {
@@ -233,7 +247,22 @@ const ClientDashboard = () => {
     };
 
     loadStats();
-  }, [tenant?.tenant_id, businessFilter, teamFilter, startDate, endDate]);
+  }, [tenant?.tenant_id, businessFilter, teamFilter, startDate, endDate, canViewDashboard]);
+
+  if (permissionsLoading) {
+    return <div className="loading">Loading dashboard permissions...</div>;
+  }
+
+  if (!canViewDashboard) {
+    return (
+      <div className="client-dashboard">
+        <div className="error">
+          <h2>Access Restricted</h2>
+          <p>You do not have permission to view the client dashboard.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="loading">Loading dashboard...</div>;

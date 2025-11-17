@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useId } from 'react'
 import { useTenant } from '../../../contexts/TenantProvider'
 import { useAuth } from '../../../contexts/AuthProvider'
+import { usePermissions } from '../../../contexts/PermissionsProvider'
 import { supabase } from '../../../api/supabaseClient'
 import { logger } from '../../../utils/logger'
 import JobOrderForm from './JobOrderForm'
@@ -8,6 +9,7 @@ import JobOrderForm from './JobOrderForm'
 export default function JobOrdersManager() {
   const { tenant } = useTenant()
   useAuth()
+  const { clientPermissions, loading: permissionsLoading } = usePermissions()
   const [jobOrders, setJobOrders] = useState([])
   const [clients, setClients] = useState([])
   const [businesses, setBusinesses] = useState([])
@@ -28,8 +30,13 @@ export default function JobOrdersManager() {
   const clientFilterId = useId()
   const businessFilterId = useId()
 
+  const canViewJobOrders = clientPermissions.canAccessJobOrders
+  const canCreateJobOrders = clientPermissions.canCreateJobOrders
+  const canEditJobOrders = clientPermissions.canEditJobOrders
+  const canDeleteJobOrders = clientPermissions.canDeleteJobOrders
+
   useEffect(() => {
-    if (!tenant?.tenant_id) {
+    if (!tenant?.tenant_id || !canViewJobOrders) {
       setJobOrders([])
       setLoading(false)
       return
@@ -37,14 +44,14 @@ export default function JobOrdersManager() {
 
     loadJobOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, canViewJobOrders])
 
   useEffect(() => {
-    if (!tenant?.tenant_id) return
+    if (!tenant?.tenant_id || !canViewJobOrders) return
     loadClients()
     loadBusinesses()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, canViewJobOrders])
 
   const loadJobOrders = async () => {
     try {
@@ -143,16 +150,28 @@ export default function JobOrdersManager() {
   }, [jobOrders, searchTerm, statusFilter, priorityFilter, clientFilter, businessFilter])
 
   const handleAddJobOrder = () => {
+    if (!canCreateJobOrders) {
+      setError('You do not have permission to create job orders.')
+      return
+    }
     setEditingJobOrder(null)
     setShowModal(true)
   }
 
   const handleEditJobOrder = (jobOrder) => {
+    if (!canEditJobOrders) {
+      setError('You do not have permission to edit job orders.')
+      return
+    }
     setEditingJobOrder(jobOrder)
     setShowModal(true)
   }
 
   const handleDeleteJobOrder = async (jobOrderId) => {
+    if (!canDeleteJobOrders) {
+      setError('You do not have permission to delete job orders.')
+      return
+    }
     if (!confirm('Are you sure you want to delete this job order?')) return
 
     try {
@@ -173,6 +192,10 @@ export default function JobOrdersManager() {
   const handleSubmitJobOrder = async (jobOrderData) => {
     try {
       if (editingJobOrder) {
+        if (!canEditJobOrders) {
+          setError('You do not have permission to edit job orders.')
+          return
+        }
         const { error } = await supabase
           .from('job_orders')
           .update({
@@ -189,6 +212,10 @@ export default function JobOrdersManager() {
             : jo
         ))
       } else {
+        if (!canCreateJobOrders) {
+          setError('You do not have permission to create job orders.')
+          return
+        }
         const { data, error } = await supabase
           .from('job_orders')
           .insert({
@@ -222,6 +249,21 @@ export default function JobOrdersManager() {
     setEditingJobOrder(null)
   }
 
+  if (permissionsLoading) {
+    return <div className="loading">Loading permissions...</div>
+  }
+
+  if (!canViewJobOrders) {
+    return (
+      <div className="job-orders-manager">
+        <div className="error">
+          <h2>Access Restricted</h2>
+          <p>You do not have permission to view job orders.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return <div className="loading">Loading job orders...</div>
   }
@@ -234,9 +276,11 @@ export default function JobOrdersManager() {
     <div className="job-orders-manager">
       <div className="header">
         <h1>Job Orders Management</h1>
-        <button onClick={handleAddJobOrder} className="btn btn-primary">
-          + New Job Order
-        </button>
+        {canCreateJobOrders && (
+          <button onClick={handleAddJobOrder} className="btn btn-primary">
+            + New Job Order
+          </button>
+        )}
       </div>
 
       <div className="filters">
@@ -360,18 +404,22 @@ export default function JobOrdersManager() {
                   <td>{jobOrder.filled_count || 0} / {jobOrder.openings_count || 1}</td>
                   <td>{new Date(jobOrder.created_at).toLocaleDateString()}</td>
                   <td className="actions">
-                    <button
-                      onClick={() => handleEditJobOrder(jobOrder)}
-                      className="btn btn-sm btn-edit"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteJobOrder(jobOrder.job_order_id)}
-                      className="btn btn-sm btn-delete"
-                    >
-                      Delete
-                    </button>
+                    {canEditJobOrders && (
+                      <button
+                        onClick={() => handleEditJobOrder(jobOrder)}
+                        className="btn btn-sm btn-edit"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {canDeleteJobOrders && (
+                      <button
+                        onClick={() => handleDeleteJobOrder(jobOrder.job_order_id)}
+                        className="btn btn-sm btn-delete"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

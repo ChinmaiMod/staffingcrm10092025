@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, Routes, Route } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthProvider'
+import { usePermissions } from '../../contexts/PermissionsProvider'
 import Dashboard from './Dashboard/Dashboard'
 import ContactsManager from './Contacts/ContactsManager'
 import ClientDashboard from './Clients/ClientDashboard'
@@ -18,6 +19,7 @@ import './CRM.css'
 export default function CRMApp() {
   const navigate = useNavigate()
   const { signOut, profile } = useAuth()
+  const { clientPermissions, loading: permissionsLoading } = usePermissions()
   const [activeMenu, setActiveMenu] = useState('dashboard')
   const [expandedMenus, setExpandedMenus] = useState({})
 
@@ -38,7 +40,7 @@ export default function CRMApp() {
     navigate('/login')
   }
 
-  const menuItems = [
+  const baseMenuItems = useMemo(() => ([
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/crm' },
     { id: 'contacts', label: 'Contacts', icon: '👥', path: '/crm/contacts' },
     { 
@@ -59,7 +61,42 @@ export default function CRMApp() {
     { id: 'email-templates', label: 'Email Templates', icon: '📧', path: '/crm/email-templates' },
     { id: 'feedback', label: 'Suggestions/Ideas ?', icon: '💡', path: '/crm/feedback' },
     { id: 'issue-report', label: 'Report an Issue', icon: '🐛', path: '/crm/issue-report' },
-  ]
+  ]), [])
+
+  const menuItems = useMemo(() => {
+    return baseMenuItems.reduce((acc, item) => {
+      if (item.id !== 'clients') {
+        acc.push(item)
+        return acc
+      }
+
+      if (!clientPermissions.canViewSection) {
+        return acc
+      }
+
+      const filteredSubItems = (item.subItems || []).filter((subItem) => {
+        if (subItem.id === 'client-dashboard') return clientPermissions.canAccessDashboard
+        if (subItem.id === 'client-information') return clientPermissions.canAccessInfo
+        if (subItem.id === 'job-orders') return clientPermissions.canAccessJobOrders
+        return true
+      })
+
+      if (filteredSubItems.length === 0) {
+        return acc
+      }
+
+      acc.push({ ...item, subItems: filteredSubItems })
+      return acc
+    }, [])
+  }, [baseMenuItems, clientPermissions])
+
+  if (permissionsLoading) {
+    return (
+      <div className="crm-loading">
+        <p>Loading workspace permissions...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="crm-container">

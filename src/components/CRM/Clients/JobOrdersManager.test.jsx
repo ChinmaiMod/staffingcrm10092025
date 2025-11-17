@@ -81,6 +81,30 @@ vi.mock('../../../contexts/AuthProvider', () => ({
   AuthProvider: ({ children }) => children,
 }))
 
+const baseClientPermissions = {
+  canViewSection: true,
+  canAccessDashboard: true,
+  canAccessInfo: true,
+  canAccessJobOrders: true,
+  canViewLinkedContacts: true,
+  canCreateClients: true,
+  canEditClients: true,
+  canDeleteClients: true,
+  canCreateJobOrders: true,
+  canEditJobOrders: true,
+  canDeleteJobOrders: true,
+}
+
+const mockUsePermissions = vi.fn(() => ({
+  loading: false,
+  clientPermissions: { ...baseClientPermissions },
+}))
+
+vi.mock('../../../contexts/PermissionsProvider', () => ({
+  usePermissions: () => mockUsePermissions(),
+  PermissionsProvider: ({ children }) => children,
+}))
+
 const renderWithProviders = (component) => {
   return render(
     <MemoryRouter>
@@ -96,6 +120,11 @@ describe('JobOrdersManager', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: { ...baseClientPermissions },
+    })
 
     const { supabase } = await import('../../../api/supabaseClient')
     mockSupabase = supabase
@@ -406,5 +435,42 @@ describe('JobOrdersManager', () => {
     )
 
     confirmSpy.mockRestore()
+  })
+
+  it('hides job order actions when user lacks permissions', async () => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: {
+        ...baseClientPermissions,
+        canCreateJobOrders: false,
+        canEditJobOrders: false,
+        canDeleteJobOrders: false,
+      },
+    })
+
+    renderWithProviders(<JobOrdersManager />)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /new job order/i })).not.toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+  })
+
+  it('shows access denied when job order permission missing', async () => {
+    mockUsePermissions.mockReturnValue({
+      loading: false,
+      clientPermissions: {
+        ...baseClientPermissions,
+        canAccessJobOrders: false,
+      },
+    })
+
+    renderWithProviders(<JobOrdersManager />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/You do not have permission to view job orders/i)).toBeInTheDocument()
+    })
   })
 })

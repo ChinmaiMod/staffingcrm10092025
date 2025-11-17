@@ -15,8 +15,64 @@ interface Recipient {
   phone?: string
   business_name?: string
   status?: string
+  status_id?: string | number | null
   id?: string
   source: 'CONTACTS' | 'INTERNAL_STAFF' | 'CUSTOM'
+}
+
+const statusLookupCache = new Map<string, string | number | null>()
+
+async function resolveWorkflowStatusId(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  tenantId: string,
+  businessId: string | null,
+  statusLabel?: string | null
+): Promise<string | number | null> {
+  if (!statusLabel) return null
+
+  const normalizedLabel = statusLabel.trim().toLowerCase()
+  if (!normalizedLabel) return null
+
+  const cacheKey = `${tenantId}:${businessId || 'all'}:${normalizedLabel}`
+  if (statusLookupCache.has(cacheKey)) {
+    return statusLookupCache.get(cacheKey) ?? null
+  }
+
+  let resolvedId: string | number | null = null
+
+  if (businessId) {
+    const { data, error } = await supabaseAdmin
+      .from('workflow_status')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('business_id', businessId)
+      .ilike('workflow_status', statusLabel)
+      .limit(1)
+
+    if (error) {
+      console.error('Error looking up workflow status for business scope:', error)
+    } else if (data && data.length > 0) {
+      resolvedId = data[0].id
+    }
+  }
+
+  if (!resolvedId) {
+    const { data, error } = await supabaseAdmin
+      .from('workflow_status')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .ilike('workflow_status', statusLabel)
+      .limit(1)
+
+    if (error) {
+      console.error('Error looking up workflow status for tenant scope:', error)
+    } else if (data && data.length > 0) {
+      resolvedId = data[0].id
+    }
+  }
+
+  statusLookupCache.set(cacheKey, resolvedId ?? null)
+  return resolvedId ?? null
 }
 
 // Placeholder replacement function
@@ -94,10 +150,41 @@ serve(async (req) => {
 
         // Fetch recipients based on type
         if (notification.recipient_type === 'CONTACTS') {
-          const filters = notification.recipient_filters || {}
+          const filters = (notification.recipient_filters || {}) as Record<string, any>
+          const statusLabelFromFilters = typeof filters.status_label === 'string' && filters.status_label.trim().length > 0
+            ? filters.status_label
+            : typeof filters.status === 'string'
+              ? filters.status
+              : null
+
+          let statusIdFromFilters = filters.status_id ?? filters.statusId ?? filters.workflow_status_id ?? null
+          if (typeof statusIdFromFilters === 'string' && statusIdFromFilters.startsWith('fallback-')) {
+            statusIdFromFilters = null
+          }
+
+          if (!statusIdFromFilters && statusLabelFromFilters) {
+            statusIdFromFilters = await resolveWorkflowStatusId(
+              supabaseAdmin,
+              notification.tenant_id,
+              notification.business_id || null,
+              statusLabelFromFilters
+            )
+          }
+
           let query = supabaseAdmin
             .from('contacts')
-            .select('id, email, first_name, last_name, phone, contact_type, workflow_status, business_id')
+            .select(`
+              id,
+              email,
+              first_name,
+              last_name,
+              phone,
+              contact_type,
+              workflow_status,
+              workflow_status_id,
+              business_id,
+              workflow_status_lookup:workflow_status_id ( workflow_status )
+            `)
             .eq('tenant_id', notification.tenant_id)
             .not('email', 'is', null)
 
@@ -111,9 +198,11 @@ serve(async (req) => {
             query = query.eq('contact_type', filters.contact_type)
           }
 
-          // Apply status filter
-          if (filters.status) {
-            query = query.eq('workflow_status', filters.status)
+          // Apply status filter (prefer workflow_status_id, fallback to legacy text column)
+          if (statusIdFromFilters) {
+            query = query.eq('workflow_status_id', statusIdFromFilters)
+          } else if (statusLabelFromFilters) {
+            query = query.ilike('workflow_status', statusLabelFromFilters)
           }
 
           const { data: contacts, error: contactsError } = await query
@@ -137,6 +226,12 @@ serve(async (req) => {
             }
 
             contacts.forEach(contact => {
+              const resolvedStatusLabel =
+                contact.workflow_status_lookup?.workflow_status ||
+                contact.workflow_status ||
+                statusLabelFromFilters ||
+                ''
+
               recipients.push({
                 email: contact.email,
                 name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
@@ -144,7 +239,8 @@ serve(async (req) => {
                 last_name: contact.last_name || '',
                 phone: contact.phone || '',
                 business_name: businessMap[contact.business_id] || '',
-                status: contact.workflow_status || '',
+                status: resolvedStatusLabel,
+                status_id: contact.workflow_status_id || null,
                 id: contact.id,
                 source: 'CONTACTS'
               })

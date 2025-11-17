@@ -3,12 +3,38 @@ import { supabase } from '../../../api/supabaseClient'
 import { useTenant } from '../../../contexts/TenantProvider'
 import { useAuth } from '../../../contexts/AuthProvider'
 
+const CONTACT_TYPES = [
+  { value: 'IT_CANDIDATE', label: 'IT Candidate' },
+  { value: 'HEALTHCARE_CANDIDATE', label: 'Healthcare Candidate' },
+  { value: 'VENDOR_CLIENT', label: 'Vendor Client' },
+  { value: 'VENDOR_EMPANELMENT', label: 'Vendor Empanelment' },
+  { value: 'EMPLOYEE_INDIA', label: 'Employee - India' },
+  { value: 'EMPLOYEE_USA', label: 'Employee - USA' }
+]
+
+const DEFAULT_STATUS_LABELS = [
+  'Initial Contact',
+  'Spoke to candidate',
+  'Resume needs to be prepared',
+  'Resume prepared and sent for review',
+  'Assigned to Recruiter',
+  'Recruiter started marketing',
+  'Placed into Job'
+]
+
+const FALLBACK_STATUS_OPTIONS = DEFAULT_STATUS_LABELS.map((label, index) => ({
+  id: `fallback-status-${index}`,
+  workflow_status: label,
+  isFallback: true
+}))
+
 export default function NotificationsManager() {
   const { tenant } = useTenant()
   const { user } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [businesses, setBusinesses] = useState([])
   const [templates, setTemplates] = useState([])
+  const [statusOptions, setStatusOptions] = useState(FALLBACK_STATUS_OPTIONS)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
@@ -21,7 +47,10 @@ export default function NotificationsManager() {
     recipient_type: 'CONTACTS',
     recipient_filters: {
       contact_type: '',
-      status: ''
+      status: '',
+      status_label: '',
+      status_id: '',
+      status_option_value: ''
     },
     custom_recipients: '',
     business_id: '',
@@ -38,6 +67,37 @@ export default function NotificationsManager() {
       loadTemplates()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.tenant_id])
+
+  useEffect(() => {
+    const loadStatusOptions = async () => {
+      if (!tenant?.tenant_id) {
+        setStatusOptions(FALLBACK_STATUS_OPTIONS)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('workflow_status')
+          .select('id, workflow_status')
+          .eq('tenant_id', tenant.tenant_id)
+          .order('workflow_status', { ascending: true })
+
+        if (error) throw error
+        const options = (data || [])
+          .filter(row => row?.id && row?.workflow_status)
+          .map(row => ({
+            id: row.id,
+            workflow_status: row.workflow_status,
+            isFallback: false
+          }))
+        setStatusOptions(options.length > 0 ? options : FALLBACK_STATUS_OPTIONS)
+      } catch (statusError) {
+        console.error('Error loading workflow statuses for notifications:', statusError)
+        setStatusOptions(FALLBACK_STATUS_OPTIONS)
+      }
+    }
+
+    loadStatusOptions()
   }, [tenant?.tenant_id])
 
   const loadNotifications = async () => {
@@ -135,13 +195,21 @@ export default function NotificationsManager() {
 
       // Handle recipient filters
       if (formData.recipient_type === 'CONTACTS' || formData.recipient_type === 'INTERNAL_STAFF') {
-        const filters = {}
+  const filters = {}
         if (formData.recipient_filters.contact_type) {
           filters.contact_type = formData.recipient_filters.contact_type
         }
-        if (formData.recipient_filters.status) {
-          filters.status = formData.recipient_filters.status
+
+        if (formData.recipient_filters.status_id) {
+          filters.status_id = formData.recipient_filters.status_id
         }
+
+        const statusLabel = formData.recipient_filters.status_label || formData.recipient_filters.status
+        if (statusLabel) {
+          filters.status_label = statusLabel
+          filters.status = statusLabel // legacy compatibility for existing server logic
+        }
+
         payload.recipient_filters = filters
       } else if (formData.recipient_type === 'CUSTOM') {
         // Parse custom recipients
@@ -182,7 +250,10 @@ export default function NotificationsManager() {
       recipient_type: 'CONTACTS',
       recipient_filters: {
         contact_type: '',
-        status: ''
+        status: '',
+        status_label: '',
+        status_id: '',
+        status_option_value: ''
       },
       custom_recipients: '',
       business_id: '',
@@ -228,31 +299,14 @@ export default function NotificationsManager() {
     }
   }
 
-  const CONTACT_TYPES = [
-    { value: 'IT_CANDIDATE', label: 'IT Candidate' },
-    { value: 'HEALTHCARE_CANDIDATE', label: 'Healthcare Candidate' },
-    { value: 'VENDOR_CLIENT', label: 'Vendor Client' },
-    { value: 'VENDOR_EMPANELMENT', label: 'Vendor Empanelment' },
-    { value: 'EMPLOYEE_INDIA', label: 'Employee - India' },
-    { value: 'EMPLOYEE_USA', label: 'Employee - USA' }
-  ]
-
-  const STATUSES = [
-    'Initial Contact',
-    'Spoke to candidate',
-    'Resume needs to be prepared',
-    'Resume prepared and sent for review',
-    'Assigned to Recruiter',
-    'Recruiter started marketing',
-    'Placed into Job'
-  ]
 
   const getRecipientDescription = (notification) => {
     if (notification.recipient_type === 'CONTACTS') {
       const filters = notification.recipient_filters || {}
       let desc = 'Contacts'
       if (filters.contact_type) desc += ` (${filters.contact_type.replace(/_/g, ' ')})`
-      if (filters.status) desc += ` - Status: ${filters.status}`
+  const statusFilterLabel = filters.status_label || filters.status
+  if (statusFilterLabel) desc += ` - Status: ${statusFilterLabel}`
       return desc
     } else if (notification.recipient_type === 'INTERNAL_STAFF') {
       return 'Internal Staff'
@@ -541,7 +595,13 @@ export default function NotificationsManager() {
                       onChange={(e) => setFormData(prev => ({ 
                         ...prev, 
                         recipient_type: e.target.value,
-                        recipient_filters: { contact_type: '', status: '' },
+                        recipient_filters: { 
+                          contact_type: '',
+                          status: '',
+                          status_label: '',
+                          status_id: '',
+                          status_option_value: ''
+                        },
                         custom_recipients: ''
                       }))}
                       required
@@ -573,16 +633,67 @@ export default function NotificationsManager() {
                       <div className="form-group">
                         <label>Filter by Status</label>
                         <select
-                          value={formData.recipient_filters.status}
-                          onChange={(e) => setFormData(prev => ({ 
-                            ...prev, 
-                            recipient_filters: { ...prev.recipient_filters, status: e.target.value }
-                          }))}
+                          value={formData.recipient_filters.status_option_value || ''}
+                          onChange={(e) => {
+                            const selectedValue = e.target.value
+                            if (!selectedValue) {
+                              setFormData(prev => ({
+                                ...prev,
+                                recipient_filters: {
+                                  ...prev.recipient_filters,
+                                  status_option_value: '',
+                                  status: '',
+                                  status_label: '',
+                                  status_id: ''
+                                }
+                              }))
+                              return
+                            }
+
+                            const selectedOption = statusOptions.find(option => {
+                              const optionValue = option.id != null ? String(option.id) : option.workflow_status
+                              return optionValue === selectedValue
+                            })
+
+                            if (!selectedOption) {
+                              setFormData(prev => ({
+                                ...prev,
+                                recipient_filters: {
+                                  ...prev.recipient_filters,
+                                  status_option_value: '',
+                                  status: '',
+                                  status_label: '',
+                                  status_id: ''
+                                }
+                              }))
+                              return
+                            }
+
+                            const fallbackOption = selectedOption.isFallback
+                            const statusLabel = selectedOption.workflow_status || ''
+
+                            setFormData(prev => ({
+                              ...prev,
+                              recipient_filters: {
+                                ...prev.recipient_filters,
+                                status_option_value: selectedValue,
+                                status: statusLabel,
+                                status_label: statusLabel,
+                                status_id: fallbackOption ? '' : selectedOption.id || ''
+                              }
+                            }))
+                          }}
                         >
                           <option value="">All Statuses</option>
-                          {STATUSES.map(status => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
+                          {statusOptions.map(option => {
+                            const optionValue = option.id != null ? String(option.id) : option.workflow_status
+                            return (
+                              <option key={option.id ?? option.workflow_status} value={optionValue}>
+                                {option.workflow_status}
+                                {option.isFallback ? ' (Default)' : ''}
+                              </option>
+                            )
+                          })}
                         </select>
                       </div>
                     </>
@@ -665,7 +776,7 @@ export default function NotificationsManager() {
                          'Custom List'}
                       </strong>
                       {formData.recipient_filters.contact_type && ` (${formData.recipient_filters.contact_type.replace(/_/g, ' ')})`}
-                      {formData.recipient_filters.status && ` - ${formData.recipient_filters.status}`}
+                      {(formData.recipient_filters.status_label || formData.recipient_filters.status) && ` - ${(formData.recipient_filters.status_label || formData.recipient_filters.status)}`}
                     </div>
                   </div>
                 </div>
