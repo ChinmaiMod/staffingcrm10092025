@@ -130,91 +130,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(FALLBACK_STATUS_RECORDS)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
-  const getIdValue = (val, defaultKey = 'id') => {
-    if (val == null) return null
-    if (typeof val === 'object') {
-      if (val[defaultKey] != null) return val[defaultKey]
-      if (val.id != null) return val.id
-      if (val.value != null) return val.value
-      if (val.country_id != null) return val.country_id
-      if (val.state_id != null) return val.state_id
-      if (val.city_id != null) return val.city_id
-    }
-    return val
-  }
-  const extractReferralLabel = (option) => {
-    if (!option) return ''
-    if (typeof option === 'object') {
-      return option.referral_source || option.label || option.name || option.value || ''
-    }
-    return String(option)
-  }
-  // Load reason for contact options from DB
-  useEffect(() => {
-    async function loadReasons() {
-      if (!tenant?.tenant_id) {
-        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
-        return
-      }
-      try {
-        let query = supabase
-          .from('reason_for_contact')
-          .select('id, reason_for_contact')
-          .eq('tenant_id', tenant.tenant_id)
-        
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
-        }
-        
-        const { data, error } = await query.order('reason_for_contact', { ascending: true })
-        if (error) throw error
-        const mapped = (data || []).map(row => ({
-          id: row.id,
-          label: row.reason_for_contact,
-          reason_for_contact: row.reason_for_contact
-        }))
-        setReasonOptions(mapped.length > 0 ? mapped : FALLBACK_REASON_FOR_CONTACT_RECORDS)
-      } catch (err) {
-        console.error('Error loading reasons for contact:', err)
-        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
-      }
-    }
-    if (tenant?.tenant_id) {
-      loadReasons()
-    }
-  }, [tenant?.tenant_id, formData.business_id])
-  // Load statuses from workflow_status table
-  useEffect(() => {
-    async function loadStatuses() {
-      if (!tenant?.tenant_id) {
-        setStatusOptions(FALLBACK_STATUS_RECORDS)
-        return
-      }
-      try {
-        let query = supabase
-          .from('workflow_status')
-          .select('id, workflow_status')
-          .eq('tenant_id', tenant.tenant_id)
-        
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
-        }
-        
-        const { data, error } = await query.order('workflow_status', { ascending: true })
-        if (error) throw error
-        const statuses = (data || []).filter(row => row.id && row.workflow_status)
-        setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
-      } catch (err) {
-        console.error('Error loading workflow statuses:', err)
-        setStatusOptions(FALLBACK_STATUS_RECORDS)
-      }
-    }
-    if (tenant?.tenant_id) {
-      loadStatuses()
-    }
-  }, [tenant?.tenant_id, formData.business_id])
+  
+  // Initialize formData BEFORE useEffects that depend on it
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -260,6 +177,94 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     } : {})
   })
 
+  const getIdValue = (val, defaultKey = 'id') => {
+    if (val == null) return null
+    if (typeof val === 'object') {
+      if (val[defaultKey] != null) return val[defaultKey]
+      if (val.id != null) return val.id
+      if (val.value != null) return val.value
+      if (val.country_id != null) return val.country_id
+      if (val.state_id != null) return val.state_id
+      if (val.city_id != null) return val.city_id
+    }
+    return val
+  }
+  const extractReferralLabel = (option) => {
+    if (!option) return ''
+    if (typeof option === 'object') {
+      return option.referral_source || option.label || option.name || option.value || ''
+    }
+    return String(option)
+  }
+  // Load reason for contact options from DB
+  useEffect(() => {
+    async function loadReasons() {
+      if (!tenant?.tenant_id) {
+        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
+        return
+      }
+      try {
+        let query = supabase
+          .from('reason_for_contact')
+          .select('id, reason_for_contact')
+          .eq('tenant_id', tenant.tenant_id)
+        
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
+        }
+        
+        const { data, error } = await query.order('reason_for_contact', { ascending: true })
+        if (error) throw error
+        const mapped = (data || []).map(row => ({
+          id: row.id,
+          label: row.reason_for_contact,
+          reason_for_contact: row.reason_for_contact
+        }))
+        setReasonOptions(mapped.length > 0 ? mapped : FALLBACK_REASON_FOR_CONTACT_RECORDS)
+      } catch (err) {
+        console.error('Error loading reasons for contact:', err)
+        setReasonOptions(FALLBACK_REASON_FOR_CONTACT_RECORDS)
+      }
+    }
+    if (tenant?.tenant_id) {
+      loadReasons()
+    }
+  }, [tenant?.tenant_id, formData.business_id])
+  // Load statuses from workflow_status table
+  useEffect(() => {
+    async function loadStatuses() {
+      if (!tenant?.tenant_id) {
+        setStatusOptions(FALLBACK_STATUS_RECORDS)
+        return
+      }
+      try {
+        let query = supabase
+          .from('workflow_status')
+          .select('id, workflow_status')
+          .eq('tenant_id', tenant.tenant_id)
+        
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
+        }
+        
+        const { data, error } = await query.order('workflow_status', { ascending: true })
+        if (error) throw error
+        const statuses = (data || []).filter(row => row.id && row.workflow_status)
+        setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
+      } catch (err) {
+        console.error('Error loading workflow statuses:', err)
+        setStatusOptions(FALLBACK_STATUS_RECORDS)
+      }
+    }
+    if (tenant?.tenant_id) {
+      loadStatuses()
+    }
+  }, [tenant?.tenant_id, formData.business_id])
+
   const [availableStates, setAvailableStates] = useState([])
   const [availableCities, setAvailableCities] = useState([])
   const [countries, setCountries] = useState([])
@@ -286,9 +291,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .select('id, visa_status')
           .eq('tenant_id', tenant.tenant_id)
         
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
         }
         
         const { data, error } = await query.order('visa_status', { ascending: true })
@@ -315,9 +321,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .select('id, job_title, field')
           .eq('tenant_id', tenant.tenant_id)
         
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
         }
         
         const { data, error } = await query.order('job_title', { ascending: true })
@@ -344,9 +351,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .select('id, type_of_roles')
           .eq('tenant_id', tenant.tenant_id)
         
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
         }
         
         const { data, error } = await query.order('type_of_roles', { ascending: true })
@@ -373,9 +381,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .select('id, referral_source, refered_by')
           .eq('tenant_id', tenant.tenant_id)
         
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
         }
         
         const { data, error } = await query.order('referral_source', { ascending: true })
@@ -528,9 +537,10 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .select('id, years_of_experience, business_id')
           .eq('tenant_id', tenant.tenant_id)
         
-        // Filter by business_id if available
-        if (formData.business_id) {
-          query = query.eq('business_id', formData.business_id)
+        // Filter by business_id if available from formData (works for both create and edit)
+        const businessId = formData.business_id
+        if (businessId) {
+          query = query.eq('business_id', businessId)
         }
         
         const { data: yearsData, error} = await query
