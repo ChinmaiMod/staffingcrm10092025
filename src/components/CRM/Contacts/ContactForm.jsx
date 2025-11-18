@@ -157,11 +157,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('reason_for_contact')
           .select('id, reason_for_contact')
           .eq('tenant_id', tenant.tenant_id)
-          .order('reason_for_contact', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('reason_for_contact', { ascending: true })
         if (error) throw error
         const mapped = (data || []).map(row => ({
           id: row.id,
@@ -177,7 +183,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     if (tenant?.tenant_id) {
       loadReasons()
     }
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
   // Load statuses from workflow_status table
   useEffect(() => {
     async function loadStatuses() {
@@ -186,11 +192,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('workflow_status')
           .select('id, workflow_status')
           .eq('tenant_id', tenant.tenant_id)
-          .order('workflow_status', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('workflow_status', { ascending: true })
         if (error) throw error
         const statuses = (data || []).filter(row => row.id && row.workflow_status)
         setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
@@ -202,7 +214,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     if (tenant?.tenant_id) {
       loadStatuses()
     }
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -223,6 +235,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     recruiter: '',
     referred_by: '',
     remarks: '',
+    business_id: contact?.business_id || null,
     ...(contact ? {
       first_name: contact.first_name || '',
       last_name: contact.last_name || '',
@@ -243,6 +256,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       recruiter: contact.recruiter || '',
       referred_by: contact.referred_by || '',
       remarks: contact.remarks || '',
+      business_id: contact.business_id || null,
     } : {})
   })
 
@@ -267,11 +281,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('visa_status')
           .select('id, visa_status')
           .eq('tenant_id', tenant.tenant_id)
-          .order('visa_status', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('visa_status', { ascending: true })
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setVisaStatusOptions(records.length > 0 ? records : FALLBACK_VISA_STATUS_RECORDS)
@@ -281,7 +301,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
     }
     loadVisaStatuses()
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
 
   useEffect(() => {
     async function loadJobTitles() {
@@ -290,11 +310,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('job_title')
           .select('id, job_title, field')
           .eq('tenant_id', tenant.tenant_id)
-          .order('job_title', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('job_title', { ascending: true })
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setAllJobTitles(records.length > 0 ? records : FALLBACK_JOB_TITLE_RECORDS)
@@ -304,7 +330,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
     }
     loadJobTitles()
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
 
   useEffect(() => {
     async function loadRoleTypes() {
@@ -313,11 +339,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('type_of_roles')
           .select('id, type_of_roles')
           .eq('tenant_id', tenant.tenant_id)
-          .order('type_of_roles', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('type_of_roles', { ascending: true })
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setRoleTypeOptions(records.length > 0 ? records : FALLBACK_ROLE_TYPE_RECORDS)
@@ -327,7 +359,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
     }
     loadRoleTypes()
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
 
   useEffect(() => {
     async function loadReferralSources() {
@@ -336,11 +368,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('referral_sources')
           .select('id, referral_source, refered_by')
           .eq('tenant_id', tenant.tenant_id)
-          .order('referral_source', { ascending: true })
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data, error } = await query.order('referral_source', { ascending: true })
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setReferralSourceOptions(records.length > 0 ? records : FALLBACK_REFERRAL_SOURCE_RECORDS)
@@ -350,7 +388,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       }
     }
     loadReferralSources()
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
 
   // Team leads and recruiters
   const [teamLeads, setTeamLeads] = useState([])
@@ -485,10 +523,17 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
     const loadYearsExperience = async () => {
       try {
-        const { data: yearsData, error} = await supabase
+        let query = supabase
           .from('years_of_experience')
           .select('id, years_of_experience, business_id')
           .eq('tenant_id', tenant.tenant_id)
+        
+        // Filter by business_id if available
+        if (formData.business_id) {
+          query = query.eq('business_id', formData.business_id)
+        }
+        
+        const { data: yearsData, error} = await query
           .order('business_id', { ascending: true, nullsFirst: true })
           .order('years_of_experience', { ascending: true })
           .abortSignal(controller.signal)
@@ -527,7 +572,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     return () => {
       controller.abort()
     }
-  }, [tenant?.tenant_id])
+  }, [tenant?.tenant_id, formData.business_id])
 
   // Load countries from database
   const loadCountries = async () => {
