@@ -411,6 +411,7 @@
 .form-group input,
 .form-group select,
 .form-group textarea {
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -428,6 +429,14 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .form-group textarea {
   min-height: 100px;
   resize: vertical;
@@ -441,6 +450,40 @@
 .form-group .error {
   color: #ef4444;
   font-size: 13px;
+}
+
+.multi-select {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  z-index: 10;
+}
+
+.multi-select-option {
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.multi-select-option + .multi-select-option {
+  border-top: 1px solid #e2e8f0;
+}
+
+.multi-select-option:hover {
+  background: #eff6ff;
 }
 
 /* Modal */

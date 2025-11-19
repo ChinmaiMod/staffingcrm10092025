@@ -178,7 +178,7 @@ export default function AutocompleteSelect({
   }
 
   return (
-    <div className="multi-select" ref={dropdownRef} style={{ position: 'relative' }}>
+    <div className="multi-select" ref={dropdownRef}>
       <input
         type="text"
         value={inputValue}
@@ -187,21 +187,10 @@ export default function AutocompleteSelect({
         onBlur={handleBlur}
         placeholder={placeholder}
         disabled={disabled}
-        style={{
-          width: '100%',
-          padding: '10px 14px',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          fontSize: '14px',
-          color: '#111827',
-          backgroundColor: disabled ? '#f3f4f6' : 'white',
-          cursor: disabled ? 'not-allowed' : 'text',
-          opacity: disabled ? 0.6 : 1,
-        }}
       />
 
       {isOpen && !disabled && filteredOptions.length > 0 && (
-        <div className="multi-select-dropdown" style={{ position: 'absolute', width: '100%', zIndex: 10 }}>
+        <div className="multi-select-dropdown">
           {filteredOptions.map((option, index) => {
             const optionValue = valueGetter(option)
             const optionLabel = toDisplayString(labelGetter(option))
@@ -217,7 +206,6 @@ export default function AutocompleteSelect({
                   e.preventDefault() // Prevent blur while selecting
                   handleSelectOption(option)
                 }}
-                style={{ cursor: 'pointer' }}
               >
                 <span>{optionLabel}</span>
               </div>

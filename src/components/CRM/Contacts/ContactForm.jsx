@@ -126,12 +126,47 @@ const FALLBACK_REASON_FOR_CONTACT_RECORDS = REASONS_FOR_CONTACT.map((label, inde
   reason_for_contact: label
 }))
 
+const normalizeBusinessValue = (value) => {
+  if (!value) {
+    return null
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value
+  }
+
+  if (typeof value === 'object') {
+    return (
+      value.business_id ||
+      value.id ||
+      value.value ||
+      null
+    )
+  }
+
+  return null
+}
+
+const resolveBusinessId = (contact) => {
+  if (!contact) {
+    return null
+  }
+
+  return (
+    normalizeBusinessValue(contact.business_id) ??
+    normalizeBusinessValue(contact.business) ??
+    normalizeBusinessValue(contact.businesses) ??
+    null
+  )
+}
+
 export default function ContactForm({ contact, onSave, onCancel, isSaving = false }) {
   const { tenant } = useTenant()
   const [statusOptions, setStatusOptions] = useState(FALLBACK_STATUS_RECORDS)
   const [reasonOptions, setReasonOptions] = useState(FALLBACK_REASON_FOR_CONTACT_RECORDS)
   
   // Initialize formData BEFORE useEffects that depend on it
+  const initialBusinessId = resolveBusinessId(contact)
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -140,7 +175,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     contact_type: 'it_candidate',
     visa_status_id: '',
     job_title_id: '',
-  reason_for_contact_id: '',
+    reason_for_contact_id: '',
     workflow_status_id: '',
     type_of_roles_id: '',
     country_id: '',
@@ -152,7 +187,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     recruiter: '',
     referred_by: '',
     remarks: '',
-    business_id: contact?.business_id || null,
+    business_id: initialBusinessId,
     ...(contact ? {
       first_name: contact.first_name || '',
       last_name: contact.last_name || '',
@@ -173,7 +208,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       recruiter: contact.recruiter || '',
       referred_by: contact.referred_by || '',
       remarks: contact.remarks || '',
-      business_id: contact.business_id || null,
+      business_id: initialBusinessId,
     } : {})
   })
 
@@ -490,6 +525,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   // Sync form data when contact prop changes (Bug #7 fix)
   useEffect(() => {
     if (contact) {
+      const resolvedBusinessId = resolveBusinessId(contact)
       setFormData(prev => ({
         ...prev,
         first_name: contact.first_name || '',
@@ -509,7 +545,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         referral_source_id: contact.referral_source_id || '',
         recruiting_team_lead: contact.recruiting_team_lead || '',
         recruiter: contact.recruiter || '',
-        remarks: contact.remarks || ''
+        remarks: contact.remarks || '',
+        business_id: resolvedBusinessId
       }))
       initialStatus.current = contact.workflow_status_id || null
     } else {
@@ -1060,7 +1097,9 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     onSave(saveData, attachments);
   }
 
+  const isEditing = Boolean(contact?.contact_id)
   const showCandidateFields = formData.contact_type === 'it_candidate' || formData.contact_type === 'healthcare_candidate'
+  const showJobTitleField = showCandidateFields || isEditing
   
   // Get current status label from workflow_status_id
   const currentStatusLabel = useMemo(() => {
@@ -1123,6 +1162,12 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           }
         }}
       >
+        <input
+          type="hidden"
+          data-testid="contact-business-id"
+          value={formData.business_id || ''}
+          readOnly
+        />
         <div className="form-grid">
           {/* Basic Information */}
           <div className="form-group">
@@ -1219,6 +1264,21 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             />
           </div>
 
+          {showJobTitleField && (
+            <div className="form-group">
+              <label>Job Title</label>
+              <AutocompleteSelect
+                options={availableJobTitles}
+                value={formData.job_title_id}
+                onChange={(id) => handleChange('job_title_id', id)}
+                getOptionLabel={option => (typeof option === 'object' ? option.job_title : option)}
+                getOptionValue={option => (typeof option === 'object' ? option.id : option)}
+                placeholder="Select job title..."
+                allowCustomValue={false}
+              />
+            </div>
+          )}
+
           {/* Candidate-specific fields */}
           {showCandidateFields && (
             <>
@@ -1231,19 +1291,6 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
                   getOptionLabel={option => (typeof option === 'object' ? option.visa_status : option)}
                   getOptionValue={option => (typeof option === 'object' ? option.id : option)}
                   placeholder="Select visa status..."
-                  allowCustomValue={false}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Job Title</label>
-                <AutocompleteSelect
-                  options={availableJobTitles}
-                  value={formData.job_title_id}
-                  onChange={(id) => handleChange('job_title_id', id)}
-                  getOptionLabel={option => (typeof option === 'object' ? option.job_title : option)}
-                  getOptionValue={option => (typeof option === 'object' ? option.id : option)}
-                  placeholder="Select job title..."
                   allowCustomValue={false}
                 />
               </div>
