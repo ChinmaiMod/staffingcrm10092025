@@ -114,6 +114,23 @@ SELECT pg_reload_conf();
 **⚠️ Important:** Replace `your_service_role_key_here` with your actual service role key from:
 - **Supabase Dashboard** → **Project Settings** → **API** → **service_role** (secret)
 
+## Step 3b: Confirm Edge Function Headers
+
+Both the **database trigger** (via `pg_net`) and the `scheduleNotificationCron` edge function must now send **two headers** when calling `sendScheduledNotifications`:
+
+- `Authorization: Bearer <service_role_key>`
+- `apikey: <service_role_key>`
+
+This dual-header approach matches Supabase's authenticated edge-function requirements and prevents intermittent `401 Unauthorized` responses from the Functions API.
+
+To verify the cron edge function includes both headers, check `supabase/functions/scheduleNotificationCron/index.ts` and redeploy:
+
+```bash
+supabase functions deploy scheduleNotificationCron
+```
+
+> If you skip this redeploy after updating the function code, pg_cron will continue using the previous version and the daily trigger will fail.
+
 ## Step 4: Verify the Cron Job is Scheduled
 
 Run this query in SQL Editor:
@@ -283,6 +300,12 @@ ORDER BY start_time DESC LIMIT 5;
 **Error:** "Supabase URL or Service Role Key not configured"
 
 **Solution:** Set database configuration variables (see Step 3)
+
+### Issue: HTTP 401 from sendScheduledNotifications
+
+**Error:** `{"message":"Unauthorized"}` or similar when pg_cron or the edge cron invokes the function.
+
+**Solution:** Redeploy both the database migration `202511190945_fix_trigger_daily_notifications.sql` and the `scheduleNotificationCron` edge function so they send **both** `Authorization` and `apikey` headers populated with the **service role key**.
 
 ### Issue: No emails being sent
 

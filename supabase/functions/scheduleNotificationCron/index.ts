@@ -67,10 +67,27 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
       },
+      body: JSON.stringify({ source: 'scheduleNotificationCron' }),
     })
 
-    const result = await response.json()
+    const responseText = await response.text()
+    let result: Record<string, unknown> | string = responseText
+    try {
+      result = responseText ? JSON.parse(responseText) : {}
+    } catch (parseError) {
+      console.warn('⚠️ Unable to parse sendScheduledNotifications response as JSON; returning raw text.', parseError)
+    }
+
+    if (!response.ok) {
+      console.error('🚨 sendScheduledNotifications failed', {
+        status: response.status,
+        statusText: response.statusText,
+        body: result,
+      })
+      throw new Error(`sendScheduledNotifications returned HTTP ${response.status}`)
+    }
     const endTime = new Date()
     const duration = endTime.getTime() - startTime.getTime()
     
