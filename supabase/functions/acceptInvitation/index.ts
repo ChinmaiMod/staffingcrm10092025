@@ -9,6 +9,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const READ_ONLY_ROLE_CODE = 'READ_ONLY'
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -73,6 +75,52 @@ serve(async (req) => {
       throw new Error('User email does not match invitation email')
     }
 
+    // Ensure the Supabase Auth account is confirmed so the user can log in immediately
+    if (!authUser.user.email_confirmed_at) {
+      const { error: confirmError } = await supabase.auth.admin.updateUserById(userId, {
+        email_confirm: true,
+        user_metadata: {
+          ...(authUser.user.user_metadata || {}),
+          full_name: invitation.invited_user_name
+        }
+      })
+
+      if (confirmError) {
+        console.error('Email confirmation update error:', confirmError)
+        throw new Error('Failed to finalize account verification. Please contact an administrator.')
+      }
+    }
+
+    // Look up the READ_ONLY role id so we always assign the correct default role
+    const { data: readOnlyRole, error: readOnlyRoleError } = await supabase
+      .from('user_roles')
+      .select('role_id')
+      .eq('role_code', READ_ONLY_ROLE_CODE)
+      .single()
+
+    if (readOnlyRoleError || !readOnlyRole) {
+      console.error('Missing READ_ONLY role configuration', readOnlyRoleError)
+      throw new Error('Default read-only role is not configured. Please seed system roles before inviting users.')
+    }
+
+    const assignReadOnlyRole = async (targetUserId: string) => {
+      const { error: roleError } = await supabase
+        .from('user_role_assignments')
+        .upsert({
+          user_id: targetUserId,
+          role_id: readOnlyRole.role_id,
+          tenant_id: invitation.tenant_id,
+          assigned_by: invitation.invited_by,
+          is_active: true
+        }, {
+          onConflict: 'user_id,role_id,tenant_id'
+        })
+
+      if (roleError) {
+        console.error('Role assignment error:', roleError)
+      }
+    }
+
     // Check if profile already exists
     const { data: existingProfile } = await supabase
       .from('profiles')
@@ -81,6 +129,8 @@ serve(async (req) => {
       .single()
 
     if (existingProfile) {
+      await assignReadOnlyRole(userId)
+
       // Profile already exists, just mark invitation as accepted
       await supabase
         .from('user_invitations')
@@ -121,21 +171,8 @@ serve(async (req) => {
       throw new Error(`Failed to create user profile: ${profileError.message}`)
     }
 
-    // Assign READ_ONLY role (role_id = 1) as default for invited users
-    const { error: roleError } = await supabase
-      .from('user_role_assignments')
-      .insert({
-        user_id: userId,
-        role_id: 1, // READ_ONLY role
-        tenant_id: invitation.tenant_id,
-        assigned_by: invitation.invited_by,
-        is_active: true
-      })
-
-    if (roleError) {
-      console.error('Role assignment error:', roleError)
-      // Don't throw - user is created, admin can assign role later
-    }
+    // Assign READ_ONLY role (looked up dynamically) as default for invited users
+    await assignReadOnlyRole(userId)
 
     // Mark invitation as accepted
     await supabase
