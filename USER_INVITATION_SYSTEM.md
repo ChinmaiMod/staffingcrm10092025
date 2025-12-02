@@ -362,6 +362,54 @@ Columns:
 - "Inviter profile not found"
 - "Failed to create invitation: <database error>"
 
+### Edge Function: getInvitationDetails
+**URL**: `https://yvcsxadahzrxuptcgtkg.supabase.co/functions/v1/getInvitationDetails`
+
+**Method**: POST
+
+**Headers**:
+```javascript
+{
+  'Content-Type': 'application/json'
+}
+```
+
+**Request Body**:
+```javascript
+{
+  "token": "invitation-token"
+}
+```
+
+**Success Response** (200):
+```javascript
+{
+  "success": true,
+  "invitation": {
+    "email": "user@example.com",
+    "invited_user_name": "Sunitha Intuites",
+    "status": "SENT",
+    "expires_at": "2025-12-09T18:20:00Z",
+    "tenants": {
+      "company_name": "Intuites Inc",
+      "email_domain": "intuites.com"
+    }
+  }
+}
+```
+
+**Error Response** (400):
+```javascript
+{
+  "error": "Invitation not found or invalid",
+  "code": "get_invitation_error"
+}
+```
+
+**Notes**:
+- Uses the service-role key, so it can be called from the Accept Invitation page before the user authenticates.
+- Frontend still enforces status checks (revoked, expired, accepted) based on the returned payload.
+
 ---
 
 ## Testing Checklist

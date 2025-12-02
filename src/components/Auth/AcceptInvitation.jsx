@@ -30,41 +30,41 @@ export default function AcceptInvitation() {
       }
 
       try {
-        const { data, error: inviteError } = await supabase
-          .from('user_invitations')
-          .select(`
-            *,
-            tenants(company_name, email_domain)
-          `)
-          .eq('token', token)
-          .single()
+          const { data, error: functionError } = await supabase.functions.invoke(
+            'getInvitationDetails',
+            {
+              body: { token }
+            }
+          )
 
-        if (inviteError || !data) {
-          setError('Invitation not found or invalid')
-          setLoading(false)
-          return
-        }
+          if (functionError || data?.error || !data?.invitation) {
+            setError(data?.error || functionError?.message || 'Invitation not found or invalid')
+            setLoading(false)
+            return
+          }
 
-        // Check if invitation is still valid
-        if (data.status === 'ACCEPTED') {
+          const invitationData = data.invitation
+
+          // Check if invitation is still valid
+          if (invitationData.status === 'ACCEPTED') {
           setError('This invitation has already been accepted')
           setLoading(false)
           return
         }
 
-        if (data.status === 'REVOKED') {
+          if (invitationData.status === 'REVOKED') {
           setError('This invitation has been revoked')
           setLoading(false)
           return
         }
 
-        if (data.status === 'EXPIRED' || new Date(data.expires_at) < new Date()) {
+          if (invitationData.status === 'EXPIRED' || new Date(invitationData.expires_at) < new Date()) {
           setError('This invitation has expired')
           setLoading(false)
           return
         }
 
-        setInvitation(data)
+          setInvitation(invitationData)
       } catch (err) {
         console.error('Error loading invitation:', err)
         setError('Failed to load invitation details')
