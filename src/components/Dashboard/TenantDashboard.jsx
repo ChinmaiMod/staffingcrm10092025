@@ -118,38 +118,27 @@ export default function TenantDashboard() {
               </button>
             </div>
 
-            {planName === 'SUITE' && (
-              <>
-                <div className="module-card">
-                  <h3>HRMS</h3>
-                  <p>Human Resource Management System</p>
-                  <button className="btn btn-primary" onClick={() => navigate('/hrms')}>
-                    Access HRMS
-                  </button>
-                </div>
+            <div className="module-card">
+              <h3>HRMS</h3>
+              <p>Human Resource Management System</p>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => window.open('https://staffinghrms.vercel.app', '_blank', 'noopener,noreferrer')}
+              >
+                Access HRMS
+              </button>
+            </div>
 
-                <div className="module-card">
-                  <h3>Finance</h3>
-                  <p>Financial Management System</p>
-                  <button className="btn btn-primary" onClick={() => navigate('/finance')}>
-                    Access Finance
-                  </button>
-                </div>
-              </>
-            )}
-
-            {planName !== 'SUITE' && (
-              <div className="module-card locked">
-                <h3>🔒 More Modules</h3>
-                <p>Unlock HRMS and Finance modules</p>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => navigate('/plans')}
-                >
-                  Upgrade to Suite
-                </button>
-              </div>
-            )}
+            <div className="module-card">
+              <h3>Accounting</h3>
+              <p>Accounting & Financial Management</p>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => window.open('https://staffingaccounts.vercel.app', '_blank', 'noopener,noreferrer')}
+              >
+                Access Accounting
+              </button>
+            </div>
           </div>
         </div>
       </div>
