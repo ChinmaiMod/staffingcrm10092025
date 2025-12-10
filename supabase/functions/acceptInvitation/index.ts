@@ -11,6 +11,40 @@ const corsHeaders = {
 
 const READ_ONLY_ROLE_CODE = 'READ_ONLY'
 
+// Ensure the default READ_ONLY role exists; create it if missing so invites never fail on missing seed data
+async function ensureReadOnlyRole(supabase: ReturnType<typeof createClient>) {
+  const { data: readOnlyRole, error: readOnlyRoleError } = await supabase
+    .from('user_roles')
+    .select('role_id')
+    .eq('role_code', READ_ONLY_ROLE_CODE)
+    .maybeSingle()
+
+  if (readOnlyRole) return readOnlyRole.role_id
+
+  if (readOnlyRoleError) {
+    console.error('Error checking READ_ONLY role:', readOnlyRoleError)
+  }
+
+  const { data: newRole, error: createRoleError } = await supabase
+    .from('user_roles')
+    .insert({
+      role_name: 'Read Only User',
+      role_code: READ_ONLY_ROLE_CODE,
+      role_level: 1,
+      description: 'Read-only access to selected pages within tenant',
+      is_system_role: true,
+    })
+    .select('role_id')
+    .single()
+
+  if (createRoleError) {
+    console.error('Failed to create READ_ONLY role:', createRoleError)
+    return null
+  }
+
+  return newRole?.role_id || null
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -91,24 +125,21 @@ serve(async (req) => {
       }
     }
 
-    // Look up the READ_ONLY role id so we always assign the correct default role
-    const { data: readOnlyRole, error: readOnlyRoleError } = await supabase
-      .from('user_roles')
-      .select('role_id')
-      .eq('role_code', READ_ONLY_ROLE_CODE)
-      .single()
+    // Look up the READ_ONLY role id so we always assign the correct default role (auto-create if missing)
+    const readOnlyRoleId = await ensureReadOnlyRole(supabase)
 
-    if (readOnlyRoleError || !readOnlyRole) {
-      console.error('Missing READ_ONLY role configuration', readOnlyRoleError)
-      throw new Error('Default read-only role is not configured. Please seed system roles before inviting users.')
+    if (!readOnlyRoleId) {
+      console.error('READ_ONLY role is missing and could not be created. Proceeding without role assignment.')
     }
 
     const assignReadOnlyRole = async (targetUserId: string) => {
+      if (!readOnlyRoleId) return
+
       const { error: roleError } = await supabase
         .from('user_role_assignments')
         .upsert({
           user_id: targetUserId,
-          role_id: readOnlyRole.role_id,
+          role_id: readOnlyRoleId,
           tenant_id: invitation.tenant_id,
           assigned_by: invitation.invited_by,
           is_active: true
