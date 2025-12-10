@@ -42,8 +42,6 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -e
-          # Login to Supabase CLI using token (will persist for the job)
-          supabase login --token "$SUPABASE_ACCESS_TOKEN"
           for d in supabase/functions/* ; do
             if [ -d "$d" ]; then
               fn=$(basename "$d")
@@ -53,7 +51,7 @@ jobs:
                 continue
               fi
               echo "Deploying function: $fn"
-              supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+              supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --access-token "$SUPABASE_ACCESS_TOKEN" --no-verify-jwt
             fi
           done
 
