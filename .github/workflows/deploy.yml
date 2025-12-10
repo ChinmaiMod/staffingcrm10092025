@@ -52,6 +52,11 @@ jobs:
           for d in supabase/functions/* ; do
             if [ -d "$d" ]; then
               fn=$(basename "$d")
+              # Skip non-function directories
+              if [ "$fn" = "_shared" ] || [ "$fn" = "templates" ] || [ "$fn" = "tests" ]; then
+                echo "Skipping non-function directory: $fn"
+                continue
+              fi
               echo "Deploying function: $fn"
               supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
             fi
