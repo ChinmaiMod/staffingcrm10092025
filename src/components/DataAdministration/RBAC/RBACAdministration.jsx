@@ -12,7 +12,7 @@ import './RBACAdministration.css';
 function RBACAdministration() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState('permissions-matrix');
+  const [activeTab, setActiveTab] = useState('user-roles');
   const [roles, setRoles] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [rolePermissions, setRolePermissions] = useState({});
@@ -33,11 +33,35 @@ function RBACAdministration() {
     is_active: true
   });
 
+  // User Role form state
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+  const [roleFormData, setRoleFormData] = useState({
+    role_name: '',
+    role_code: '',
+    role_level: 2,
+    description: '',
+    can_create_records: false,
+    can_edit_own_records: false,
+    can_edit_subordinate_records: false,
+    can_edit_all_records: false,
+    can_delete_own_records: false,
+    can_delete_subordinate_records: false,
+    can_delete_all_records: false,
+    can_view_own_records: true,
+    can_view_subordinate_records: false,
+    can_view_all_records: false,
+    can_assign_roles: false,
+    can_manage_users: false,
+    can_manage_businesses: false,
+    can_manage_roles: false,
+  });
+  const [selectedMenuItems, setSelectedMenuItems] = useState([]);
+
   const loadRoles = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_roles')
       .select('*')
-      .eq('is_active', true)
       .order('role_level', { ascending: false });
 
     if (error) throw error;
@@ -384,8 +408,209 @@ function RBACAdministration() {
     }
   };
 
+  // ============ User Roles Management Functions ============
+  const handleRoleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setRoleFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleMenuItemToggle = (menuItemId) => {
+    setSelectedMenuItems(prev => {
+      if (prev.includes(menuItemId)) {
+        return prev.filter(id => id !== menuItemId);
+      } else {
+        return [...prev, menuItemId];
+      }
+    });
+  };
+
+  const handleSelectAllMenus = () => {
+    setSelectedMenuItems(menuItems.map(item => item.menu_item_id));
+  };
+
+  const handleDeselectAllMenus = () => {
+    setSelectedMenuItems([]);
+  };
+
+  const openCreateRoleModal = () => {
+    setEditingRole(null);
+    setRoleFormData({
+      role_name: '',
+      role_code: '',
+      role_level: 2,
+      description: '',
+      can_create_records: false,
+      can_edit_own_records: false,
+      can_edit_subordinate_records: false,
+      can_edit_all_records: false,
+      can_delete_own_records: false,
+      can_delete_subordinate_records: false,
+      can_delete_all_records: false,
+      can_view_own_records: true,
+      can_view_subordinate_records: false,
+      can_view_all_records: false,
+      can_assign_roles: false,
+      can_manage_users: false,
+      can_manage_businesses: false,
+      can_manage_roles: false,
+    });
+    setSelectedMenuItems([]);
+    setShowRoleModal(true);
+  };
+
+  const openEditRoleModal = async (role) => {
+    setEditingRole(role);
+    setRoleFormData({
+      role_name: role.role_name,
+      role_code: role.role_code,
+      role_level: role.role_level,
+      description: role.description || '',
+      can_create_records: role.can_create_records,
+      can_edit_own_records: role.can_edit_own_records,
+      can_edit_subordinate_records: role.can_edit_subordinate_records,
+      can_edit_all_records: role.can_edit_all_records,
+      can_delete_own_records: role.can_delete_own_records,
+      can_delete_subordinate_records: role.can_delete_subordinate_records,
+      can_delete_all_records: role.can_delete_all_records,
+      can_view_own_records: role.can_view_own_records,
+      can_view_subordinate_records: role.can_view_subordinate_records,
+      can_view_all_records: role.can_view_all_records,
+      can_assign_roles: role.can_assign_roles,
+      can_manage_users: role.can_manage_users,
+      can_manage_businesses: role.can_manage_businesses,
+      can_manage_roles: role.can_manage_roles,
+    });
+    
+    // Load existing menu permissions
+    const { data, error } = await supabase
+      .from('role_menu_permissions')
+      .select('menu_item_id')
+      .eq('role_id', role.role_id)
+      .eq('can_access', true);
+    
+    if (!error && data) {
+      setSelectedMenuItems(data.map(p => p.menu_item_id));
+    }
+    
+    setShowRoleModal(true);
+  };
+
+  const handlePresetRole = (level) => {
+    const presets = {
+      1: {
+        can_create_records: false, can_edit_own_records: false, can_edit_subordinate_records: false,
+        can_edit_all_records: false, can_delete_own_records: false, can_delete_subordinate_records: false,
+        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: false,
+        can_view_all_records: false, can_assign_roles: false, can_manage_users: false,
+        can_manage_businesses: false, can_manage_roles: false,
+      },
+      2: {
+        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: false,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: false,
+        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: false,
+        can_view_all_records: false, can_assign_roles: false, can_manage_users: false,
+        can_manage_businesses: false, can_manage_roles: false,
+      },
+      3: {
+        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: true,
+        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: true,
+        can_view_all_records: false, can_assign_roles: true, can_manage_users: false,
+        can_manage_businesses: false, can_manage_roles: false,
+      },
+      4: {
+        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: true,
+        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: true,
+        can_view_all_records: false, can_assign_roles: true, can_manage_users: true,
+        can_manage_businesses: false, can_manage_roles: false,
+      },
+      5: {
+        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: true, can_delete_own_records: true, can_delete_subordinate_records: true,
+        can_delete_all_records: true, can_view_own_records: true, can_view_subordinate_records: true,
+        can_view_all_records: true, can_assign_roles: true, can_manage_users: true,
+        can_manage_businesses: true, can_manage_roles: true,
+      },
+    };
+    if (presets[level]) {
+      setRoleFormData(prev => ({ ...prev, ...presets[level] }));
+    }
+  };
+
+  const handleSubmitRole = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      setSaving(true);
+      let roleId;
+
+      if (editingRole) {
+        const { error: updateError } = await supabase
+          .from('user_roles')
+          .update({ ...roleFormData, updated_by: profile?.id })
+          .eq('role_id', editingRole.role_id);
+        if (updateError) throw updateError;
+        roleId = editingRole.role_id;
+
+        await supabase.from('role_menu_permissions').delete().eq('role_id', roleId);
+      } else {
+        const { data: newRole, error: insertError } = await supabase
+          .from('user_roles')
+          .insert([{ ...roleFormData, created_by: profile?.id }])
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        roleId = newRole.role_id;
+      }
+
+      if (selectedMenuItems.length > 0) {
+        const menuPermissions = selectedMenuItems.map(menuItemId => ({
+          role_id: roleId, menu_item_id: menuItemId, can_access: true,
+        }));
+        const { error: permError } = await supabase.from('role_menu_permissions').insert(menuPermissions);
+        if (permError) throw permError;
+      }
+
+      setShowRoleModal(false);
+      setSuccess(editingRole ? 'Role updated successfully' : 'Role created successfully');
+      loadAllData();
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Error saving role:', err);
+      setError(err.message || 'Failed to save role');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRole = async (role) => {
+    if (role.is_system_role) {
+      setError('System roles cannot be deleted');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete the role "${role.role_name}"?`)) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase.from('user_roles').delete().eq('role_id', role.role_id);
+      if (error) throw error;
+      setSuccess('Role deleted successfully');
+      loadAllData();
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Error deleting role:', err);
+      setError('Failed to delete role: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
-    return <div className="loading-spinner">Loading RBAC configuration...</div>;
+    return <div className="loading-spinner">Loading Access Control configuration...</div>;
   }
 
   return (
@@ -431,6 +656,12 @@ function RBACAdministration() {
       {/* Tab Navigation */}
       <div className="rbac-tabs">
         <button
+          className={`rbac-tab ${activeTab === 'user-roles' ? 'active' : ''}`}
+          onClick={() => setActiveTab('user-roles')}
+        >
+          🔐 User Roles
+        </button>
+        <button
           className={`rbac-tab ${activeTab === 'permissions-matrix' ? 'active' : ''}`}
           onClick={() => setActiveTab('permissions-matrix')}
         >
@@ -449,6 +680,79 @@ function RBACAdministration() {
           📈 Role Summary
         </button>
       </div>
+
+      {/* User Roles Tab */}
+      {activeTab === 'user-roles' && (
+        <div className="user-roles-section">
+          <div className="section-header">
+            <h2>User Roles Management</h2>
+            <button className="btn-primary" onClick={openCreateRoleModal}>
+              ➕ Create New Role
+            </button>
+          </div>
+
+          <div className="roles-grid">
+            {roles.map(role => (
+              <div key={role.role_id} className="role-card">
+                <div className="role-card-header">
+                  <div>
+                    <h3>{role.role_name}</h3>
+                    <span 
+                      className="role-level-badge"
+                      style={{ backgroundColor: getRoleLevelColor(role.role_level) }}
+                    >
+                      {getRoleLevelName(role.role_level)}
+                    </span>
+                    {role.is_system_role && (
+                      <span className="system-role-badge">System Role</span>
+                    )}
+                  </div>
+                  <div className="role-actions">
+                    <button 
+                      className="btn-icon" 
+                      onClick={() => openEditRoleModal(role)}
+                      title="Edit Role"
+                    >
+                      ✏️
+                    </button>
+                    {!role.is_system_role && (
+                      <button 
+                        className="btn-icon btn-danger" 
+                        onClick={() => handleDeleteRole(role)}
+                        title="Delete Role"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {role.description && (
+                  <p className="role-description">{role.description}</p>
+                )}
+
+                <div className="role-permissions-summary">
+                  <h4>Permissions:</h4>
+                  <div className="permission-tags">
+                    {role.can_create_records && <span className="tag tag-success">Create</span>}
+                    {role.can_edit_own_records && <span className="tag tag-info">Edit Own</span>}
+                    {role.can_edit_subordinate_records && <span className="tag tag-info">Edit Subordinates</span>}
+                    {role.can_edit_all_records && <span className="tag tag-warning">Edit All</span>}
+                    {role.can_delete_own_records && <span className="tag tag-danger">Delete Own</span>}
+                    {role.can_delete_subordinate_records && <span className="tag tag-danger">Delete Subordinates</span>}
+                    {role.can_delete_all_records && <span className="tag tag-danger">Delete All</span>}
+                    {role.can_view_all_records && <span className="tag tag-primary">View All</span>}
+                    {role.can_assign_roles && <span className="tag tag-special">Assign Roles</span>}
+                    {role.can_manage_users && <span className="tag tag-special">Manage Users</span>}
+                    {role.can_manage_businesses && <span className="tag tag-special">Manage Businesses</span>}
+                    {role.can_manage_roles && <span className="tag tag-special">Manage Roles</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Permissions Matrix Tab */}
       {activeTab === 'permissions-matrix' && (
@@ -805,6 +1109,159 @@ function RBACAdministration() {
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
                   {saving ? 'Saving...' : (editingMenuItem ? 'Update' : 'Create')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Role Modal */}
+      {showRoleModal && (
+        <div className="modal-overlay" onClick={() => setShowRoleModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingRole ? '✏️ Edit Role' : '➕ Create New Role'}</h2>
+              <button className="btn-close" onClick={() => setShowRoleModal(false)}>×</button>
+            </div>
+
+            <form onSubmit={handleSubmitRole}>
+              <div className="modal-body">
+                <section className="form-section">
+                  <h3>Basic Information</h3>
+                  <div className="form-group">
+                    <label htmlFor="role_name">Role Name *</label>
+                    <input type="text" id="role_name" name="role_name" value={roleFormData.role_name}
+                      onChange={handleRoleInputChange} required placeholder="e.g., Senior Recruiter" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="role_code">Role Code *</label>
+                    <input type="text" id="role_code" name="role_code" value={roleFormData.role_code}
+                      onChange={handleRoleInputChange} required placeholder="e.g., SENIOR_RECRUITER"
+                      disabled={editingRole?.is_system_role} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="role_level">Role Level *</label>
+                    <select id="role_level" name="role_level" value={roleFormData.role_level}
+                      onChange={(e) => { handleRoleInputChange(e); handlePresetRole(parseInt(e.target.value)); }}
+                      required disabled={editingRole?.is_system_role}>
+                      <option value={1}>Level 1 - Read Only</option>
+                      <option value={2}>Level 2 - Recruiter</option>
+                      <option value={3}>Level 3 - Lead</option>
+                      <option value={4}>Level 4 - Manager</option>
+                      <option value={5}>Level 5 - CEO/Super Admin</option>
+                    </select>
+                    <small>Selecting a level applies default permissions.</small>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="description">Description</label>
+                    <textarea id="description" name="description" value={roleFormData.description}
+                      onChange={handleRoleInputChange} rows={2} placeholder="Role description" />
+                  </div>
+                </section>
+
+                <section className="form-section">
+                  <h3>Data Permissions</h3>
+                  <div className="permission-grid">
+                    <div className="permission-category">
+                      <h4>📝 Create</h4>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_create_records" checked={roleFormData.can_create_records} onChange={handleRoleInputChange} />
+                        <span>Can create records</span>
+                      </label>
+                    </div>
+                    <div className="permission-category">
+                      <h4>👁️ View</h4>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_view_own_records" checked={roleFormData.can_view_own_records} onChange={handleRoleInputChange} />
+                        <span>View own</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_view_subordinate_records" checked={roleFormData.can_view_subordinate_records} onChange={handleRoleInputChange} />
+                        <span>View subordinates</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_view_all_records" checked={roleFormData.can_view_all_records} onChange={handleRoleInputChange} />
+                        <span>View all</span>
+                      </label>
+                    </div>
+                    <div className="permission-category">
+                      <h4>✏️ Edit</h4>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_edit_own_records" checked={roleFormData.can_edit_own_records} onChange={handleRoleInputChange} />
+                        <span>Edit own</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_edit_subordinate_records" checked={roleFormData.can_edit_subordinate_records} onChange={handleRoleInputChange} />
+                        <span>Edit subordinates</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_edit_all_records" checked={roleFormData.can_edit_all_records} onChange={handleRoleInputChange} />
+                        <span>Edit all</span>
+                      </label>
+                    </div>
+                    <div className="permission-category">
+                      <h4>🗑️ Delete</h4>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_delete_own_records" checked={roleFormData.can_delete_own_records} onChange={handleRoleInputChange} />
+                        <span>Delete own</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_delete_subordinate_records" checked={roleFormData.can_delete_subordinate_records} onChange={handleRoleInputChange} />
+                        <span>Delete subordinates</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_delete_all_records" checked={roleFormData.can_delete_all_records} onChange={handleRoleInputChange} />
+                        <span>Delete all</span>
+                      </label>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="form-section">
+                  <h3>Management Permissions</h3>
+                  <div className="permission-list">
+                    <label className="checkbox-label">
+                      <input type="checkbox" name="can_assign_roles" checked={roleFormData.can_assign_roles} onChange={handleRoleInputChange} />
+                      <span>Can assign roles</span>
+                    </label>
+                    <label className="checkbox-label">
+                      <input type="checkbox" name="can_manage_users" checked={roleFormData.can_manage_users} onChange={handleRoleInputChange} />
+                      <span>Can manage users</span>
+                    </label>
+                    <label className="checkbox-label">
+                      <input type="checkbox" name="can_manage_businesses" checked={roleFormData.can_manage_businesses} onChange={handleRoleInputChange} />
+                      <span>Can manage businesses</span>
+                    </label>
+                    <label className="checkbox-label">
+                      <input type="checkbox" name="can_manage_roles" checked={roleFormData.can_manage_roles} onChange={handleRoleInputChange} />
+                      <span>Can manage roles</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section className="form-section">
+                  <h3>Page Access</h3>
+                  <div className="menu-actions">
+                    <button type="button" className="btn-secondary" onClick={handleSelectAllMenus}>Select All</button>
+                    <button type="button" className="btn-secondary" onClick={handleDeselectAllMenus}>Deselect All</button>
+                  </div>
+                  <div className="menu-items-list">
+                    {menuItems.filter(m => m.is_active).map(item => (
+                      <label key={item.menu_item_id} className="checkbox-label menu-item-checkbox">
+                        <input type="checkbox" checked={selectedMenuItems.includes(item.menu_item_id)}
+                          onChange={() => handleMenuItemToggle(item.menu_item_id)} />
+                        <span>{item.icon} {item.item_name} {item.item_path && <code className="menu-path">{item.item_path}</code>}</span>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setShowRoleModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Saving...' : (editingRole ? 'Update Role' : 'Create Role')}
                 </button>
               </div>
             </form>
