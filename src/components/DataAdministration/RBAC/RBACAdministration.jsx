@@ -408,7 +408,7 @@ function RBACAdministration() {
 
       <div className="page-header">
         <div>
-          <h1>🛡️ RBAC Administration</h1>
+          <h1>🛡️ Access Control</h1>
           <p className="page-description">
             Manage Role-Based Access Control - Configure which menu items and features each role can access
           </p>

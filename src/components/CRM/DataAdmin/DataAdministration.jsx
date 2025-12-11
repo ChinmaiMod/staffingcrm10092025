@@ -13,7 +13,7 @@ import RBACAdministration from '../../DataAdministration/RBAC/RBACAdministration
 import AIPromptsPage from './AIPrompts/AIPromptsPage'
 
 const REFERENCE_TABLES = [
-  { id: 'rbac_admin', label: 'RBAC Administration', icon: '🛡️', path: 'rbac-admin', highlight: true },
+  { id: 'rbac_admin', label: 'Access Control', icon: '🛡️', path: 'rbac-admin' },
   { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
   { id: 'assign_roles', label: 'Assign User Roles', icon: '👤', path: 'assign-roles' },
   { id: 'invite_users', label: 'Invite Users', icon: '📧', path: 'invite-users' },
@@ -73,20 +73,13 @@ export default function DataAdministration() {
                 <div 
                   key={table.id}
                   className="stat-card"
-                  style={{ 
-                    cursor: 'pointer',
-                    ...(table.highlight ? {
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: '2px solid #764ba2'
-                    } : {})
-                  }}
+                  style={{ cursor: 'pointer' }}
                   onClick={() => handleTableClick(table)}
                 >
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>{table.icon}</div>
-                  <h3 style={{ fontSize: '16px', margin: 0, color: table.highlight ? 'white' : undefined }}>{table.label}</h3>
-                  <p style={{ fontSize: '13px', color: table.highlight ? 'rgba(255,255,255,0.8)' : '#64748b', margin: '8px 0 0 0' }}>
-                    {table.highlight ? 'Manage permissions & menu access' : 'Click to manage'}
+                  <h3 style={{ fontSize: '16px', margin: 0 }}>{table.label}</h3>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '8px 0 0 0' }}>
+                    Click to manage
                   </p>
                 </div>
               ))}
