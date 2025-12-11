@@ -252,7 +252,7 @@ const AssignUserRoles = () => {
       const { data: canAssign, error: checkError } = await supabase
         .rpc('can_assign_role', {
           p_assigner_id: currentUser.id,
-          p_role_id: roleIdInt
+          p_target_role_level: selectedRole.role_level
         });
 
       if (checkError) throw checkError;
