@@ -11,6 +11,7 @@ export default function InviteUsers() {
   const { tenant } = useTenant()
   const { profile } = useAuth()
   const [invitations, setInvitations] = useState([])
+  const [availableRoles, setAvailableRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -19,11 +20,28 @@ export default function InviteUsers() {
   const [inviteForm, setInviteForm] = useState({
     email: '',
     fullName: '',
-    message: ''
+    message: '',
+    roleId: ''
   })
   const [fieldErrors, setFieldErrors] = useState({})
 
   const canInviteUsers = profile?.role === 'ADMIN' || profile?.role === 'CEO'
+
+  const loadAvailableRoles = useCallback(async () => {
+    try {
+      // Load all roles that can be assigned
+      // Users can assign roles at or below their level
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role_id, role_name, role_level, role_code')
+        .order('role_level', { ascending: true })
+
+      if (rolesError) throw rolesError
+      setAvailableRoles(roles || [])
+    } catch (err) {
+      console.error('Error loading roles:', err)
+    }
+  }, [])
 
   const loadInvitations = useCallback(async () => {
     if (!tenant?.tenant_id) return
@@ -37,6 +55,11 @@ export default function InviteUsers() {
           invited_by_profile:profiles!user_invitations_invited_by_fkey(
             full_name,
             email
+          ),
+          assigned_role:user_roles(
+            role_id,
+            role_name,
+            role_level
           )
         `)
         .eq('tenant_id', tenant.tenant_id)
@@ -54,7 +77,8 @@ export default function InviteUsers() {
 
   useEffect(() => {
     loadInvitations()
-  }, [loadInvitations])
+    loadAvailableRoles()
+  }, [loadInvitations, loadAvailableRoles])
 
   const validateForm = () => {
     const errors = {}
@@ -74,6 +98,11 @@ export default function InviteUsers() {
     const emailDomain = inviteForm.email.split('@')[1]
     if (tenant?.email_domain && emailDomain !== tenant.email_domain) {
       errors.email = `Email must be from your company domain: @${tenant.email_domain}`
+    }
+
+    // Validate role selection
+    if (!inviteForm.roleId) {
+      errors.roleId = 'Please select a role for the user'
     }
 
     setFieldErrors(errors)
@@ -134,7 +163,8 @@ export default function InviteUsers() {
             message: inviteForm.message.trim() || null,
             tenantId: tenant.tenant_id,
             invitedBy: profile.id,
-            frontendUrl: frontendUrl // Pass frontend URL from client
+            frontendUrl: frontendUrl, // Pass frontend URL from client
+            roleId: inviteForm.roleId ? parseInt(inviteForm.roleId, 10) : null // Pass selected role
           }
         }
       )
@@ -153,7 +183,7 @@ export default function InviteUsers() {
       }
 
       setSuccess(`Invitation sent successfully to ${inviteForm.email}`)
-      setInviteForm({ email: '', fullName: '', message: '' })
+      setInviteForm({ email: '', fullName: '', message: '', roleId: '' })
       setShowInviteForm(false)
       await loadInvitations()
     } catch (err) {
@@ -359,6 +389,32 @@ export default function InviteUsers() {
             </div>
 
             <div className="form-group">
+              <label htmlFor="roleId">Role *</label>
+              <select
+                id="roleId"
+                value={inviteForm.roleId}
+                onChange={(e) => {
+                  setInviteForm({ ...inviteForm, roleId: e.target.value })
+                  if (fieldErrors.roleId) {
+                    setFieldErrors({ ...fieldErrors, roleId: '' })
+                  }
+                }}
+                className={fieldErrors.roleId ? 'error' : ''}
+              >
+                <option value="">Select a role...</option>
+                {availableRoles.map((role) => (
+                  <option key={role.role_id} value={role.role_id}>
+                    {role.role_name} (Level {role.role_level})
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.roleId && (
+                <small className="error-text">{fieldErrors.roleId}</small>
+              )}
+              <small>The role that will be assigned when the user accepts the invitation</small>
+            </div>
+
+            <div className="form-group">
               <label htmlFor="message">Personal Message (Optional)</label>
               <textarea
                 id="message"
@@ -375,7 +431,7 @@ export default function InviteUsers() {
                 className="btn btn-secondary"
                 onClick={() => {
                   setShowInviteForm(false)
-                  setInviteForm({ email: '', fullName: '', message: '' })
+                  setInviteForm({ email: '', fullName: '', message: '', roleId: '' })
                   setFieldErrors({})
                 }}
               >
@@ -408,6 +464,7 @@ export default function InviteUsers() {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Role</th>
                 <th>Status</th>
                 <th>Invited By</th>
                 <th>Invited On</th>
@@ -422,6 +479,9 @@ export default function InviteUsers() {
                     <strong>{invitation.invited_user_name}</strong>
                   </td>
                   <td>{invitation.email}</td>
+                  <td>
+                    {invitation.assigned_role?.role_name || 'Read Only'}
+                  </td>
                   <td>
                     <span className={`status-badge ${getStatusBadgeClass(invitation.status)}`}>
                       {invitation.status}

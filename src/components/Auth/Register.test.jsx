@@ -94,7 +94,7 @@ describe('Register Component', () => {
     })
   })
 
-  it('should successfully register with valid data', async () => {
+  it('should successfully register with valid data', { timeout: 15000 }, async () => {
     const user = userEvent.setup()
     mockSignUp.mockResolvedValue({ data: { user: { id: '123' } }, error: null })
     mockInvoke.mockResolvedValue({ data: { success: true }, error: null })

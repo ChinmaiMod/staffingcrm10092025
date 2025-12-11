@@ -39,11 +39,24 @@ serve(async (req) => {
       }
     })
 
-    const { email, fullName, message, tenantId, invitedBy, frontendUrl: requestFrontendUrl } = await req.json()
-    console.log('Request data:', { email: !!email, fullName: !!fullName, tenantId: !!tenantId, invitedBy: !!invitedBy })
+    const { email, fullName, message, tenantId, invitedBy, frontendUrl: requestFrontendUrl, roleId } = await req.json()
+    console.log('Request data:', { email: !!email, fullName: !!fullName, tenantId: !!tenantId, invitedBy: !!invitedBy, roleId })
 
     if (!email || !fullName || !tenantId || !invitedBy) {
       throw new Error('Missing required fields: email, fullName, tenantId, invitedBy')
+    }
+
+    // Validate roleId if provided
+    if (roleId) {
+      const { data: roleExists, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role_id')
+        .eq('role_id', roleId)
+        .single()
+
+      if (roleError || !roleExists) {
+        throw new Error('Invalid role selected')
+      }
     }
 
     // Check if user already exists
@@ -97,7 +110,7 @@ serve(async (req) => {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7) // Expires in 7 days
 
-    // Create invitation record
+    // Create invitation record with optional role_id
     const { data: invitation, error: inviteError } = await supabase
       .from('user_invitations')
       .insert({
@@ -109,7 +122,8 @@ serve(async (req) => {
         message: message || null,
         invited_by: invitedBy,
         expires_at: expiresAt.toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        role_id: roleId || null // Store the selected role
       })
       .select()
       .single()

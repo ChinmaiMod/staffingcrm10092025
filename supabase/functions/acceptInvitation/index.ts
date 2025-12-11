@@ -125,21 +125,26 @@ serve(async (req) => {
       }
     }
 
-    // Look up the READ_ONLY role id so we always assign the correct default role (auto-create if missing)
-    const readOnlyRoleId = await ensureReadOnlyRole(supabase)
+    // Determine the role to assign: use invitation's role_id if set, otherwise default to READ_ONLY
+    let roleIdToAssign = invitation.role_id
 
-    if (!readOnlyRoleId) {
-      console.error('READ_ONLY role is missing and could not be created. Proceeding without role assignment.')
+    if (!roleIdToAssign) {
+      // Fall back to READ_ONLY role if no role specified in invitation
+      roleIdToAssign = await ensureReadOnlyRole(supabase)
     }
 
-    const assignReadOnlyRole = async (targetUserId: string) => {
-      if (!readOnlyRoleId) return
+    if (!roleIdToAssign) {
+      console.error('No role available to assign. Proceeding without role assignment.')
+    }
+
+    const assignRole = async (targetUserId: string) => {
+      if (!roleIdToAssign) return
 
       const { error: roleError } = await supabase
         .from('user_role_assignments')
         .upsert({
           user_id: targetUserId,
-          role_id: readOnlyRoleId,
+          role_id: roleIdToAssign,
           tenant_id: invitation.tenant_id,
           assigned_by: invitation.invited_by,
           is_active: true
@@ -160,7 +165,7 @@ serve(async (req) => {
       .single()
 
     if (existingProfile) {
-      await assignReadOnlyRole(userId)
+      await assignRole(userId)
 
       // Profile already exists, just mark invitation as accepted
       await supabase
@@ -202,8 +207,8 @@ serve(async (req) => {
       throw new Error(`Failed to create user profile: ${profileError.message}`)
     }
 
-    // Assign READ_ONLY role (looked up dynamically) as default for invited users
-    await assignReadOnlyRole(userId)
+    // Assign the role from invitation (or default READ_ONLY)
+    await assignRole(userId)
 
     // Mark invitation as accepted
     await supabase
