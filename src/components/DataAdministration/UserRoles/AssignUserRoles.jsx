@@ -184,8 +184,8 @@ const AssignUserRoles = () => {
     const roleId = e.target.value;
     setAssignmentForm(prev => ({ ...prev, role_id: roleId }));
 
-    // Find the selected role
-    const selectedRole = roles.find(r => r.role_id === roleId);
+    // Find the selected role (convert to int for comparison)
+    const selectedRole = roles.find(r => r.role_id === parseInt(roleId, 10));
     
     // Reset business/contact type/pipeline scoping if role doesn't need it
     if (selectedRole && selectedRole.role_level < 3) {
@@ -231,7 +231,14 @@ const AssignUserRoles = () => {
         return;
       }
 
-      const selectedRole = roles.find(r => r.role_id === assignmentForm.role_id);
+      // Convert to int for comparison since form value is string
+      const roleIdInt = parseInt(assignmentForm.role_id, 10);
+      const selectedRole = roles.find(r => r.role_id === roleIdInt);
+
+      if (!selectedRole) {
+        setError('Invalid role selected');
+        return;
+      }
 
       // For Lead and Manager roles, require business selection
       if (selectedRole.role_level >= 3 && selectedRole.role_level <= 4) {
@@ -245,7 +252,7 @@ const AssignUserRoles = () => {
       const { data: canAssign, error: checkError } = await supabase
         .rpc('can_assign_role', {
           p_assigner_id: currentUser.id,
-          p_role_id: assignmentForm.role_id
+          p_role_id: roleIdInt
         });
 
       if (checkError) throw checkError;
@@ -285,7 +292,7 @@ const AssignUserRoles = () => {
         .from('user_role_assignments')
         .insert({
           user_id: selectedUser.id,
-          role_id: assignmentForm.role_id,
+          role_id: roleIdInt,
           assigned_by: currentUser.id,
           valid_from: assignmentForm.valid_from,
           valid_until: assignmentForm.valid_until || null
