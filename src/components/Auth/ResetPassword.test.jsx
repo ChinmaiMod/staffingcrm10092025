@@ -4,13 +4,13 @@ import ResetPassword from './ResetPassword.jsx'
 import { mockAuthContext } from '../../test/mocks.js'
 
 const setSessionMock = vi.fn(() => Promise.resolve({ data: null, error: null }))
-const exchangeCodeForSessionMock = vi.fn(() => Promise.resolve({ data: null, error: null }))
+const verifyOtpMock = vi.fn(() => Promise.resolve({ data: null, error: null }))
 
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
     auth: {
       setSession: (...args) => setSessionMock(...args),
-      exchangeCodeForSession: (...args) => exchangeCodeForSessionMock(...args),
+      verifyOtp: (...args) => verifyOtpMock(...args),
     },
   },
 }))
@@ -42,16 +42,19 @@ describe('ResetPassword', () => {
 
     expect(screen.getByRole('button', { name: /request new reset link/i })).toBeInTheDocument()
     expect(setSessionMock).not.toHaveBeenCalled()
-    expect(exchangeCodeForSessionMock).not.toHaveBeenCalled()
+    expect(verifyOtpMock).not.toHaveBeenCalled()
   })
 
-  it('exchanges code parameter for a session and renders the form', async () => {
-    exchangeCodeForSessionMock.mockResolvedValueOnce({ data: { session: {} }, error: null })
+  it('verifies token_hash and renders the form', async () => {
+    verifyOtpMock.mockResolvedValueOnce({ data: { session: {} }, error: null })
 
     renderComponent('/reset-password?code=test-hash&type=recovery')
 
     await waitFor(() => {
-      expect(exchangeCodeForSessionMock).toHaveBeenCalledWith('test-hash')
+      expect(verifyOtpMock).toHaveBeenCalledWith({
+        token_hash: 'test-hash',
+        type: 'recovery',
+      })
     })
 
     await waitFor(() => {

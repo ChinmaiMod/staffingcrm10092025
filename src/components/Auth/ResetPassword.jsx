@@ -55,7 +55,8 @@ export default function ResetPassword() {
 
       const accessToken = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
-      const code = searchParams.get('code') || searchParams.get('token_hash')
+      // token_hash from URL can be in 'code' or 'token_hash' parameter
+      const tokenHash = searchParams.get('token_hash') || searchParams.get('code')
 
       try {
         if (accessToken && refreshToken) {
@@ -69,11 +70,16 @@ export default function ResetPassword() {
           }
 
           setHasValidToken(true)
-        } else if (code && (!typeParam || typeParam === 'recovery')) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        } else if (tokenHash && (!typeParam || typeParam === 'recovery')) {
+          // Use verifyOtp for token_hash (from admin.generateLink or email templates)
+          // This is different from exchangeCodeForSession which is for PKCE codes
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          })
 
-          if (exchangeError) {
-            throw exchangeError
+          if (verifyError) {
+            throw verifyError
           }
 
           setHasValidToken(true)
