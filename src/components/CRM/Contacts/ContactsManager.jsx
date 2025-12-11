@@ -611,9 +611,15 @@ export default function ContactsManager() {
       let effectiveBusinessId = businessId
 
       if (selectedContact?.contact_id) {
+        // Update existing contact - set updated_by
+        const updatePayload = {
+          ...payload,
+          updated_by: profile?.id || null,
+          updated_at: new Date().toISOString()
+        }
         const { data, error } = await supabase
           .from('contacts')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', selectedContact.contact_id)
           .eq('tenant_id', tenant.tenant_id)
           .select('id, business_id')
@@ -626,9 +632,14 @@ export default function ContactsManager() {
           effectiveBusinessId = data[0].business_id ?? effectiveBusinessId
         }
       } else {
+        // Create new contact - set created_by
+        const insertPayload = {
+          ...payload,
+          created_by: profile?.id || null
+        }
         const { data, error } = await supabase
           .from('contacts')
-          .insert([payload])
+          .insert([insertPayload])
           .select('id, business_id')
           .single()
 
