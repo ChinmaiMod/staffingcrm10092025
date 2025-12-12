@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Tooling output
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
