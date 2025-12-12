@@ -157,6 +157,11 @@ export default function ContactsManager() {
   const [advancedFilterConfig, setAdvancedFilterConfig] = useState(null)
   const [isAdvancedFilterActive, setIsAdvancedFilterActive] = useState(false)
 
+  // Sorting state
+  const [showSortControls, setShowSortControls] = useState(false)
+  const [sortField, setSortField] = useState('created_at')
+  const [sortDirection, setSortDirection] = useState('desc')
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const CONTACTS_PER_PAGE = 20
@@ -921,16 +926,64 @@ export default function ContactsManager() {
     ? applyAdvancedFilters(filteredContacts, advancedFilterConfig)
     : filteredContacts
 
+  const sortedContacts = useMemo(() => {
+    const directionMultiplier = sortDirection === 'asc' ? 1 : -1
+    const safeString = (value) => (value ?? '').toString()
+    const safeDateValue = (value) => {
+      if (!value) return null
+      const time = Date.parse(value)
+      return Number.isFinite(time) ? time : null
+    }
+
+    const getValue = (contact) => {
+      switch (sortField) {
+        case 'created_at':
+          return contact.created_at
+        case 'first_name':
+          return contact.first_name
+        case 'last_name':
+          return contact.last_name
+        case 'contact_type':
+          return contact.contact_type
+        case 'status':
+          return contact.status
+        case 'job_title':
+          return contact.job_title
+        case 'reason_for_contact':
+          return contact.reason_for_contact_label
+        default:
+          return ''
+      }
+    }
+
+    const compare = (a, b) => {
+      if (sortField === 'created_at') {
+        const aTime = safeDateValue(getValue(a))
+        const bTime = safeDateValue(getValue(b))
+        if (aTime === null && bTime === null) return 0
+        if (aTime === null) return 1
+        if (bTime === null) return -1
+        return aTime - bTime
+      }
+
+      const aValue = safeString(getValue(a)).toLocaleLowerCase()
+      const bValue = safeString(getValue(b)).toLocaleLowerCase()
+      return aValue.localeCompare(bValue, undefined, { sensitivity: 'base' })
+    }
+
+    return [...finalContacts].sort((a, b) => directionMultiplier * compare(a, b))
+  }, [finalContacts, sortField, sortDirection])
+
   // Pagination calculations
   const totalPages = Math.ceil(finalContacts.length / CONTACTS_PER_PAGE)
   const startIndex = (currentPage - 1) * CONTACTS_PER_PAGE
   const endIndex = startIndex + CONTACTS_PER_PAGE
-  const paginatedContacts = finalContacts.slice(startIndex, endIndex)
+  const paginatedContacts = sortedContacts.slice(startIndex, endIndex)
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterStatus, filterType, filterTimeframe, filterBusiness, isAdvancedFilterActive])
+  }, [searchTerm, filterStatus, filterType, filterTimeframe, filterBusiness, isAdvancedFilterActive, sortField, sortDirection])
 
   const clearFilters = () => {
     setSearchTerm('')
@@ -1102,6 +1155,13 @@ export default function ContactsManager() {
           >
             🔍 Advanced Filter
           </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowSortControls((prev) => !prev)}
+            title="Sort contacts"
+          >
+            ↕ Sort
+          </button>
           {hasActiveFilters && (
             <button 
               className="btn btn-secondary btn-sm"
@@ -1112,6 +1172,36 @@ export default function ContactsManager() {
             </button>
           )}
         </div>
+
+        {showSortControls && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select
+                aria-label="Sort field"
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+              >
+                <option value="created_at">Created Date</option>
+                <option value="first_name">First Name</option>
+                <option value="last_name">Last Name</option>
+                <option value="contact_type">Type</option>
+                <option value="status">Status</option>
+                <option value="job_title">Job Title</option>
+                <option value="reason_for_contact">Reason for Contact</option>
+              </select>
+              <select
+                aria-label="Sort direction"
+                value={sortDirection}
+                onChange={(e) => setSortDirection(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* Advanced Filter Builder - Inline */}
         {showAdvancedFilter && (

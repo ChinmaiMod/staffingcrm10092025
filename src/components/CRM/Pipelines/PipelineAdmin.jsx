@@ -103,8 +103,13 @@ export default function PipelineAdmin() {
       
       setPipelines(data || [])
       if (data && data.length > 0) {
-        const currentSelection = data.find((p) => p.pipeline_id === selectedPipeline?.pipeline_id)
-        setSelectedPipeline(currentSelection || data[0])
+        setSelectedPipeline((previousSelection) => {
+          const previousId = previousSelection?.pipeline_id
+          const currentSelection = previousId
+            ? data.find((p) => p.pipeline_id === previousId)
+            : null
+          return currentSelection || data[0]
+        })
       } else {
         setSelectedPipeline(null)
       }
@@ -114,7 +119,7 @@ export default function PipelineAdmin() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPipeline?.pipeline_id, tenant?.tenant_id, canViewPipelines])
+  }, [tenant?.tenant_id, canViewPipelines])
 
   useEffect(() => {
     if (!tenant?.tenant_id) {

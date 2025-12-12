@@ -81,6 +81,8 @@ beforeAll(() => {
                     email: 'john.doe@intuites.com',
                     phone: '+1 (555) 123-4567',
                     contact_type: 'IT Candidate',
+                    created_at: '2025-01-02T00:00:00.000Z',
+                    updated_at: '2025-01-02T00:00:00.000Z',
                     workflow_status_id: 31,
                     workflow_status: { workflow_status: 'Initial Contact' },
                     visa_status_id: 34,
@@ -101,6 +103,8 @@ beforeAll(() => {
                     email: 'jane.smith@intuites.com',
                     phone: '+1 (555) 987-6543',
                     contact_type: 'Healthcare Candidate',
+                    created_at: '2025-01-01T00:00:00.000Z',
+                    updated_at: '2025-01-01T00:00:00.000Z',
                     workflow_status_id: 32,
                     workflow_status: { workflow_status: 'Spoke to Candidate' },
                     visa_status_id: 32,
@@ -496,6 +500,39 @@ describe('ContactsManager Search and Filter', () => {
     // 3. Only contacts matching both conditions are shown
     
     expect(screen.getByText(/Advanced Filter Builder/i)).toBeInTheDocument();
+  });
+});
+
+describe('ContactsManager Sorting', () => {
+  beforeEach(() => {
+    supabase.from.mockClear();
+  });
+
+  it('should show sort controls when Sort button is clicked', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    const sortButton = screen.getByRole('button', { name: /sort/i });
+    fireEvent.click(sortButton);
+
+    expect(screen.getByLabelText(/sort field/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/sort direction/i)).toBeInTheDocument();
+  });
+
+  it('should sort contacts by first name ascending', async () => {
+    renderWithProviders(<ContactsManager />);
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /sort/i }));
+
+    fireEvent.change(screen.getByLabelText(/sort field/i), { target: { value: 'first_name' } });
+    fireEvent.change(screen.getByLabelText(/sort direction/i), { target: { value: 'asc' } });
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole('row');
+      expect(within(rows[1]).getByText(/Jane\s+Smith/)).toBeInTheDocument();
+      expect(within(rows[2]).getByText(/John\s+Doe/)).toBeInTheDocument();
+    });
   });
 });
 
