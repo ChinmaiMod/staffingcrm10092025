@@ -508,25 +508,18 @@ describe('ContactsManager Sorting', () => {
     supabase.from.mockClear();
   });
 
-  it('should show sort controls when Sort button is clicked', async () => {
+  it('should show a combined Sort dropdown', async () => {
     renderWithProviders(<ContactsManager />);
     await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
 
-    const sortButton = screen.getByRole('button', { name: /sort/i });
-    fireEvent.click(sortButton);
-
-    expect(screen.getByLabelText(/sort field/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/sort direction/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^sort$/i)).toBeInTheDocument();
   });
 
   it('should sort contacts by first name ascending', async () => {
     renderWithProviders(<ContactsManager />);
     await waitFor(() => expect(screen.queryByText('Loading contacts...')).not.toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /sort/i }));
-
-    fireEvent.change(screen.getByLabelText(/sort field/i), { target: { value: 'first_name' } });
-    fireEvent.change(screen.getByLabelText(/sort direction/i), { target: { value: 'asc' } });
+    fireEvent.change(screen.getByLabelText(/^sort$/i), { target: { value: 'first_name:asc' } });
 
     await waitFor(() => {
       const rows = screen.getAllByRole('row');
