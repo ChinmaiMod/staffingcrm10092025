@@ -1,14 +1,15 @@
 // Deno Edge Function: CRM Contacts CRUD
-// Expects SERVICE_ROLE_KEY, SUPABASE_URL set in environment for server-side safe operations
+// Expects SUPABASE_SERVICE_ROLE_KEY + SUPABASE_URL (legacy fallback: SERVICE_ROLE_KEY)
 
 import { serve } from 'std/server'
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY')
+const SERVICE_ROLE_KEY =
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  console.error('Missing SUPABASE_URL or SERVICE_ROLE_KEY')
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
 }
 
 const supabase = createClient(SUPABASE_URL || '', SERVICE_ROLE_KEY || '')
