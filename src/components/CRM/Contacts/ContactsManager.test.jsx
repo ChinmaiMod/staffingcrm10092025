@@ -6,7 +6,45 @@ import ContactDetail from './ContactDetail';
 import { supabase } from '../../../api/supabaseClient';
 import { MemoryRouter } from 'react-router-dom';
 
+let mockUserPermissions = {
+  role_level: 5,
+  can_create_records: true,
+  can_edit_all_records: true,
+  can_edit_subordinate_records: true,
+  can_edit_own_records: true,
+  can_delete_all_records: true,
+  can_delete_subordinate_records: true,
+  can_delete_own_records: true,
+  can_view_all_records: true,
+  can_view_subordinate_records: true,
+  can_view_own_records: true,
+}
+
 vi.mock('../../../api/supabaseClient');
+
+vi.mock('../../../contexts/PermissionsProvider', () => ({
+  usePermissions: () => ({
+    loading: false,
+    error: null,
+    permissions: mockUserPermissions,
+    roleLevel: mockUserPermissions?.role_level ?? null,
+    roleCode: mockUserPermissions?.role_code ?? null,
+    clientPermissions: {
+      canViewSection: true,
+      canAccessDashboard: true,
+      canAccessInfo: true,
+      canAccessJobOrders: true,
+      canViewLinkedContacts: true,
+      canCreateClients: true,
+      canEditClients: true,
+      canDeleteClients: true,
+      canCreateJobOrders: true,
+      canEditJobOrders: true,
+      canDeleteJobOrders: true,
+    },
+    refresh: vi.fn(),
+  }),
+}))
 
 const createSelectResponse = (rows) => ({
   select: () => {
@@ -180,6 +218,19 @@ function renderWithProviders(ui) {
 
 describe('ContactsManager', () => {
   beforeEach(() => {
+    mockUserPermissions = {
+      role_level: 5,
+      can_create_records: true,
+      can_edit_all_records: true,
+      can_edit_subordinate_records: true,
+      can_edit_own_records: true,
+      can_delete_all_records: true,
+      can_delete_subordinate_records: true,
+      can_delete_own_records: true,
+      can_view_all_records: true,
+      can_view_subordinate_records: true,
+      can_view_own_records: true,
+    }
     supabase.from.mockClear();
   });
 

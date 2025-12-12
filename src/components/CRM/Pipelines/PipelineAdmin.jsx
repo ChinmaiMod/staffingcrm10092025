@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../api/supabaseClient'
 import { useAuth } from '../../../contexts/AuthProvider'
+import { usePermissions } from '../../../contexts/PermissionsProvider'
 import { useTenant } from '../../../contexts/TenantProvider'
 import { validateTextField, handleSupabaseError, handleError } from '../../../utils/validators'
 import './PipelineAdmin.css'
@@ -9,6 +10,7 @@ import './PipelineAdmin.css'
 export default function PipelineAdmin() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { permissions, loading: permissionsLoading } = usePermissions()
   const { tenant } = useTenant()
   const [pipelines, setPipelines] = useState([])
   const [selectedPipeline, setSelectedPipeline] = useState(null)
@@ -46,6 +48,26 @@ export default function PipelineAdmin() {
     is_final: false
   })
 
+  const canViewPipelines = Boolean(
+    permissions?.can_view_all_records ||
+      permissions?.can_view_subordinate_records ||
+      permissions?.can_view_own_records
+  )
+
+  const canCreatePipelines = Boolean(permissions?.can_create_records)
+
+  const canEditPipelines = Boolean(
+    permissions?.can_edit_all_records ||
+      permissions?.can_edit_subordinate_records ||
+      permissions?.can_edit_own_records
+  )
+
+  const canDeletePipelines = Boolean(
+    permissions?.can_delete_all_records ||
+      permissions?.can_delete_subordinate_records ||
+      permissions?.can_delete_own_records
+  )
+
   const businessLookup = useMemo(() => {
     return (businessOptions || []).reduce((acc, business) => {
       if (!business?.business_id) return acc
@@ -56,6 +78,13 @@ export default function PipelineAdmin() {
 
   const fetchPipelines = useCallback(async () => {
     if (!tenant?.tenant_id) {
+      setPipelines([])
+      setSelectedPipeline(null)
+      setLoading(false)
+      return
+    }
+
+    if (!canViewPipelines) {
       setPipelines([])
       setSelectedPipeline(null)
       setLoading(false)
@@ -85,7 +114,7 @@ export default function PipelineAdmin() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPipeline?.pipeline_id, tenant?.tenant_id])
+  }, [selectedPipeline?.pipeline_id, tenant?.tenant_id, canViewPipelines])
 
   useEffect(() => {
     if (!tenant?.tenant_id) {
@@ -162,6 +191,10 @@ export default function PipelineAdmin() {
   }
 
   const handleCreatePipeline = () => {
+    if (!canCreatePipelines) {
+      setError('You do not have permission to create pipelines.')
+      return
+    }
     if (businessOptions.length === 0) {
       setError('Create a business before configuring pipelines.')
       return
@@ -184,6 +217,10 @@ export default function PipelineAdmin() {
   }
 
   const handleEditPipeline = (pipeline) => {
+    if (!canEditPipelines) {
+      setError('You do not have permission to edit pipelines.')
+      return
+    }
     setEditingPipeline(pipeline)
     setPipelineForm({
       name: pipeline.name,
@@ -256,6 +293,16 @@ export default function PipelineAdmin() {
     e.preventDefault()
     setError('')
     setSuccess('')
+
+    if (editingPipeline && !canEditPipelines) {
+      setError('You do not have permission to edit pipelines.')
+      return
+    }
+
+    if (!editingPipeline && !canCreatePipelines) {
+      setError('You do not have permission to create pipelines.')
+      return
+    }
     
     if (!tenant?.tenant_id) {
       setError('Missing tenant context. Please refresh and try again.')
@@ -315,6 +362,10 @@ export default function PipelineAdmin() {
   }
 
   const handleDeletePipeline = async (pipeline) => {
+    if (!canDeletePipelines) {
+      setError('You do not have permission to delete pipelines.')
+      return
+    }
     if (!confirm(`Are you sure you want to delete "${pipeline.name}"?\n\nThis will also delete all stages and assignments. This action cannot be undone.`)) {
       return
     }
@@ -346,6 +397,10 @@ export default function PipelineAdmin() {
   }
 
   const handleCreateStage = () => {
+    if (!canCreatePipelines) {
+      setError('You do not have permission to create stages.')
+      return
+    }
     setEditingStage(null)
     setStageForm({
       name: '',
@@ -361,6 +416,10 @@ export default function PipelineAdmin() {
   }
 
   const handleEditStage = (stage) => {
+    if (!canEditPipelines) {
+      setError('You do not have permission to edit stages.')
+      return
+    }
     setEditingStage(stage)
     setStageForm({
       name: stage.name,
@@ -415,6 +474,16 @@ export default function PipelineAdmin() {
     e.preventDefault()
     setError('')
     setSuccess('')
+
+    if (editingStage && !canEditPipelines) {
+      setError('You do not have permission to edit stages.')
+      return
+    }
+
+    if (!editingStage && !canCreatePipelines) {
+      setError('You do not have permission to create stages.')
+      return
+    }
     
     if (!selectedPipeline) {
       setError('Please select a pipeline first')
@@ -469,6 +538,10 @@ export default function PipelineAdmin() {
   }
 
   const handleDeleteStage = async (stage) => {
+    if (!canDeletePipelines) {
+      setError('You do not have permission to delete stages.')
+      return
+    }
     if (!confirm(`Are you sure you want to delete "${stage.name}"?\n\nThis action cannot be undone.`)) {
       return
     }
@@ -497,6 +570,10 @@ export default function PipelineAdmin() {
   }
 
   const moveStage = async (stage, direction) => {
+    if (!canEditPipelines) {
+      setError('You do not have permission to reorder stages.')
+      return
+    }
     const currentIndex = stages.findIndex(s => s.stage_id === stage.stage_id)
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
     
@@ -530,6 +607,36 @@ export default function PipelineAdmin() {
     }
   }
 
+  if (permissionsLoading) {
+    return <div className="loading">Loading permissions...</div>
+  }
+
+  if (!canViewPipelines) {
+    return (
+      <div className="pipeline-admin">
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate('/crm/data-admin')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '14px',
+              padding: '8px 16px'
+            }}
+          >
+            ← Back to All Tables
+          </button>
+        </div>
+        <div className="error">
+          <h2>Access Restricted</h2>
+          <p>You do not have permission to view pipelines.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return <div className="loading">Loading pipelines...</div>
   }
@@ -554,14 +661,16 @@ export default function PipelineAdmin() {
       
       <div className="pipeline-admin-header">
         <h1>Pipeline Administration</h1>
-        <button
-          className="btn btn-primary"
-          onClick={handleCreatePipeline}
-          disabled={businessOptions.length === 0}
-          title={businessOptions.length === 0 ? 'Add a business in Data Admin before creating pipelines' : undefined}
-        >
-          + Create Pipeline
-        </button>
+        {canCreatePipelines && (
+          <button
+            className="btn btn-primary"
+            onClick={handleCreatePipeline}
+            disabled={businessOptions.length === 0}
+            title={businessOptions.length === 0 ? 'Add a business in Data Admin before creating pipelines' : undefined}
+          >
+            + Create Pipeline
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -595,26 +704,30 @@ export default function PipelineAdmin() {
                     <div className="pipeline-description">{pipeline.description}</div>
                   </div>
                   <div className="pipeline-actions">
-                    <button 
-                      className="btn-icon" 
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEditPipeline(pipeline)
-                      }}
-                      title="Edit pipeline"
-                    >
-                      ✏️
-                    </button>
-                    <button 
-                      className="btn-icon" 
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeletePipeline(pipeline)
-                      }}
-                      title="Delete pipeline"
-                    >
-                      🗑️
-                    </button>
+                    {canEditPipelines && (
+                      <button
+                        className="btn-icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditPipeline(pipeline)
+                        }}
+                        title="Edit pipeline"
+                      >
+                        ✏️
+                      </button>
+                    )}
+                    {canDeletePipelines && (
+                      <button
+                        className="btn-icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeletePipeline(pipeline)
+                        }}
+                        title="Delete pipeline"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -628,9 +741,11 @@ export default function PipelineAdmin() {
             <>
               <div className="stages-header">
                 <h3>Stages for {selectedPipeline.name}</h3>
-                <button className="btn btn-secondary" onClick={handleCreateStage}>
-                  + Add Stage
-                </button>
+                {canCreatePipelines && (
+                  <button className="btn btn-secondary" onClick={handleCreateStage}>
+                    + Add Stage
+                  </button>
+                )}
               </div>
 
               {stages.length === 0 ? (
@@ -648,36 +763,44 @@ export default function PipelineAdmin() {
                         <div className="stage-description">{stage.description}</div>
                       </div>
                       <div className="stage-actions">
-                        <button 
-                          className="btn-icon"
-                          onClick={() => moveStage(stage, 'up')}
-                          disabled={index === 0}
-                          title="Move up"
-                        >
-                          ⬆️
-                        </button>
-                        <button 
-                          className="btn-icon"
-                          onClick={() => moveStage(stage, 'down')}
-                          disabled={index === stages.length - 1}
-                          title="Move down"
-                        >
-                          ⬇️
-                        </button>
-                        <button 
-                          className="btn-icon" 
-                          onClick={() => handleEditStage(stage)}
-                          title="Edit stage"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          className="btn-icon" 
-                          onClick={() => handleDeleteStage(stage)}
-                          title="Delete stage"
-                        >
-                          🗑️
-                        </button>
+                        {canEditPipelines && (
+                          <button
+                            className="btn-icon"
+                            onClick={() => moveStage(stage, 'up')}
+                            disabled={index === 0}
+                            title="Move up"
+                          >
+                            ⬆️
+                          </button>
+                        )}
+                        {canEditPipelines && (
+                          <button
+                            className="btn-icon"
+                            onClick={() => moveStage(stage, 'down')}
+                            disabled={index === stages.length - 1}
+                            title="Move down"
+                          >
+                            ⬇️
+                          </button>
+                        )}
+                        {canEditPipelines && (
+                          <button
+                            className="btn-icon"
+                            onClick={() => handleEditStage(stage)}
+                            title="Edit stage"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {canDeletePipelines && (
+                          <button
+                            className="btn-icon"
+                            onClick={() => handleDeleteStage(stage)}
+                            title="Delete stage"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

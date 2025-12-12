@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { sendBulkEmail } from '../../../api/edgeFunctions'
 import { useAuth } from '../../../contexts/AuthProvider'
 import { useTenant } from '../../../contexts/TenantProvider'
+import { usePermissions } from '../../../contexts/PermissionsProvider'
 import { supabase } from '../../../api/supabaseClient'
 import { applyAdvancedFilters, describeFilter, isFilterEmpty } from '../../../utils/filterEngine'
 import { logger } from '../../../utils/logger'
@@ -131,6 +132,7 @@ export default function ContactsManager() {
   
   const [searchParams, setSearchParams] = useSearchParams()
   const { session, profile } = useAuth()
+  const { permissions, loading: permissionsLoading } = usePermissions()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -163,6 +165,22 @@ export default function ContactsManager() {
   const isMountedRef = useRef(true)
   const abortControllerRef = useRef(null)
   const lookupMapsRef = useRef({})
+
+  const canCreateContacts = !permissionsLoading && Boolean(permissions?.can_create_records)
+  const canEditContacts =
+    !permissionsLoading &&
+    Boolean(
+      permissions?.can_edit_all_records ||
+        permissions?.can_edit_subordinate_records ||
+        permissions?.can_edit_own_records
+    )
+  const canDeleteContacts =
+    !permissionsLoading &&
+    Boolean(
+      permissions?.can_delete_all_records ||
+        permissions?.can_delete_subordinate_records ||
+        permissions?.can_delete_own_records
+    )
 
   const loadContacts = useCallback(async () => {
     // Bug #13 fix: Abort previous request if still pending
@@ -962,8 +980,8 @@ export default function ContactsManager() {
             (selectedContact.business_id ? businessLookup[selectedContact.business_id] : null)
         }}
         onClose={() => setSelectedContact(null)}
-        onEdit={handleEditContact}
-        onDelete={handleDeleteContact}
+        onEdit={canEditContacts ? handleEditContact : undefined}
+        onDelete={canDeleteContacts ? handleDeleteContact : undefined}
       />
     )
   }
@@ -997,9 +1015,11 @@ export default function ContactsManager() {
               )}
             </div>
           )}
-          <button className="btn btn-primary" onClick={handleCreateContact}>
-            + New Contact
-          </button>
+          {canCreateContacts && (
+            <button className="btn btn-primary" onClick={handleCreateContact}>
+              + New Contact
+            </button>
+          )}
         </div>
       </div>
 
@@ -1198,9 +1218,11 @@ export default function ContactsManager() {
                         : 'Start by adding your first contact'}
                     </p>
                     {!hasActiveFilters && !isAdvancedFilterActive && (
-                      <button className="btn btn-primary" onClick={handleCreateContact}>
-                        + New Contact
-                      </button>
+                      canCreateContacts && (
+                        <button className="btn btn-primary" onClick={handleCreateContact}>
+                          + New Contact
+                        </button>
+                      )
                     )}
                   </div>
                 </td>
@@ -1251,18 +1273,22 @@ export default function ContactsManager() {
                       >
                         View
                       </button>
-                      <button 
-                        className="btn btn-sm btn-primary" 
-                        onClick={() => handleEditContact(contact)}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        className="btn btn-sm btn-danger" 
-                        onClick={() => handleDeleteContact(contact.contact_id)}
-                      >
-                        Delete
-                      </button>
+                      {canEditContacts && (
+                        <button 
+                          className="btn btn-sm btn-primary" 
+                          onClick={() => handleEditContact(contact)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canDeleteContacts && (
+                        <button 
+                          className="btn btn-sm btn-danger" 
+                          onClick={() => handleDeleteContact(contact.contact_id)}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
