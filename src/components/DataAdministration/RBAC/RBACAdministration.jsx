@@ -43,12 +43,15 @@ function RBACAdministration() {
     description: '',
     can_create_records: false,
     can_edit_own_records: false,
+    can_edit_peer_records: false,
     can_edit_subordinate_records: false,
     can_edit_all_records: false,
     can_delete_own_records: false,
+    can_delete_peer_records: false,
     can_delete_subordinate_records: false,
     can_delete_all_records: false,
     can_view_own_records: true,
+    can_view_peer_records: false,
     can_view_subordinate_records: false,
     can_view_all_records: false,
     can_assign_roles: false,
@@ -444,12 +447,15 @@ function RBACAdministration() {
       description: '',
       can_create_records: false,
       can_edit_own_records: false,
+      can_edit_peer_records: false,
       can_edit_subordinate_records: false,
       can_edit_all_records: false,
       can_delete_own_records: false,
+      can_delete_peer_records: false,
       can_delete_subordinate_records: false,
       can_delete_all_records: false,
       can_view_own_records: true,
+      can_view_peer_records: false,
       can_view_subordinate_records: false,
       can_view_all_records: false,
       can_assign_roles: false,
@@ -470,12 +476,15 @@ function RBACAdministration() {
       description: role.description || '',
       can_create_records: role.can_create_records,
       can_edit_own_records: role.can_edit_own_records,
+      can_edit_peer_records: role.can_edit_peer_records || false,
       can_edit_subordinate_records: role.can_edit_subordinate_records,
       can_edit_all_records: role.can_edit_all_records,
       can_delete_own_records: role.can_delete_own_records,
+      can_delete_peer_records: role.can_delete_peer_records || false,
       can_delete_subordinate_records: role.can_delete_subordinate_records,
       can_delete_all_records: role.can_delete_all_records,
       can_view_own_records: role.can_view_own_records,
+      can_view_peer_records: role.can_view_peer_records || false,
       can_view_subordinate_records: role.can_view_subordinate_records,
       can_view_all_records: role.can_view_all_records,
       can_assign_roles: role.can_assign_roles,
@@ -501,37 +510,37 @@ function RBACAdministration() {
   const handlePresetRole = (level) => {
     const presets = {
       1: {
-        can_create_records: false, can_edit_own_records: false, can_edit_subordinate_records: false,
-        can_edit_all_records: false, can_delete_own_records: false, can_delete_subordinate_records: false,
-        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: false,
+        can_create_records: false, can_edit_own_records: false, can_edit_peer_records: false, can_edit_subordinate_records: false,
+        can_edit_all_records: false, can_delete_own_records: false, can_delete_peer_records: false, can_delete_subordinate_records: false,
+        can_delete_all_records: false, can_view_own_records: true, can_view_peer_records: false, can_view_subordinate_records: false,
         can_view_all_records: false, can_assign_roles: false, can_manage_users: false,
         can_manage_businesses: false, can_manage_roles: false,
       },
       2: {
-        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: false,
-        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: false,
-        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: false,
+        can_create_records: true, can_edit_own_records: true, can_edit_peer_records: true, can_edit_subordinate_records: false,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_peer_records: false, can_delete_subordinate_records: false,
+        can_delete_all_records: false, can_view_own_records: true, can_view_peer_records: true, can_view_subordinate_records: false,
         can_view_all_records: false, can_assign_roles: false, can_manage_users: false,
         can_manage_businesses: false, can_manage_roles: false,
       },
       3: {
-        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
-        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: true,
-        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: true,
+        can_create_records: true, can_edit_own_records: true, can_edit_peer_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_peer_records: false, can_delete_subordinate_records: true,
+        can_delete_all_records: false, can_view_own_records: true, can_view_peer_records: true, can_view_subordinate_records: true,
         can_view_all_records: false, can_assign_roles: true, can_manage_users: false,
         can_manage_businesses: false, can_manage_roles: false,
       },
       4: {
-        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
-        can_edit_all_records: false, can_delete_own_records: true, can_delete_subordinate_records: true,
-        can_delete_all_records: false, can_view_own_records: true, can_view_subordinate_records: true,
+        can_create_records: true, can_edit_own_records: true, can_edit_peer_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: false, can_delete_own_records: true, can_delete_peer_records: false, can_delete_subordinate_records: true,
+        can_delete_all_records: false, can_view_own_records: true, can_view_peer_records: true, can_view_subordinate_records: true,
         can_view_all_records: false, can_assign_roles: true, can_manage_users: true,
         can_manage_businesses: false, can_manage_roles: false,
       },
       5: {
-        can_create_records: true, can_edit_own_records: true, can_edit_subordinate_records: true,
-        can_edit_all_records: true, can_delete_own_records: true, can_delete_subordinate_records: true,
-        can_delete_all_records: true, can_view_own_records: true, can_view_subordinate_records: true,
+        can_create_records: true, can_edit_own_records: true, can_edit_peer_records: true, can_edit_subordinate_records: true,
+        can_edit_all_records: true, can_delete_own_records: true, can_delete_peer_records: true, can_delete_subordinate_records: true,
+        can_delete_all_records: true, can_view_own_records: true, can_view_peer_records: true, can_view_subordinate_records: true,
         can_view_all_records: true, can_assign_roles: true, can_manage_users: true,
         can_manage_businesses: true, can_manage_roles: true,
       },
@@ -1177,6 +1186,10 @@ function RBACAdministration() {
                         <span>View own</span>
                       </label>
                       <label className="checkbox-label">
+                        <input type="checkbox" name="can_view_peer_records" checked={roleFormData.can_view_peer_records} onChange={handleRoleInputChange} />
+                        <span>View peers (same level)</span>
+                      </label>
+                      <label className="checkbox-label">
                         <input type="checkbox" name="can_view_subordinate_records" checked={roleFormData.can_view_subordinate_records} onChange={handleRoleInputChange} />
                         <span>View subordinates</span>
                       </label>
@@ -1192,6 +1205,10 @@ function RBACAdministration() {
                         <span>Edit own</span>
                       </label>
                       <label className="checkbox-label">
+                        <input type="checkbox" name="can_edit_peer_records" checked={roleFormData.can_edit_peer_records} onChange={handleRoleInputChange} />
+                        <span>Edit peers (same level)</span>
+                      </label>
+                      <label className="checkbox-label">
                         <input type="checkbox" name="can_edit_subordinate_records" checked={roleFormData.can_edit_subordinate_records} onChange={handleRoleInputChange} />
                         <span>Edit subordinates</span>
                       </label>
@@ -1205,6 +1222,10 @@ function RBACAdministration() {
                       <label className="checkbox-label">
                         <input type="checkbox" name="can_delete_own_records" checked={roleFormData.can_delete_own_records} onChange={handleRoleInputChange} />
                         <span>Delete own</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" name="can_delete_peer_records" checked={roleFormData.can_delete_peer_records} onChange={handleRoleInputChange} />
+                        <span>Delete peers (same level)</span>
                       </label>
                       <label className="checkbox-label">
                         <input type="checkbox" name="can_delete_subordinate_records" checked={roleFormData.can_delete_subordinate_records} onChange={handleRoleInputChange} />
