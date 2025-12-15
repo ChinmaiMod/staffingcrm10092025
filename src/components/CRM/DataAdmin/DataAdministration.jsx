@@ -6,7 +6,6 @@ import BusinessesPage from './Businesses/BusinessesPage'
 import InternalStaffPage from './InternalStaff/InternalStaffPage'
 import TeamsPage from './Teams/TeamsPage'
 import ResendApiKeysPage from './ResendApiKeys/ResendApiKeysPage'
-import UserRolesManagement from '../../DataAdministration/UserRoles/UserRolesManagement'
 import AssignUserRoles from '../../DataAdministration/UserRoles/AssignUserRoles'
 import InviteUsers from '../../DataAdministration/UserInvitations/InviteUsers'
 import RBACAdministration from '../../DataAdministration/RBAC/RBACAdministration'
@@ -14,7 +13,6 @@ import AIPromptsPage from './AIPrompts/AIPromptsPage'
 
 const REFERENCE_TABLES = [
   { id: 'rbac_admin', label: 'Access Control', icon: '🛡️', path: 'rbac-admin' },
-  { id: 'user_roles', label: 'User Roles', icon: '🔐', path: 'user-roles' },
   { id: 'assign_roles', label: 'Assign User Roles', icon: '👤', path: 'assign-roles' },
   { id: 'invite_users', label: 'Invite Users', icon: '📧', path: 'invite-users' },
   { id: 'resend_api_keys', label: 'Configure Resend API Keys', icon: '🔑', path: 'resend-api-keys' },
@@ -51,7 +49,6 @@ export default function DataAdministration() {
   return (
     <Routes>
       <Route path="rbac-admin" element={<RBACAdministration />} />
-      <Route path="user-roles" element={<UserRolesManagement />} />
       <Route path="assign-roles" element={<AssignUserRoles />} />
       <Route path="invite-users" element={<InviteUsers />} />
       <Route path="resend-api-keys" element={<ResendApiKeysPage />} />
