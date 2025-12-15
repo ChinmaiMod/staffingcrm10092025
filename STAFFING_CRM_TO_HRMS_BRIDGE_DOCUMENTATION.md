@@ -13,16 +13,17 @@ This document captures the essential architectural patterns, design decisions, a
 **Key Takeaway:** Every table must have `tenant_id` for complete data isolation.
 
 ```sql
--- Standard table structure
+-- Standard table structure (match CRM conventions)
+-- CRM uses named UUID primary keys (e.g., tenant_id, business_id, contact_id)
 CREATE TABLE hrms_employees (
-  id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
+  employee_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
   -- other fields
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES profiles(id),
-  updated_by UUID REFERENCES profiles(id)
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL
 );
 ```
 
@@ -30,16 +31,19 @@ CREATE TABLE hrms_employees (
 - ✅ **ALL tables MUST include `tenant_id`** - This is the primary multi-tenancy isolation mechanism
 - ✅ **ALL transactional tables SHOULD include `business_id`** - Enables multi-business support within a tenant
 - ✅ **Exceptions:** System-wide reference tables (roles, menu_permissions) don't need tenant_id/business_id
-- ✅ RLS policies filter by `auth.jwt() ->> 'sub'` to enforce tenant isolation
+- ✅ RLS policies use `auth.uid()` + `profiles.tenant_id = <table>.tenant_id` (with a `service_role` bypass for server/admin operations)
 - ✅ Cascading deletes ensure data cleanup on tenant removal
 - ✅ Updated timestamps managed via triggers
 - ✅ All foreign key references include appropriate ON DELETE actions
 
-**Critical Rules:**
-1. **tenant_id**: NOT NULL, UUID data type, references tenants(id) ON DELETE CASCADE
-2. **business_id**: NULL allowed (for tenant-wide data), UUID data type, references businesses(id) ON DELETE SET NULL
-3. **Indexes**: Always create indexes on tenant_id and business_id for query performance
-4. **Audit fields**: created_at, updated_at, created_by (optional), updated_by (optional) - same as CRM
+**Critical Rules (Current CRM Pattern):**
+1. **Primary Keys**: Prefer named UUID PKs (e.g., `employee_id`, `policy_id`) with `DEFAULT gen_random_uuid()`
+2. **tenant_id**: NOT NULL, UUID, references `tenants(tenant_id)` ON DELETE CASCADE
+3. **business_id**: UUID, references `businesses(business_id)` (CRM commonly uses ON DELETE CASCADE for business-scoped rows)
+4. **Indexes**: Always create indexes on tenant_id and business_id for query performance
+5. **Audit fields**: created_at, updated_at, created_by (optional), updated_by (optional) - same as CRM
+
+**Compatibility Note:** Some older snippets may still show `tenants(id)` / `businesses(id)`; in the current CRM schema these are `tenants(tenant_id)` / `businesses(business_id)`.
 
 ---
 
@@ -76,14 +80,14 @@ const newId = uuidv4();
 
 **Technical Specifications:**
 ```sql
-tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE
 ```
 
 | Property | Value | Reason |
 |----------|-------|--------|
 | **Data Type** | UUID | Globally unique, secure, non-sequential |
 | **NOT NULL** | ✅ Required | Every record MUST belong to a tenant |
-| **References** | tenants(id) | Foreign key ensures referential integrity |
+| **References** | tenants(tenant_id) | Foreign key ensures referential integrity |
 | **ON DELETE** | CASCADE | When tenant deleted, all related data automatically removed |
 | **Default** | None | Must be explicitly provided during INSERT |
 | **Index** | ✅ Required | B-tree index for fast lookups: `CREATE INDEX idx_table_tenant ON table(tenant_id)` |
@@ -132,15 +136,15 @@ tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
 
 **Technical Specifications:**
 ```sql
-business_id UUID REFERENCES businesses(id) ON DELETE SET NULL
+business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE
 ```
 
 | Property | Value | Reason |
 |----------|-------|--------|
 | **Data Type** | UUID | Consistent with tenant_id, globally unique |
 | **NULL Allowed** | ✅ Yes | Some data may be tenant-wide (not business-specific) |
-| **References** | businesses(id) | Foreign key to businesses table |
-| **ON DELETE** | SET NULL | When business deleted, records remain but business_id becomes NULL |
+| **References** | businesses(business_id) | Foreign key to businesses table |
+| **ON DELETE** | CASCADE | CRM commonly cascades business-scoped records when a business is removed |
 | **Default** | NULL | Optional field |
 | **Index** | ✅ Required | B-tree index for filtering: `CREATE INDEX idx_table_business ON table(business_id)` |
 
@@ -187,11 +191,11 @@ WHERE tenant_id = '3fa85f64-5717-4562-b3fc-2c963f66afa6'
 
 ```sql
 CREATE TABLE example_table (
-  id BIGSERIAL PRIMARY KEY,
+  example_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Multi-tenancy (REQUIRED)
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
   
   -- Your business logic columns
   column_name DATA_TYPE,
@@ -235,8 +239,8 @@ const { tenant } = useTenant();
 
 const createEmployee = async (employeeData) => {
   const payload = {
-    tenant_id: tenant.id,
-    business_id: selectedBusiness.id,
+    tenant_id: tenant.tenant_id,
+    business_id: selectedBusinessId ?? null,
     created_by: user.id, // Track who created it
     updated_by: user.id, // Same on creation
     ...employeeData
@@ -259,7 +263,7 @@ const updateEmployee = async (employeeId, updates) => {
   await supabase
     .from('hrms_employees')
     .update(payload)
-    .eq('id', employeeId);
+    .eq('employee_id', employeeId);
 };
 ```
 
@@ -323,18 +327,23 @@ CREATE POLICY "Users can create employees for their tenant"
 ```sql
 -- Businesses table (already exists in CRM)
 CREATE TABLE businesses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  business_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   business_name TEXT NOT NULL,
-  division_type TEXT CHECK (division_type IN ('IT', 'Healthcare')),
+  business_type TEXT NOT NULL CHECK (business_type IN ('IT_STAFFING','HEALTHCARE_STAFFING','GENERAL','OTHER')),
   is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  is_default BOOLEAN DEFAULT false,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, business_name)
 );
 
 -- All HRMS tables should support business_id
-ALTER TABLE hrms_employees ADD COLUMN business_id UUID REFERENCES businesses(id);
-ALTER TABLE hrms_departments ADD COLUMN business_id UUID REFERENCES businesses(id);
-ALTER TABLE hrms_positions ADD COLUMN business_id UUID REFERENCES businesses(id);
+ALTER TABLE hrms_employees ADD COLUMN business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE;
+ALTER TABLE hrms_departments ADD COLUMN business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE;
+ALTER TABLE hrms_positions ADD COLUMN business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE;
 ```
 
 **UI Pattern:**
@@ -354,9 +363,9 @@ ALTER TABLE hrms_positions ADD COLUMN business_id UUID REFERENCES businesses(id)
 ```sql
 -- Example: Employment Types
 CREATE TABLE employment_types (
-  id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL, -- Optional: business-specific types
+  employment_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
   employment_type TEXT NOT NULL,
   description TEXT,
   is_active BOOLEAN DEFAULT true,
@@ -757,11 +766,11 @@ CREATE INDEX idx_employee_training_expiry ON employee_training(expiry_date);
 ```sql
 -- Link table
 CREATE TABLE contact_employee_links (
-  id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
-  contact_id BIGINT REFERENCES contacts(id) ON DELETE SET NULL,
-  employee_id BIGINT REFERENCES hrms_employees(id) ON DELETE CASCADE,
+  contact_employee_link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
+  crm_contact_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL,
+  hrms_employee_id UUID REFERENCES hrms_employees(employee_id) ON DELETE CASCADE,
   conversion_date TIMESTAMPTZ DEFAULT NOW(),
   converted_by UUID REFERENCES profiles(id),
   notes TEXT,
@@ -771,12 +780,12 @@ CREATE TABLE contact_employee_links (
 -- Indexes
 CREATE INDEX idx_contact_employee_links_tenant ON contact_employee_links(tenant_id);
 CREATE INDEX idx_contact_employee_links_business ON contact_employee_links(business_id);
-CREATE INDEX idx_contact_employee_links_contact ON contact_employee_links(contact_id);
-CREATE INDEX idx_contact_employee_links_employee ON contact_employee_links(employee_id);
+CREATE INDEX idx_contact_employee_links_contact ON contact_employee_links(crm_contact_id);
+CREATE INDEX idx_contact_employee_links_employee ON contact_employee_links(hrms_employee_id);
 
 -- Employee table includes optional contact reference
 ALTER TABLE hrms_employees 
-  ADD COLUMN source_contact_id BIGINT REFERENCES contacts(id);
+  ADD COLUMN source_contact_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL;
 ```
 
 **Conversion Workflow:**
@@ -800,7 +809,7 @@ ALTER TABLE hrms_employees
 **Key Takeaway:** Reuse CRM lookup tables where applicable to maintain consistency.
 
 **Tables to Share Between CRM & HRMS:**
-- ✅ `visa_statuses` - Immigration status tracking
+- ✅ `visa_status` - Immigration status tracking
 - ✅ `job_titles` - Consistent job title taxonomy
 - ✅ `countries`, `states`, `cities` - Geographic data
 - ✅ `businesses` - Division/business unit structure
@@ -809,9 +818,9 @@ ALTER TABLE hrms_employees
 ```sql
 -- HRMS references CRM tables
 ALTER TABLE hrms_employees 
-  ADD COLUMN visa_status_id BIGINT REFERENCES visa_statuses(id),
-  ADD COLUMN job_title_id BIGINT REFERENCES job_titles(id),
-  ADD COLUMN country_id BIGINT REFERENCES countries(id);
+  ADD COLUMN visa_status_id UUID REFERENCES visa_status(visa_status_id) ON DELETE SET NULL,
+  ADD COLUMN job_title_id UUID REFERENCES job_titles(job_title_id) ON DELETE SET NULL,
+  ADD COLUMN country_id UUID REFERENCES countries(country_id) ON DELETE SET NULL;
 ```
 
 ### 3. Team/Recruiter Relationship Preservation
@@ -822,16 +831,16 @@ ALTER TABLE hrms_employees
 ```sql
 -- Track who recruited this employee
 ALTER TABLE hrms_employees 
-  ADD COLUMN recruited_by_team_id BIGINT REFERENCES teams(id),
-  ADD COLUMN primary_recruiter_id BIGINT REFERENCES team_members(id);
+  ADD COLUMN recruiting_team_lead_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  ADD COLUMN recruiter_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
 -- Optional: Commission tracking
 CREATE TABLE recruitment_commissions (
-  id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
-  employee_id BIGINT REFERENCES hrms_employees(id) ON DELETE CASCADE,
-  team_member_id BIGINT REFERENCES team_members(id) ON DELETE SET NULL,
+  recruitment_commission_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
+  employee_id UUID REFERENCES hrms_employees(employee_id) ON DELETE CASCADE,
+  recruiter_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   commission_amount DECIMAL(10,2),
   commission_type TEXT, -- 'placement', 'retention_milestone'
   earned_date TIMESTAMPTZ,
@@ -845,7 +854,7 @@ CREATE TABLE recruitment_commissions (
 CREATE INDEX idx_recruitment_commissions_tenant ON recruitment_commissions(tenant_id);
 CREATE INDEX idx_recruitment_commissions_business ON recruitment_commissions(business_id);
 CREATE INDEX idx_recruitment_commissions_employee ON recruitment_commissions(employee_id);
-CREATE INDEX idx_recruitment_commissions_team_member ON recruitment_commissions(team_member_id);
+CREATE INDEX idx_recruitment_commissions_recruiter ON recruitment_commissions(recruiter_id);
 ```
 
 ---
@@ -1037,13 +1046,13 @@ SELECT pgp_sym_decrypt(ssn_encrypted, 'encryption-key') FROM hrms_employees;
 **Enhanced Audit Pattern:**
 ```sql
 CREATE TABLE hrms_audit_logs (
-  id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
-  user_id UUID REFERENCES profiles(id),
+  audit_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  business_id UUID REFERENCES businesses(business_id) ON DELETE CASCADE,
+  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   action TEXT NOT NULL, -- 'view', 'create', 'update', 'delete', 'export'
   table_name TEXT NOT NULL,
-  record_id BIGINT,
+  record_id UUID,
   changes JSONB, -- Before/after values
   ip_address INET,
   user_agent TEXT,
@@ -1150,50 +1159,11 @@ INSERT INTO scheduled_notifications (
 **Key Takeaway:** Centralize state management with context providers.
 
 **Required Contexts for HRMS:**
-```javascript
-// 1. AuthProvider (reuse from CRM)
-const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Auth methods
-  return (
-    <AuthContext.Provider value={{ user, session, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
 
-// 2. TenantProvider (reuse from CRM)
-const TenantProvider = ({ children }) => {
-  const [tenant, setTenant] = useState(null);
-  const [subscription, setSubscription] = useState(null);
-  const [selectedBusiness, setSelectedBusiness] = useState(null);
-  
-  return (
-    <TenantContext.Provider value={{ tenant, subscription, selectedBusiness }}>
-      {children}
-    </TenantContext.Provider>
-  );
-};
-
-// 3. NEW: HRMSProvider (employee-specific state)
-const HRMSProvider = ({ children }) => {
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [departments, setDepartments] = useState([]);
-  const [employmentTypes, setEmploymentTypes] = useState([]);
-  
-  return (
-    <HRMSContext.Provider value={{ 
-      selectedEmployee, setSelectedEmployee,
-      departments, employmentTypes 
-    }}>
-      {children}
-    </HRMSContext.Provider>
-  );
-};
-```
+- `AuthProvider.jsx` (CRM source of truth): loads Supabase session, fetches `profiles`, caches `crm::tenant_id` + `crm::profile_cache`
+- `TenantProvider.jsx` (CRM source of truth): loads `tenants` + active `subscriptions`, caches `crm::tenant_data` + `crm::tenant_subscription`
+- `PermissionsProvider.jsx` (CRM source of truth): reads `user_permissions` and derives feature flags/role info
+- HRMS can add an `HRMSProvider.jsx` for employee-domain state, but keep auth/tenant/permissions behavior identical to CRM
 
 ### 2. Component Organization
 
@@ -1355,36 +1325,35 @@ Deno.serve(async (req) => {
 **Workflow:**
 ```javascript
 const convertContactToEmployee = async (contactId, additionalData) => {
-  const { data: userToken } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   
   // Call Edge Function for secure conversion
-  const response = await callEdgeFunction(
+  const result = await callEdgeFunction(
     'convertContactToEmployee',
     {
-      contact_id: contactId,
+      crm_contact_id: contactId, // UUID (CRM contacts.contact_id)
       employment_start_date: additionalData.startDate,
       department_id: additionalData.departmentId,
-      salary: additionalData.salary, // Encrypted in Edge Function
-      employment_type_id: additionalData.employmentTypeId
+      salary: additionalData.salary, // Encrypt/store securely in Edge Function
+      employment_type_id: additionalData.employmentTypeId,
     },
-    userToken.access_token
+    session?.access_token
   );
-  
-  if (response.ok) {
-    const { employee_id, contact_employee_link_id } = await response.json();
-    return { employeeId: employee_id, linkId: contact_employee_link_id };
-  } else {
-    throw new Error('Conversion failed');
-  }
+
+  // callEdgeFunction throws on non-2xx and returns parsed JSON on success
+  return {
+    employeeId: result.employee_id,
+    linkId: result.contact_employee_link_id,
+  };
 };
 ```
 
 **Edge Function Implementation:**
 ```typescript
 // convertContactToEmployee.ts
-export async function convertContactToEmployee(contactId: number, employmentData: any) {
+export async function convertContactToEmployee(contactId: string, employmentData: any) {
   // 1. Fetch contact details
-  const contact = await getContact(contactId);
+  const contact = await getContact(contactId); // CRM contacts.contact_id (UUID)
   
   // 2. Create employee record
   const employee = await supabase
@@ -1406,7 +1375,8 @@ export async function convertContactToEmployee(contactId: number, employmentData
       department_id: employmentData.department_id,
       employment_type_id: employmentData.employment_type_id,
       employment_status: 'ACTIVE',
-      recruited_by_team_id: contact.assigned_team_id
+      recruiting_team_lead_id: contact.recruiting_team_lead_id,
+      recruiter_id: contact.recruiter_id,
     })
     .select()
     .single();
@@ -1416,22 +1386,25 @@ export async function convertContactToEmployee(contactId: number, employmentData
     .from('contact_employee_links')
     .insert({
       tenant_id: contact.tenant_id,
-      contact_id: contactId,
-      employee_id: employee.id,
+      business_id: contact.business_id,
+      crm_contact_id: contactId,
+      hrms_employee_id: employee.employee_id,
       converted_by: getCurrentUserId()
     });
   
   // 4. Update contact status
+  // NOTE: CRM uses contacts.status_id (FK to contact_statuses.status_id).
+  // Update to the appropriate status for your workflow.
   await supabase
     .from('contacts')
-    .update({ workflow_status_id: getStatusId('Converted to Employee') })
-    .eq('id', contactId);
+    .update({ status_id: getStatusId('CONVERTED_TO_EMPLOYEE') })
+    .eq('contact_id', contactId);
   
   // 5. Transfer attachments
-  await copyContactAttachmentsToEmployee(contactId, employee.id);
+  await copyContactAttachmentsToEmployee(contactId, employee.employee_id);
   
   // 6. Trigger onboarding workflow
-  await initiateOnboarding(employee.id);
+  await initiateOnboarding(employee.employee_id);
   
   return employee;
 }
@@ -1450,8 +1423,8 @@ BEGIN
     email = NEW.email,
     phone = NEW.phone,
     updated_at = NOW()
-  WHERE id = NEW.source_contact_id
-    AND NEW.source_contact_id IS NOT NULL;
+  WHERE NEW.source_contact_id IS NOT NULL
+    AND contact_id = NEW.source_contact_id;
   
   RETURN NEW;
 END;
@@ -1475,6 +1448,7 @@ CREATE TRIGGER trigger_sync_employee_to_contact
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_FUNCTIONS_URL=https://your-project.supabase.co/functions/v1
+VITE_FRONTEND_URL=https://your-frontend.example.com
 
 # HRMS-Specific
 VITE_HRMS_MODULE_ENABLED=true
@@ -1573,12 +1547,12 @@ jobs:
 ```javascript
 // Shared API functions (works on web & mobile)
 export const getEmployeePaystubs = async (employeeId, userToken) => {
-  const response = await callEdgeFunction(
+  const data = await callEdgeFunction(
     'getPaystubs',
     { employee_id: employeeId },
     userToken
   );
-  return response.json();
+  return data;
 };
 
 // Web component
@@ -1591,7 +1565,7 @@ const PaystubList = () => {
   }, [employee]);
   
   const loadPaystubs = async () => {
-    const data = await getEmployeePaystubs(employee.id, userToken);
+    const data = await getEmployeePaystubs(employee.employee_id, userToken);
     setPaystubs(data);
   };
   
@@ -1608,7 +1582,7 @@ const PaystubList = () => {
   }, [employee]);
   
   const loadPaystubs = async () => {
-    const data = await getEmployeePaystubs(employee.id, userToken);
+    const data = await getEmployeePaystubs(employee.employee_id, userToken);
     setPaystubs(data);
   };
   
@@ -1788,16 +1762,16 @@ CREATE INDEX idx_time_off_employee_status
 ```sql
 -- GOOD: Single query with joins
 SELECT 
-  e.id, e.first_name, e.last_name, e.email,
+  e.employee_id, e.first_name, e.last_name, e.email,
   d.department_name,
-  jt.job_title,
+  jt.title,
   et.employment_type,
-  vs.visa_status
+  vs.label AS visa_status
 FROM hrms_employees e
-LEFT JOIN departments d ON e.department_id = d.id
-LEFT JOIN job_titles jt ON e.job_title_id = jt.id
-LEFT JOIN employment_types et ON e.employment_type_id = et.id
-LEFT JOIN visa_statuses vs ON e.visa_status_id = vs.id
+LEFT JOIN departments d ON e.department_id = d.department_id
+LEFT JOIN job_titles jt ON e.job_title_id = jt.job_title_id
+LEFT JOIN employment_types et ON e.employment_type_id = et.employment_type_id
+LEFT JOIN visa_status vs ON e.visa_status_id = vs.visa_status_id
 WHERE e.tenant_id = $1
   AND e.employment_status = 'ACTIVE'
 LIMIT 100;
@@ -1909,10 +1883,10 @@ When building HRMS to link with CRM:
 
 - [ ] **Database**
   - [ ] **CRITICAL: All HRMS tables include tenant_id (NOT NULL, CASCADE DELETE)**
-  - [ ] **CRITICAL: All transactional tables include business_id (NULL allowed, SET NULL on delete)**
+  - [ ] **CRITICAL: All business-scoped tables include business_id (CRM commonly CASCADE deletes business-scoped rows)**
   - [ ] **CRITICAL: Create indexes on tenant_id and business_id for every table**
   - [ ] Reuse `tenants`, `profiles`, `businesses` tables
-  - [ ] Share `visa_statuses`, `job_titles`, `countries`, `states`, `cities`
+  - [ ] Share `visa_status`, `job_titles`, `countries`, `states`, `cities`
   - [ ] Create `contact_employee_links` table with tenant_id/business_id
   - [ ] Apply RLS policies to all new tables (tenant-scoped and business-scoped)
   - [ ] Add proper indexes for performance (tenant_id, business_id, frequently queried columns)
@@ -1922,6 +1896,7 @@ When building HRMS to link with CRM:
 - [ ] **Authentication**
   - [ ] Use same Supabase Auth instance
   - [ ] Share `AuthProvider` context
+  - [ ] Reuse `TenantProvider` + subscription loading pattern
   - [ ] Reuse JWT token for API calls
 
 - [ ] **API Layer**
@@ -1968,9 +1943,9 @@ When building HRMS to link with CRM:
 ### Code References from CRM
 - `src/api/edgeFunctions.js` - API call patterns
 - `src/contexts/AuthProvider.jsx` - Authentication state
-- `supabase/migrations/011_businesses_multi_business.sql` - Multi-business schema
+- `supabase/migrations/COMBINED_COMPLETE_SCHEMA.sql` - Current combined schema (includes tenants/profiles/businesses/contacts/RLS)
 - `src/components/CRM/Contacts/ContactForm.jsx` - Form validation patterns
-- `src/components/Shared/AutocompleteSelect.jsx` - Reusable dropdown component
+- `src/components/CRM/common/AutocompleteSelect.jsx` - Reusable dropdown component
 
 ---
 
@@ -2047,9 +2022,9 @@ CREATE POLICY "Users can update records from their tenant"
 
 | Column | Required | Data Type | Foreign Key | On Delete | Default | Purpose |
 |--------|----------|-----------|-------------|-----------|---------|---------|
-| `id` | ✅ YES | BIGSERIAL | - | - | AUTO | Primary key |
-| `tenant_id` | ✅ YES (NOT NULL) | **UUID** | tenants(id) | CASCADE | - | Multi-tenancy isolation |
-| `business_id` | ⚠️ Recommended | **UUID** | businesses(id) | SET NULL | NULL | Business-level filtering |
+| `*_id` | ✅ YES | **UUID** | - | - | `gen_random_uuid()` | Primary key (prefer named UUID PKs: `employee_id`, `policy_id`, etc.) |
+| `tenant_id` | ✅ YES (NOT NULL) | **UUID** | tenants(tenant_id) | CASCADE | - | Multi-tenancy isolation |
+| `business_id` | ⚠️ Recommended | **UUID** | businesses(business_id) | CASCADE | NULL | Business-level filtering |
 | `created_at` | ✅ YES | TIMESTAMPTZ | - | - | NOW() | Creation timestamp (UTC) |
 | `updated_at` | ✅ YES | TIMESTAMPTZ | - | - | NOW() | Last update (auto-updated) |
 | `created_by` | ⚠️ Optional | **UUID** | profiles(id) | SET NULL | - | User who created record |
@@ -2133,7 +2108,7 @@ const updateEmployee = async (employeeId, updates) => {
   const { data, error } = await supabase
     .from('hrms_employees')
     .update(payload)
-    .eq('id', employeeId)
+    .eq('employee_id', employeeId)
     .select()
     .single();
   

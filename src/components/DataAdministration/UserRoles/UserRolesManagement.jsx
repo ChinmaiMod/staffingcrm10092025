@@ -28,12 +28,15 @@ function UserRolesManagement() {
     can_create_records: false,
     can_edit_own_records: false,
     can_edit_subordinate_records: false,
+    can_edit_peer_records: false,
     can_edit_all_records: false,
     can_delete_own_records: false,
     can_delete_subordinate_records: false,
+    can_delete_peer_records: false,
     can_delete_all_records: false,
     can_view_own_records: true,
     can_view_subordinate_records: false,
+    can_view_peer_records: false,
     can_view_all_records: false,
     can_assign_roles: false,
     can_manage_users: false,
@@ -117,12 +120,15 @@ function UserRolesManagement() {
       can_create_records: false,
       can_edit_own_records: false,
       can_edit_subordinate_records: false,
+      can_edit_peer_records: false,
       can_edit_all_records: false,
       can_delete_own_records: false,
       can_delete_subordinate_records: false,
+      can_delete_peer_records: false,
       can_delete_all_records: false,
       can_view_own_records: true,
       can_view_subordinate_records: false,
+      can_view_peer_records: false,
       can_view_all_records: false,
       can_assign_roles: false,
       can_manage_users: false,
@@ -143,12 +149,15 @@ function UserRolesManagement() {
       can_create_records: role.can_create_records,
       can_edit_own_records: role.can_edit_own_records,
       can_edit_subordinate_records: role.can_edit_subordinate_records,
+      can_edit_peer_records: role.can_edit_peer_records || false,
       can_edit_all_records: role.can_edit_all_records,
       can_delete_own_records: role.can_delete_own_records,
       can_delete_subordinate_records: role.can_delete_subordinate_records,
+      can_delete_peer_records: role.can_delete_peer_records || false,
       can_delete_all_records: role.can_delete_all_records,
       can_view_own_records: role.can_view_own_records,
       can_view_subordinate_records: role.can_view_subordinate_records,
+      can_view_peer_records: role.can_view_peer_records || false,
       can_view_all_records: role.can_view_all_records,
       can_assign_roles: role.can_assign_roles,
       can_manage_users: role.can_manage_users,
@@ -274,12 +283,15 @@ function UserRolesManagement() {
         can_create_records: false,
         can_edit_own_records: false,
         can_edit_subordinate_records: false,
+        can_edit_peer_records: false,
         can_edit_all_records: false,
         can_delete_own_records: false,
         can_delete_subordinate_records: false,
+        can_delete_peer_records: false,
         can_delete_all_records: false,
         can_view_own_records: true,
         can_view_subordinate_records: false,
+        can_view_peer_records: false,
         can_view_all_records: false,
         can_assign_roles: false,
         can_manage_users: false,
@@ -290,12 +302,15 @@ function UserRolesManagement() {
         can_create_records: true,
         can_edit_own_records: true,
         can_edit_subordinate_records: false,
+        can_edit_peer_records: true,
         can_edit_all_records: false,
         can_delete_own_records: true,
         can_delete_subordinate_records: false,
+        can_delete_peer_records: false,
         can_delete_all_records: false,
         can_view_own_records: true,
         can_view_subordinate_records: false,
+        can_view_peer_records: true,
         can_view_all_records: false,
         can_assign_roles: false,
         can_manage_users: false,
@@ -306,12 +321,15 @@ function UserRolesManagement() {
         can_create_records: true,
         can_edit_own_records: true,
         can_edit_subordinate_records: true,
+        can_edit_peer_records: true,
         can_edit_all_records: false,
         can_delete_own_records: true,
         can_delete_subordinate_records: true,
+        can_delete_peer_records: false,
         can_delete_all_records: false,
         can_view_own_records: true,
         can_view_subordinate_records: true,
+        can_view_peer_records: true,
         can_view_all_records: false,
         can_assign_roles: true,
         can_manage_users: false,
@@ -322,12 +340,15 @@ function UserRolesManagement() {
         can_create_records: true,
         can_edit_own_records: true,
         can_edit_subordinate_records: true,
+        can_edit_peer_records: true,
         can_edit_all_records: false,
         can_delete_own_records: true,
         can_delete_subordinate_records: true,
+        can_delete_peer_records: true,
         can_delete_all_records: false,
         can_view_own_records: true,
         can_view_subordinate_records: true,
+        can_view_peer_records: true,
         can_view_all_records: false,
         can_assign_roles: true,
         can_manage_users: true,
@@ -338,12 +359,15 @@ function UserRolesManagement() {
         can_create_records: true,
         can_edit_own_records: true,
         can_edit_subordinate_records: true,
+        can_edit_peer_records: true,
         can_edit_all_records: true,
         can_delete_own_records: true,
         can_delete_subordinate_records: true,
+        can_delete_peer_records: true,
         can_delete_all_records: true,
         can_view_own_records: true,
         can_view_subordinate_records: true,
+        can_view_peer_records: true,
         can_view_all_records: true,
         can_assign_roles: true,
         can_manage_users: true,
@@ -440,11 +464,14 @@ function UserRolesManagement() {
               <div className="permission-tags">
                 {role.can_create_records && <span className="tag tag-success">Create</span>}
                 {role.can_edit_own_records && <span className="tag tag-info">Edit Own</span>}
+                {role.can_edit_peer_records && <span className="tag tag-info">Edit Peers</span>}
                 {role.can_edit_subordinate_records && <span className="tag tag-info">Edit Subordinates</span>}
                 {role.can_edit_all_records && <span className="tag tag-warning">Edit All</span>}
                 {role.can_delete_own_records && <span className="tag tag-danger">Delete Own</span>}
+                {role.can_delete_peer_records && <span className="tag tag-danger">Delete Peers</span>}
                 {role.can_delete_subordinate_records && <span className="tag tag-danger">Delete Subordinates</span>}
                 {role.can_delete_all_records && <span className="tag tag-danger">Delete All</span>}
+                {role.can_view_peer_records && <span className="tag tag-primary">View Peers</span>}
                 {role.can_view_all_records && <span className="tag tag-primary">View All</span>}
                 {role.can_assign_roles && <span className="tag tag-special">Assign Roles</span>}
                 {role.can_manage_users && <span className="tag tag-special">Manage Users</span>}
@@ -565,6 +592,15 @@ function UserRolesManagement() {
                       <label className="checkbox-label">
                         <input
                           type="checkbox"
+                          name="can_view_peer_records"
+                          checked={formData.can_view_peer_records}
+                          onChange={handleInputChange}
+                        />
+                        <span>Can view peers&rsquo; records (same role level)</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
                           name="can_view_subordinate_records"
                           checked={formData.can_view_subordinate_records}
                           onChange={handleInputChange}
@@ -596,6 +632,15 @@ function UserRolesManagement() {
                       <label className="checkbox-label">
                         <input
                           type="checkbox"
+                          name="can_edit_peer_records"
+                          checked={formData.can_edit_peer_records}
+                          onChange={handleInputChange}
+                        />
+                        <span>Can edit peers&rsquo; records (same role level)</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
                           name="can_edit_subordinate_records"
                           checked={formData.can_edit_subordinate_records}
                           onChange={handleInputChange}
@@ -623,6 +668,15 @@ function UserRolesManagement() {
                           onChange={handleInputChange}
                         />
                         <span>Can delete own records</span>
+                      </label>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          name="can_delete_peer_records"
+                          checked={formData.can_delete_peer_records}
+                          onChange={handleInputChange}
+                        />
+                        <span>Can delete peers&rsquo; records (same role level)</span>
                       </label>
                       <label className="checkbox-label">
                         <input
