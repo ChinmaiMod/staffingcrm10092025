@@ -1077,3 +1077,169 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Application Access Tab Styles */
+.app-access-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.app-access-matrix .user-header {
+  text-align: left;
+  min-width: 250px;
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.app-access-matrix .app-header {
+  text-align: center;
+  min-width: 120px;
+  background: #f8fafc;
+}
+
+.app-header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-icon {
+  font-size: 20px;
+}
+
+.app-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.app-access-matrix .actions-header {
+  text-align: center;
+  min-width: 120px;
+  background: #f8fafc;
+}
+
+.user-cell {
+  padding: 12px 16px;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.app-access-matrix .user-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.access-cell {
+  text-align: center;
+  padding: 12px;
+}
+
+.access-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.access-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.access-toggle input:checked + .toggle-slider {
+  background-color: #22c55e;
+}
+
+.access-toggle input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.access-toggle input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actions-cell {
+  text-align: center;
+  padding: 12px;
+}
+
+.actions-cell .btn-mini {
+  margin: 0 2px;
+}
+
+.app-access-info {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.app-access-info h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.app-access-info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.app-access-info li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.app-access-info li:last-child {
+  margin-bottom: 0;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+  font-size: 14px;
+}

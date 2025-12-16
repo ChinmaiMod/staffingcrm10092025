@@ -214,6 +214,32 @@
   font-size: 14px;
 }
 
+.loading-apps {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
+}
+
+.no-apps-message {
+  text-align: center;
+  padding: 40px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px dashed #dee2e6;
+}
+
+.no-apps-message p {
+  margin: 8px 0;
+  color: #666;
+}
+
+.no-apps-message p:first-child {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
 .btn-outline {
   background: white;
   border: 2px solid #667eea;

@@ -1,14 +1,49 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthProvider'
 import { useTenant } from '../../contexts/TenantProvider'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../api/supabaseClient'
 import './Dashboard.css'
 
 export default function TenantDashboard() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, session } = useAuth()
   const { tenant, subscription, getPlanName } = useTenant()
   const navigate = useNavigate()
+  const [userApps, setUserApps] = useState([])
+  const [loadingApps, setLoadingApps] = useState(true)
 
   const canManageTenantAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(profile?.role || '')
+
+  // Fetch user's accessible applications
+  useEffect(() => {
+    const fetchUserApplications = async () => {
+      if (!session?.user?.id || !tenant?.tenant_id) {
+        setLoadingApps(false)
+        return
+      }
+
+      try {
+        const { data, error } = await supabase.rpc('get_user_applications', {
+          user_uuid: session.user.id,
+          tenant_uuid: tenant.tenant_id
+        })
+
+        if (error) {
+          console.error('Error fetching user applications:', error)
+          setUserApps([])
+        } else {
+          setUserApps(data || [])
+        }
+      } catch (err) {
+        console.error('Error in fetchUserApplications:', err)
+        setUserApps([])
+      } finally {
+        setLoadingApps(false)
+      }
+    }
+
+    fetchUserApplications()
+  }, [session?.user?.id, tenant?.tenant_id])
 
   const handleSignOut = async () => {
     await signOut()
@@ -109,37 +144,35 @@ export default function TenantDashboard() {
 
         <div className="modules-section">
           <h2>Available Modules</h2>
-          <div className="modules-grid">
-            <div className="module-card">
-              <h3>CRM</h3>
-              <p>Customer Relationship Management</p>
-              <button className="btn btn-primary" onClick={() => navigate('/crm')}>
-                Access CRM
-              </button>
+          {loadingApps ? (
+            <div className="loading-apps">Loading available modules...</div>
+          ) : userApps.length === 0 ? (
+            <div className="no-apps-message">
+              <p>No applications have been assigned to your account yet.</p>
+              <p>Please contact your administrator to request access.</p>
             </div>
-
-            <div className="module-card">
-              <h3>HRMS</h3>
-              <p>Human Resource Management System</p>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => window.open('https://staffinghrms.vercel.app', '_blank', 'noopener,noreferrer')}
-              >
-                Access HRMS
-              </button>
+          ) : (
+            <div className="modules-grid">
+              {userApps.map((app) => (
+                <div className="module-card" key={app.app_code}>
+                  <h3>{app.app_name}</h3>
+                  <p>{app.app_description}</p>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => {
+                      if (app.app_url.startsWith('/')) {
+                        navigate(app.app_url)
+                      } else {
+                        window.open(app.app_url, '_blank', 'noopener,noreferrer')
+                      }
+                    }}
+                  >
+                    Access {app.app_name}
+                  </button>
+                </div>
+              ))}
             </div>
-
-            <div className="module-card">
-              <h3>Accounting</h3>
-              <p>Accounting & Financial Management</p>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => window.open('https://staffingaccounts.vercel.app', '_blank', 'noopener,noreferrer')}
-              >
-                Access Accounting
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

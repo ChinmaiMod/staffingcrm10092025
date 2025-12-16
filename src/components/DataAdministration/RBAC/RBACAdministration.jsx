@@ -61,6 +61,13 @@ function RBACAdministration() {
   });
   const [selectedMenuItems, setSelectedMenuItems] = useState([]);
 
+  // Application Access state
+  const [applications, setApplications] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [userAppAccess, setUserAppAccess] = useState({});
+  const [loadingAppAccess, setLoadingAppAccess] = useState(false);
+  const [tenantId, setTenantId] = useState(null);
+
   const loadRoles = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_roles')
@@ -99,31 +106,109 @@ function RBACAdministration() {
     return permissionsMap;
   }, []);
 
+  // Load applications for Application Access tab
+  const loadApplications = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('applications')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
+
+    if (error) throw error;
+    return data || [];
+  }, []);
+
+  // Load tenant users for Application Access tab
+  const loadTenantUsers = useCallback(async (currentTenantId) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, first_name, last_name, status')
+      .eq('tenant_id', currentTenantId)
+      .eq('status', 'ACTIVE')
+      .order('email');
+
+    if (error) throw error;
+    return data || [];
+  }, []);
+
+  // Load user application access mappings
+  const loadUserAppAccess = useCallback(async (currentTenantId) => {
+    const { data, error } = await supabase
+      .from('user_application_access')
+      .select('user_id, application_id, is_active')
+      .eq('tenant_id', currentTenantId)
+      .eq('is_active', true);
+
+    if (error) throw error;
+    
+    // Transform into a map: { userId: { appId: true } }
+    const accessMap = {};
+    (data || []).forEach(a => {
+      if (!accessMap[a.user_id]) {
+        accessMap[a.user_id] = {};
+      }
+      accessMap[a.user_id][a.application_id] = true;
+    });
+    return accessMap;
+  }, []);
+
   const loadAllData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const [rolesData, menuItemsData, permissionsData] = await Promise.all([
+      const [rolesData, menuItemsData, permissionsData, appsData] = await Promise.all([
         loadRoles(),
         loadMenuItems(),
-        loadRolePermissions()
+        loadRolePermissions(),
+        loadApplications()
       ]);
 
       setRoles(rolesData);
       setMenuItems(menuItemsData);
       setRolePermissions(permissionsData);
+      setApplications(appsData);
     } catch (err) {
       console.error('Error loading RBAC data:', err);
       setError('Failed to load RBAC data: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [loadRoles, loadMenuItems, loadRolePermissions]);
+  }, [loadRoles, loadMenuItems, loadRolePermissions, loadApplications]);
+
+  // Load application access data when switching to that tab
+  const loadAppAccessData = useCallback(async () => {
+    if (!profile?.tenant_id) return;
+    
+    try {
+      setLoadingAppAccess(true);
+      setTenantId(profile.tenant_id);
+      
+      const [usersData, accessData] = await Promise.all([
+        loadTenantUsers(profile.tenant_id),
+        loadUserAppAccess(profile.tenant_id)
+      ]);
+      
+      setUsers(usersData);
+      setUserAppAccess(accessData);
+    } catch (err) {
+      console.error('Error loading app access data:', err);
+      setError('Failed to load application access data: ' + err.message);
+    } finally {
+      setLoadingAppAccess(false);
+    }
+  }, [profile?.tenant_id, loadTenantUsers, loadUserAppAccess]);
 
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  // Load app access data when switching to app-access tab
+  useEffect(() => {
+    if (activeTab === 'app-access') {
+      loadAppAccessData();
+    }
+  }, [activeTab, loadAppAccessData]);
 
   const getRoleLevelName = (level) => {
     const names = {
@@ -269,6 +354,134 @@ function RBACAdministration() {
     } catch (err) {
       console.error('Error revoking permissions:', err);
       setError('Failed to revoke permissions: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle toggling application access for a user
+  const handleAppAccessToggle = async (userId, appId) => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      const hasAccess = userAppAccess[userId]?.[appId] || false;
+
+      if (hasAccess) {
+        // Revoke access - update is_active to false
+        const { error } = await supabase
+          .from('user_application_access')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .eq('application_id', appId)
+          .eq('tenant_id', tenantId);
+
+        if (error) throw error;
+
+        // Update local state
+        setUserAppAccess(prev => {
+          const newAccess = { ...prev };
+          if (newAccess[userId]) {
+            delete newAccess[userId][appId];
+          }
+          return newAccess;
+        });
+      } else {
+        // Grant access - upsert
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const { error } = await supabase
+          .from('user_application_access')
+          .upsert({
+            user_id: userId,
+            application_id: appId,
+            tenant_id: tenantId,
+            granted_by: user?.id,
+            is_active: true
+          }, {
+            onConflict: 'user_id,application_id,tenant_id'
+          });
+
+        if (error) throw error;
+
+        // Update local state
+        setUserAppAccess(prev => ({
+          ...prev,
+          [userId]: {
+            ...prev[userId],
+            [appId]: true
+          }
+        }));
+      }
+
+      setSuccess('Application access updated successfully');
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Error updating application access:', err);
+      setError('Failed to update application access: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Grant all apps to a user
+  const handleGrantAllApps = async (userId) => {
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      for (const app of applications) {
+        if (!userAppAccess[userId]?.[app.id]) {
+          await supabase
+            .from('user_application_access')
+            .upsert({
+              user_id: userId,
+              application_id: app.id,
+              tenant_id: tenantId,
+              granted_by: user?.id,
+              is_active: true
+            }, {
+              onConflict: 'user_id,application_id,tenant_id'
+            });
+        }
+      }
+
+      // Reload access data
+      const newAccess = await loadUserAppAccess(tenantId);
+      setUserAppAccess(newAccess);
+
+      setSuccess('All applications granted to user');
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Error granting all apps:', err);
+      setError('Failed to grant applications: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Revoke all apps from a user
+  const handleRevokeAllApps = async (userId) => {
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('user_application_access')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('tenant_id', tenantId);
+
+      if (error) throw error;
+
+      // Reload access data
+      const newAccess = await loadUserAppAccess(tenantId);
+      setUserAppAccess(newAccess);
+
+      setSuccess('All applications revoked from user');
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Error revoking all apps:', err);
+      setError('Failed to revoke applications: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -671,6 +884,12 @@ function RBACAdministration() {
           🔐 User Roles
         </button>
         <button
+          className={`rbac-tab ${activeTab === 'app-access' ? 'active' : ''}`}
+          onClick={() => setActiveTab('app-access')}
+        >
+          📱 Application Access
+        </button>
+        <button
           className={`rbac-tab ${activeTab === 'permissions-matrix' ? 'active' : ''}`}
           onClick={() => setActiveTab('permissions-matrix')}
         >
@@ -759,6 +978,92 @@ function RBACAdministration() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Application Access Tab */}
+      {activeTab === 'app-access' && (
+        <div className="app-access-section">
+          <div className="section-header">
+            <h2>Application Access Management</h2>
+            <p>Control which applications each user can access (Two-Tier Permission System - Tier 1)</p>
+          </div>
+
+          {loadingAppAccess ? (
+            <div className="loading-state">Loading users and applications...</div>
+          ) : (
+            <div className="matrix-container">
+              <table className="permissions-matrix app-access-matrix">
+                <thead>
+                  <tr>
+                    <th className="user-header">User</th>
+                    {applications.map(app => (
+                      <th key={app.id} className="app-header">
+                        <div className="app-header-content">
+                          <span className="app-icon">{app.icon_name === 'users' ? '👥' : app.icon_name === 'briefcase' ? '💼' : '💰'}</span>
+                          <span className="app-name">{app.app_name}</span>
+                        </div>
+                      </th>
+                    ))}
+                    <th className="actions-header">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(user => (
+                    <tr key={user.id}>
+                      <td className="user-cell">
+                        <div className="user-info">
+                          <span className="user-name">{user.first_name} {user.last_name}</span>
+                          <span className="user-email">{user.email}</span>
+                        </div>
+                      </td>
+                      {applications.map(app => (
+                        <td key={app.id} className="access-cell">
+                          <label className="access-toggle">
+                            <input
+                              type="checkbox"
+                              checked={userAppAccess[user.id]?.[app.id] || false}
+                              onChange={() => handleAppAccessToggle(user.id, app.id)}
+                              disabled={saving}
+                            />
+                            <span className="toggle-slider"></span>
+                          </label>
+                        </td>
+                      ))}
+                      <td className="actions-cell">
+                        <button
+                          className="btn-mini btn-grant"
+                          onClick={() => handleGrantAllApps(user.id)}
+                          disabled={saving}
+                          title="Grant all applications"
+                        >
+                          ✓ All
+                        </button>
+                        <button
+                          className="btn-mini btn-revoke"
+                          onClick={() => handleRevokeAllApps(user.id)}
+                          disabled={saving}
+                          title="Revoke all applications"
+                        >
+                          ✗ None
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="app-access-info">
+            <h3>📋 How Application Access Works</h3>
+            <ul>
+              <li><strong>Tier 1 (Application Access):</strong> Controls which applications a user can see on their dashboard</li>
+              <li><strong>Tier 2 (User Roles):</strong> Controls what actions a user can perform within each application</li>
+              <li>Users must have both application access AND appropriate role permissions to use features</li>
+              <li>New users are automatically granted CRM access when assigned a role</li>
+            </ul>
           </div>
         </div>
       )}
