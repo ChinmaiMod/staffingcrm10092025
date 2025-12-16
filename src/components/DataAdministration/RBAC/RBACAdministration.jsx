@@ -122,7 +122,7 @@ function RBACAdministration() {
   const loadTenantUsers = useCallback(async (currentTenantId) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, first_name, last_name, status')
+      .select('id, email, full_name, status')
       .eq('tenant_id', currentTenantId)
       .eq('status', 'ACTIVE')
       .order('email');
@@ -1014,7 +1014,7 @@ function RBACAdministration() {
                     <tr key={user.id}>
                       <td className="user-cell">
                         <div className="user-info">
-                          <span className="user-name">{user.first_name} {user.last_name}</span>
+                          <span className="user-name">{user.full_name || user.email}</span>
                           <span className="user-email">{user.email}</span>
                         </div>
                       </td>
