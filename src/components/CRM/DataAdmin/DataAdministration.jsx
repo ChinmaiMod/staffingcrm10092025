@@ -25,6 +25,7 @@ const REFERENCE_TABLES = [
   { id: 'job_titles_it', label: 'IT Job Titles', icon: '💼' },
   { id: 'job_titles_healthcare', label: 'Healthcare Job Titles', icon: '🏥' },
   { id: 'reasons_for_contact', label: 'Reasons for Contact', icon: '📋' },
+  { id: 'type_of_contact', label: 'Type of Contact', icon: '👤' },
   { id: 'statuses', label: 'Contact Statuses', icon: '📊' },
   { id: 'role_types', label: 'Role Types', icon: '🎯' },
   { id: 'countries', label: 'Countries', icon: '🌍' },
