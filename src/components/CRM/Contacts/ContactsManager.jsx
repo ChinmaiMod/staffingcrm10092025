@@ -99,7 +99,7 @@ export default function ContactsManager() {
           if (tbl.tenantColumn) {
             query = query.eq(tbl.tenantColumn, tenant.tenant_id)
           }
-          const { data, error } = await query
+          const { data, error } = await query.limit(1000) // Explicitly set a high limit to ensure all records are fetched
           if (error) {
             logger.error(`Failed to load lookup table ${tbl.key}:`, error)
             continue

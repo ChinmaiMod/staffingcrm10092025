@@ -59,7 +59,19 @@ const createSelectResponse = (rows) => ({
     const result = { data: rows, error: null };
     return {
       ...result,
-      eq: () => result,
+      eq: () => ({
+        ...result,
+        order: () => ({
+          ...result,
+          limit: () => Promise.resolve(result),
+        }),
+        limit: () => Promise.resolve(result),
+      }),
+      order: () => ({
+        ...result,
+        limit: () => Promise.resolve(result),
+      }),
+      limit: () => Promise.resolve(result),
       gte: () => result,
       lte: () => result,
     };

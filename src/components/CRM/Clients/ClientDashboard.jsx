@@ -48,8 +48,8 @@ const ClientDashboard = () => {
     const loadOptions = async () => {
       try {
         const [businessesResult, teamsResult] = await Promise.all([
-          supabase.from('businesses').select('*').eq('tenant_id', tenant.tenant_id),
-          supabase.from('teams').select('*').eq('tenant_id', tenant.tenant_id),
+          supabase.from('businesses').select('*').eq('tenant_id', tenant.tenant_id).limit(1000),
+          supabase.from('teams').select('*').eq('tenant_id', tenant.tenant_id).limit(1000),
         ]);
 
         setBusinesses(businessesResult.data || []);

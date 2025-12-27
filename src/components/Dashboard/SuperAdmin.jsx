@@ -15,7 +15,7 @@ export default function SuperAdmin() {
   const fetchTenants = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('tenants').select('*').order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('tenants').select('*').order('created_at', { ascending: false }).limit(1000)
       if (error) throw error
       setTenants(data)
     } catch (err) {

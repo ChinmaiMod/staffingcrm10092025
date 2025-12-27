@@ -250,7 +250,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('reason_for_contact', { ascending: true })
+        const { data, error } = await query.order('reason_for_contact', { ascending: true }).limit(1000)
         if (error) throw error
         const mapped = (data || []).map(row => ({
           id: row.id,
@@ -286,7 +286,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('workflow_status', { ascending: true })
+        const { data, error } = await query.order('workflow_status', { ascending: true }).limit(1000)
         if (error) throw error
         const statuses = (data || []).filter(row => row.id && row.workflow_status)
         setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
@@ -332,7 +332,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('visa_status', { ascending: true })
+        const { data, error } = await query.order('visa_status', { ascending: true }).limit(1000)
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setVisaStatusOptions(records.length > 0 ? records : FALLBACK_VISA_STATUS_RECORDS)
@@ -362,7 +362,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('job_title', { ascending: true })
+        const { data, error } = await query.order('job_title', { ascending: true }).limit(1000)
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setAllJobTitles(records.length > 0 ? records : FALLBACK_JOB_TITLE_RECORDS)
@@ -392,7 +392,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('type_of_roles', { ascending: true })
+        const { data, error } = await query.order('type_of_roles', { ascending: true }).limit(1000)
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setRoleTypeOptions(records.length > 0 ? records : FALLBACK_ROLE_TYPE_RECORDS)
@@ -422,7 +422,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           query = query.eq('business_id', businessId)
         }
         
-        const { data, error } = await query.order('referral_source', { ascending: true })
+        const { data, error } = await query.order('referral_source', { ascending: true }).limit(1000)
         if (error) throw error
   const records = Array.isArray(data) ? data : []
   setReferralSourceOptions(records.length > 0 ? records : FALLBACK_REFERRAL_SOURCE_RECORDS)
@@ -583,6 +583,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         const { data: yearsData, error} = await query
           .order('business_id', { ascending: true, nullsFirst: true })
           .order('years_of_experience', { ascending: true })
+          .limit(1000) // Explicitly set a high limit to ensure all years of experience options are fetched
           .abortSignal(controller.signal)
 
         if (error) {
@@ -628,6 +629,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .from('countries')
         .select('country_id, code, name')
         .order('name')
+        .limit(1000) // Explicitly set a high limit to ensure all countries are fetched
 
     if (error) throw error
     setCountries((data || []).map(c => ({ country_id: c.country_id, name: c.name, code: c.code })))
@@ -674,6 +676,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .select('state_id, code, name')
         .eq('country_id', countryId)
         .order('name')
+        .limit(1000) // Explicitly set a high limit to ensure all states are fetched
 
       if (error) throw error
 
@@ -722,6 +725,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         .select('city_id, name')
         .eq('state_id', stateId)
         .order('name')
+        .limit(1000) // Explicitly set a high limit to ensure all cities are fetched
 
       if (error) throw error
 
@@ -767,6 +771,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         `)
         .eq('role', 'LEAD')
         .eq('is_active', true)
+        .limit(1000) // Explicitly set a high limit to ensure all team leads are fetched
 
       if (error) throw error
       
@@ -818,6 +823,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           .eq('is_active', true)
           .eq('staff.first_name', firstName)
           .eq('staff.last_name', lastName)
+          .limit(100) // Limit for specific lead lookup
         
         if (!leadError && leadData) {
           leadMemberIds = leadData.map(m => m.member_id)
@@ -841,6 +847,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         `)
         .eq('role', 'RECRUITER')
         .eq('is_active', true)
+        .limit(1000) // Explicitly set a high limit to ensure all recruiters are fetched
       
       // If lead is selected, filter by reports_to_member_id
       if (leadMemberIds.length > 0) {

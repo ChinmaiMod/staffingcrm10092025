@@ -10,8 +10,20 @@ vi.mock('../../../api/supabaseClient', () => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          order: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+            abortSignal: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+          limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          in: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
         })),
+        order: vi.fn(() => ({
+          limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          abortSignal: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        })),
+        limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
       })),
       insert: vi.fn(() => Promise.resolve({ data: {}, error: null })),
       update: vi.fn(() => Promise.resolve({ data: {}, error: null })),
