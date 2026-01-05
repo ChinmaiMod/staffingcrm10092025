@@ -276,21 +276,46 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         return
       }
       try {
-        let query = supabase
+        const baseQuery = () => supabase
           .from('workflow_status')
           .select('id, workflow_status')
           .eq('tenant_id', tenant.tenant_id)
-        
-        // Filter by business_id if available from formData (works for both create and edit)
+
+        // Prefer business-scoped statuses when present, but fall back to tenant/global statuses
+        // when a business has no specific workflow_status rows yet.
         const businessId = formData.business_id
+
+        let query = baseQuery()
         if (businessId) {
           query = query.eq('business_id', businessId)
         }
-        
-        const { data, error } = await query.order('workflow_status', { ascending: true }).limit(1000)
-        if (error) throw error
-        const statuses = (data || []).filter(row => row.id && row.workflow_status)
-        setStatusOptions(statuses.length > 0 ? statuses : FALLBACK_STATUS_RECORDS)
+
+        const { data: scopedData, error: scopedError } = await query
+          .order('workflow_status', { ascending: true })
+          .limit(1000)
+
+        if (scopedError) throw scopedError
+
+        const scopedStatuses = (scopedData || []).filter(row => row.id && row.workflow_status)
+        if (scopedStatuses.length > 0) {
+          setStatusOptions(scopedStatuses)
+          return
+        }
+
+        // Retry without business scope if business had no statuses
+        if (businessId) {
+          const { data: unscopedData, error: unscopedError } = await baseQuery()
+            .order('workflow_status', { ascending: true })
+            .limit(1000)
+
+          if (unscopedError) throw unscopedError
+
+          const unscopedStatuses = (unscopedData || []).filter(row => row.id && row.workflow_status)
+          setStatusOptions(unscopedStatuses.length > 0 ? unscopedStatuses : FALLBACK_STATUS_RECORDS)
+          return
+        }
+
+        setStatusOptions(FALLBACK_STATUS_RECORDS)
       } catch (err) {
         console.error('Error loading workflow statuses:', err)
         setStatusOptions(FALLBACK_STATUS_RECORDS)

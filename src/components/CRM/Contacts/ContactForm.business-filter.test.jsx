@@ -167,4 +167,32 @@ describe('ContactForm - Business scoped behavior', () => {
 
     expect(screen.getByText('Job Title')).toBeTruthy()
   })
+
+  it('falls back to tenant workflow statuses when business has none', async () => {
+    const businessId = 'business-empty-statuses'
+
+    // Seed only tenant/global statuses (no business_id match).
+    mockSupabaseQueries.workflow_status = [
+      { id: 1, workflow_status: 'Initial Contact', tenant_id: undefined, business_id: null }
+    ]
+
+    render(
+      <ContactForm
+        contact={{ business_id: businessId }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    )
+
+    await waitFor(() => {
+      const workflowQueries = supabaseCallHistory.filter(entry => entry.table === 'workflow_status')
+      expect(workflowQueries.length).toBeGreaterThanOrEqual(2)
+
+      // First try includes business_id filter
+      expect(workflowQueries[0].filters.some(filter => filter.column === 'business_id' && filter.value === businessId)).toBe(true)
+
+      // Second try omits business_id filter (tenant/global fallback)
+      expect(workflowQueries[1].filters.some(filter => filter.column === 'business_id')).toBe(false)
+    })
+  })
 })
