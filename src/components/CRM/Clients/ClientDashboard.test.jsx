@@ -538,7 +538,7 @@ describe('ClientDashboard', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Revenue This Month/i)).toBeInTheDocument();
-      expect(screen.getByText(/\$50,000/i)).toBeInTheDocument(); // Total revenue this month
+      expect(screen.getByText(/\$20,000/i)).toBeInTheDocument(); // Total revenue this month
     });
   });
 

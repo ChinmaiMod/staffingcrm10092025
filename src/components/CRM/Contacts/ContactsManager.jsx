@@ -588,7 +588,7 @@ export default function ContactsManager() {
 
     // Get workflow_status label for status history
     let statusLabel = null
-    if (workflow_status_id) {
+    if (workflow_status_id !== null && workflow_status_id !== undefined) {
       let query = supabase
         .from('workflow_status')
         .select('workflow_status')
@@ -720,6 +720,9 @@ export default function ContactsManager() {
       }
 
       if (contactId && statusChanged) {
+        if (!statusLabel) {
+          throw new Error('Please select a valid workflow status before saving.')
+        }
         const { error: statusHistoryError } = await supabase
           .from('contact_status_history')
           .insert({

@@ -4,6 +4,7 @@ import { useTenant } from '../../../contexts/TenantProvider'
 import AutocompleteSelect from '../common/AutocompleteSelect'
 import StatusChangeModal from './StatusChangeModal'
 import { formatFileSize } from '../../../utils/fileUtils'
+import { toNullableNumberId } from '../../../utils/idCoercion'
 import { 
   validateEmail, 
   validatePhone, 
@@ -1053,20 +1054,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
 
     // Extract IDs for all lookup fields before saving
     const getId = (val, key = 'id') => getIdValue(val, key)
-    const toNumericId = (val) => {
-      const resolved = getId(val)
-      if (resolved === null || resolved === undefined || resolved === '') {
-        return null
-      }
-      if (typeof resolved === 'number') {
-        return resolved
-      }
-      if (typeof resolved === 'string') {
-        const numeric = Number(resolved)
-        return Number.isNaN(numeric) ? null : numeric
-      }
-      return null
-    }
+    const toNumericId = (val) => toNullableNumberId(getId(val))
 
     const normalizeGeoId = (val, key) => {
       const resolved = getId(val, key)
@@ -1079,6 +1067,19 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       return resolved
     }
 
+    const isEditing = Boolean(contact?.contact_id)
+    const initialWorkflowStatusId = toNullableNumberId(initialStatus.current)
+    const nextWorkflowStatusId = toNumericId(formData.workflow_status_id)
+
+    // Guard: if we cannot normalize the status selection while editing, preserve the existing status
+    // to avoid accidentally clearing status + inserting invalid status history.
+    const workflowStatusIdToSave =
+      isEditing && nextWorkflowStatusId === null && initialWorkflowStatusId !== null
+        ? initialWorkflowStatusId
+        : nextWorkflowStatusId
+
+    const statusChanged = workflowStatusIdToSave !== initialWorkflowStatusId
+
     const saveData = {
       ...formData,
       first_name: formData.first_name.trim(),
@@ -1088,11 +1089,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       city: formData.city ? formData.city.trim() : '',
       remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
-      statusChanged: formData.workflow_status_id !== initialStatus.current,
+      statusChanged,
       visa_status_id: toNumericId(formData.visa_status_id),
       job_title_id: toNumericId(formData.job_title_id),
       reason_for_contact_id: toNumericId(formData.reason_for_contact_id),
-      workflow_status_id: toNumericId(formData.workflow_status_id),
+      workflow_status_id: workflowStatusIdToSave,
       type_of_roles_id: toNumericId(formData.type_of_roles_id),
       years_of_experience_id: toNumericId(formData.years_of_experience_id),
       referral_source_id: toNumericId(formData.referral_source_id),
