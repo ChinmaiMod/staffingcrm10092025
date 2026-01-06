@@ -64,6 +64,77 @@ const nullIfEmpty = (value) => {
   return value
 }
 
+const coerceLookupId = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  if (typeof value === 'number') {
+    return value
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return null
+    }
+    if (/^\d+$/.test(trimmed)) {
+      const numeric = Number(trimmed)
+      return Number.isNaN(numeric) ? null : numeric
+    }
+  }
+  return null
+}
+
+export const buildContactUpsertPayload = ({ tenantId, businessId, profileId, contactData, nowIso }) => {
+  const {
+    statusChangeRemarks, // eslint-disable-line no-unused-vars
+    statusChanged, // eslint-disable-line no-unused-vars
+    workflow_status_id,
+    reason_for_contact_id,
+    role_types, // eslint-disable-line no-unused-vars
+    years_experience, // eslint-disable-line no-unused-vars
+    referral_source, // eslint-disable-line no-unused-vars
+    referral_source_label, // eslint-disable-line no-unused-vars
+    ...formFields
+  } = contactData || {}
+
+  const payload = {
+    tenant_id: tenantId,
+    business_id: businessId,
+    first_name: nullIfEmpty(formFields.first_name),
+    last_name: nullIfEmpty(formFields.last_name),
+    email: nullIfEmpty(formFields.email),
+    phone: nullIfEmpty(formFields.phone),
+    contact_type: mapContactTypeToDb(formFields.contact_type),
+    visa_status_id: coerceLookupId(formFields.visa_status_id),
+    job_title_id: coerceLookupId(formFields.job_title_id),
+    type_of_roles_id: coerceLookupId(formFields.type_of_roles_id),
+    country_id: formFields.country_id || null,
+    state_id: formFields.state_id || null,
+    city_id: formFields.city_id || null,
+    years_of_experience_id: coerceLookupId(formFields.years_of_experience_id),
+    referral_source_id: coerceLookupId(formFields.referral_source_id),
+    workflow_status_id: coerceLookupId(workflow_status_id),
+    reason_for_contact_id: coerceLookupId(reason_for_contact_id),
+    remarks: nullIfEmpty(formFields.remarks),
+    referred_by: nullIfEmpty(formFields.referred_by)
+  }
+
+  const timestamp = nowIso || new Date().toISOString()
+
+  return {
+    payload,
+    updatePayload: {
+      ...payload,
+      updated_by: profileId || null,
+      updated_at: timestamp
+    },
+    insertPayload: {
+      ...payload,
+      created_by: profileId || null
+    }
+  }
+}
+
 export default function ContactsManager() {
   // Lookup maps for contact list rendering
   const [lookupMaps, setLookupMaps] = useState({})
@@ -272,6 +343,7 @@ export default function ContactsManager() {
           contact_type_key: contactTypeKey,
           status: contact.workflow_status?.workflow_status || 'Unknown',
           status_code: contact.workflow_status_id || null,
+          workflow_status_id: contact.workflow_status_id || null,
           visa_status_id: contact.visa_status_id || null,
           visa_status: currentLookups.visa_status?.[contact.visa_status_id] || '',  // Add resolved visa status for filtering
           job_title_id: contact.job_title_id || null,
@@ -531,6 +603,7 @@ export default function ContactsManager() {
       city_id: contact.city_id || null,
       years_of_experience_id: contact.years_of_experience_id || null,
       referral_source_id: contact.referral_source_id || null,
+      workflow_status_id: contact.workflow_status_id ?? contact.status_code ?? null,
       reason_for_contact_id: contact.reason_for_contact_id || null,
       role_types: contact.role_types,
       remarks: contact.remarks,
@@ -546,45 +619,22 @@ export default function ContactsManager() {
     setSelectedContact(contact)
   }
 
-  const coerceLookupId = (value) => {
-    if (value === null || value === undefined || value === '') {
-      return null
-    }
-    if (typeof value === 'number') {
-      return value
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        return null
-      }
-      if (/^\d+$/.test(trimmed)) {
-        const numeric = Number(trimmed)
-        return Number.isNaN(numeric) ? null : numeric
-      }
-    }
-    return null
-  }
-
   const handleSaveContact = async (contactData, attachments = []) => {
     if (!tenant?.tenant_id) {
       alert('Missing tenant context. Please refresh and try again.')
       return
     }
 
-    const {
-      statusChangeRemarks,
-      statusChanged,
-      workflow_status_id,
-      reason_for_contact_id,
-      role_types, // eslint-disable-line no-unused-vars
-      years_experience, // eslint-disable-line no-unused-vars
-      referral_source, // eslint-disable-line no-unused-vars
-      referral_source_label,
-      ...formFields
-    } = contactData
-
     const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
+
+    const { payload, updatePayload, insertPayload } = buildContactUpsertPayload({
+      tenantId: tenant.tenant_id,
+      businessId,
+      profileId: profile?.id || null,
+      contactData
+    })
+
+    const { statusChanged, statusChangeRemarks, workflow_status_id } = contactData
 
     // Get workflow_status label for status history
     let statusLabel = null
@@ -604,40 +654,12 @@ export default function ContactsManager() {
       statusLabel = statusRows?.workflow_status || null
     }
 
-    const payload = {
-      tenant_id: tenant.tenant_id,
-      business_id: businessId,
-      first_name: nullIfEmpty(formFields.first_name),
-      last_name: nullIfEmpty(formFields.last_name),
-      email: nullIfEmpty(formFields.email),
-      phone: nullIfEmpty(formFields.phone),
-      contact_type: mapContactTypeToDb(formFields.contact_type),
-      visa_status_id: coerceLookupId(formFields.visa_status_id),
-      job_title_id: coerceLookupId(formFields.job_title_id),
-      type_of_roles_id: coerceLookupId(formFields.type_of_roles_id),
-      country_id: formFields.country_id || null,
-      state_id: formFields.state_id || null,
-      city_id: formFields.city_id || null,
-      years_of_experience_id: coerceLookupId(formFields.years_of_experience_id),
-      referral_source_id: coerceLookupId(formFields.referral_source_id),
-      workflow_status_id: coerceLookupId(workflow_status_id),
-      reason_for_contact_id: coerceLookupId(reason_for_contact_id),
-      remarks: nullIfEmpty(formFields.remarks),
-      referred_by: nullIfEmpty(formFields.referred_by)
-    }
-
     try {
       setSavingContact(true)
       let contactId = selectedContact?.contact_id || null
       let effectiveBusinessId = businessId
 
       if (selectedContact?.contact_id) {
-        // Update existing contact - set updated_by
-        const updatePayload = {
-          ...payload,
-          updated_by: profile?.id || null,
-          updated_at: new Date().toISOString()
-        }
         const { data, error } = await supabase
           .from('contacts')
           .update(updatePayload)
@@ -653,11 +675,6 @@ export default function ContactsManager() {
           effectiveBusinessId = data[0].business_id ?? effectiveBusinessId
         }
       } else {
-        // Create new contact - set created_by
-        const insertPayload = {
-          ...payload,
-          created_by: profile?.id || null
-        }
         const { data, error } = await supabase
           .from('contacts')
           .insert([insertPayload])
@@ -740,7 +757,7 @@ export default function ContactsManager() {
 
       try {
         if (payload.referral_source_id) {
-          const referralLabel = referral_source_label || lookupMaps.referral_sources?.[payload.referral_source_id] || null
+          const referralLabel = contactData?.referral_source_label || lookupMaps.referral_sources?.[payload.referral_source_id] || null
           const normalizedLabel = referralLabel ? referralLabel.trim().toLowerCase() : ''
           if (payload.referred_by && normalizedLabel && normalizedLabel !== 'facebook' && normalizedLabel !== 'google') {
             const { error: referralUpdateError } = await supabase
@@ -1456,8 +1473,19 @@ export default function ContactsManager() {
 
       {showForm && (
         <>
-          <div className="modal-overlay" onClick={() => setShowForm(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-overlay"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowForm(false)
+              }
+            }}
+          >
+            <div
+              className="modal"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="modal-header">
                 <h2>{selectedContact ? 'Edit Contact' : 'New Contact'}</h2>
                 <button className="btn btn-icon btn-secondary" onClick={() => setShowForm(false)}>
