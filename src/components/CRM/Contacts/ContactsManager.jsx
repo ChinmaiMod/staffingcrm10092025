@@ -335,6 +335,26 @@ export default function ContactsManager() {
           contact.businesses?.business_id
         )
 
+        if (import.meta?.env?.DEV) {
+          const hasAnyBusinessId =
+            contact.business_id !== null &&
+            contact.business_id !== undefined &&
+            contact.business_id !== ''
+
+          const hasRelatedBusinessId =
+            contact.businesses?.business_id !== null &&
+            contact.businesses?.business_id !== undefined &&
+            contact.businesses?.business_id !== ''
+
+          if ((hasAnyBusinessId || hasRelatedBusinessId) && !normalizedBusinessId) {
+            logger.warn('Contact business_id normalized to null', {
+              contact_id: contact.id,
+              raw_business_id: contact.business_id,
+              related_business_id: contact.businesses?.business_id
+            })
+          }
+        }
+
         const contactTypeKey = mapContactTypeToKey(contact.contact_type)
         const contactTypeLabel = CONTACT_TYPE_LABELS[contactTypeKey] || contact.contact_type || null
 
@@ -643,6 +663,19 @@ export default function ContactsManager() {
       selectedContact?.business_id ??
       defaultBusinessId ??
       null
+
+    if (!businessId) {
+      if (import.meta?.env?.DEV) {
+        logger.warn('Attempted to save contact with null business_id', {
+          selected_contact_id: selectedContact?.contact_id || null,
+          contact_data_business_id: contactData?.business_id ?? null,
+          selected_contact_business_id: selectedContact?.business_id ?? null,
+          default_business_id: defaultBusinessId ?? null
+        })
+      }
+      alert('Business is required. Please select a business and try again.')
+      return
+    }
 
     const { payload, updatePayload, insertPayload } = buildContactUpsertPayload({
       tenantId: tenant.tenant_id,
