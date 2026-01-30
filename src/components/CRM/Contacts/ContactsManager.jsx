@@ -720,6 +720,12 @@ export default function ContactsManager() {
         if (error) {
           throw error
         }
+        if (!data || data.length === 0) {
+          throw new Error(
+            'Unable to update this contact. Your role may allow viewing, but not editing contacts created by other users. ' +
+              'Ask a tenant admin to assign you a role with edit permissions or add the contact creator under you in User Hierarchy.'
+          )
+        }
         if (data && data.length > 0) {
           contactId = data[0].id
           effectiveBusinessId = data[0].business_id ?? effectiveBusinessId
