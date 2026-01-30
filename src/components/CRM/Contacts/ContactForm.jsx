@@ -594,6 +594,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         visa_status_id: contact.visa_status_id || '',
         job_title_id: contact.job_title_id || '',
         reason_for_contact_id: contact.reason_for_contact_id || '',
+        workflow_status_id: contact.workflow_status_id || '',
         status: contact.status || 'Initial Contact',
         type_of_roles_id: contact.type_of_roles_id || '',
         country_id: contact.country_id || '',
@@ -603,6 +604,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
         referral_source_id: contact.referral_source_id || '',
         recruiting_team_lead: contact.recruiting_team_lead || '',
         recruiter: contact.recruiter || '',
+        referred_by: contact.referred_by || '',
         remarks: contact.remarks || '',
         business_id: resolvedBusinessId
       }))
