@@ -710,20 +710,31 @@ export default function ContactsManager() {
       let effectiveBusinessId = businessId
 
       if (selectedContact?.contact_id) {
-        const { data, error } = await supabase
+        // Debug: log what we're sending (always, for troubleshooting)
+        console.log('[DEBUG] UPDATE contact payload', {
+          contact_id: selectedContact.contact_id,
+          updatePayload
+        })
+
+        const { data, error, status, statusText } = await supabase
           .from('contacts')
           .update(updatePayload)
           .eq('id', selectedContact.contact_id)
-          .eq('tenant_id', tenant.tenant_id)
           .select('id, business_id')
 
+        // Debug: log response (always, for troubleshooting)
+        console.log('[DEBUG] UPDATE contact response', { data, error, status, statusText })
+
         if (error) {
+          console.error('[DEBUG] UPDATE error:', error)
           throw error
         }
         if (!data || data.length === 0) {
+          console.warn('[DEBUG] UPDATE returned 0 rows')
           throw new Error(
-            'Unable to update this contact. Your role may allow viewing, but not editing contacts created by other users. ' +
-              'Ask a tenant admin to assign you a role with edit permissions or add the contact creator under you in User Hierarchy.'
+            'Unable to update this contact (0 rows affected). ' +
+              'This may be caused by RLS restrictions or the contact no longer exists. ' +
+              'Contact ID: ' + selectedContact.contact_id
           )
         }
         if (data && data.length > 0) {
