@@ -1240,6 +1240,32 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
           readOnly
         />
         <div className="form-grid">
+          {/* Business Name - FIRST FIELD */}
+          <div className="form-group">
+            <label htmlFor="business_id">Business <span style={{ color: 'red' }}>*</span></label>
+            <select
+              id="business_id"
+              value={formData.business_id || ''}
+              onChange={(e) => handleChange('business_id', e.target.value)}
+              className={fieldErrors.business_id ? 'error' : ''}
+              disabled={loadingBusinesses}
+              required
+            >
+              <option value="">Select business...</option>
+              {businesses.map(business => (
+                <option key={business.business_id} value={business.business_id}>
+                  {business.business_name}{business.is_default ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.business_id && (
+              <small className="error-text">{fieldErrors.business_id}</small>
+            )}
+            {loadingBusinesses && (
+              <small style={{ color: '#666' }}>Loading businesses...</small>
+            )}
+          </div>
+
           {/* Basic Information */}
           <div className="form-group">
             <label>First Name <span style={{ color: 'red' }}>*</span></label>
@@ -1319,31 +1345,6 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             </select>
             {fieldErrors.contact_type && (
               <small className="error-text">{fieldErrors.contact_type}</small>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="business_id">Business <span style={{ color: 'red' }}>*</span></label>
-            <select
-              id="business_id"
-              value={formData.business_id || ''}
-              onChange={(e) => handleChange('business_id', e.target.value)}
-              className={fieldErrors.business_id ? 'error' : ''}
-              disabled={loadingBusinesses}
-              required
-            >
-              <option value="">Select business...</option>
-              {businesses.map(business => (
-                <option key={business.business_id} value={business.business_id}>
-                  {business.business_name}{business.is_default ? ' (Default)' : ''}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.business_id && (
-              <small className="error-text">{fieldErrors.business_id}</small>
-            )}
-            {loadingBusinesses && (
-              <small style={{ color: '#666' }}>Loading businesses...</small>
             )}
           </div>
 
