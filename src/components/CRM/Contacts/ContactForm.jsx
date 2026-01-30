@@ -339,6 +339,8 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
   const [attachments, setAttachments] = useState([])
   const [fieldErrors, setFieldErrors] = useState({})
   const [yearsExperienceOptions, setYearsExperienceOptions] = useState(FALLBACK_YEARS_EXPERIENCE_RECORDS)
+  const [businesses, setBusinesses] = useState([])
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false)
   
   useEffect(() => {
     async function loadVisaStatuses() {
@@ -459,6 +461,36 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
     }
     loadReferralSources()
   }, [tenant?.tenant_id, formData.business_id])
+
+  // Load businesses for business dropdown
+  useEffect(() => {
+    async function loadBusinesses() {
+      if (!tenant?.tenant_id) {
+        setBusinesses([])
+        return
+      }
+      try {
+        setLoadingBusinesses(true)
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_id, business_name, is_default')
+          .eq('tenant_id', tenant.tenant_id)
+          .eq('is_active', true)
+          .order('is_default', { ascending: false })
+          .order('business_name', { ascending: true })
+          .limit(1000)
+
+        if (error) throw error
+        setBusinesses(data || [])
+      } catch (err) {
+        console.error('Error loading businesses:', err)
+        setBusinesses([])
+      } finally {
+        setLoadingBusinesses(false)
+      }
+    }
+    loadBusinesses()
+  }, [tenant?.tenant_id])
 
   // Team leads and recruiters
   const [teamLeads, setTeamLeads] = useState([])
@@ -1044,6 +1076,11 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       errors.contact_type = contactTypeValidation.error;
     }
 
+    // Validate business (required)
+    if (!formData.business_id) {
+      errors.business_id = 'Business is required.';
+    }
+
     // Validate city (if provided, 2-100 characters)
     if (formData.city && formData.city.trim()) {
       const cityValidation = validateTextField(formData.city, {
@@ -1115,6 +1152,7 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
       remarks: formData.remarks ? formData.remarks.trim() : '',
       statusChangeRemarks: statusChangeRemarks || null,
       statusChanged,
+      business_id: formData.business_id || null,
       visa_status_id: toNumericId(formData.visa_status_id),
       job_title_id: toNumericId(formData.job_title_id),
       reason_for_contact_id: toNumericId(formData.reason_for_contact_id),
@@ -1281,6 +1319,31 @@ export default function ContactForm({ contact, onSave, onCancel, isSaving = fals
             </select>
             {fieldErrors.contact_type && (
               <small className="error-text">{fieldErrors.contact_type}</small>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="business_id">Business <span style={{ color: 'red' }}>*</span></label>
+            <select
+              id="business_id"
+              value={formData.business_id || ''}
+              onChange={(e) => handleChange('business_id', e.target.value)}
+              className={fieldErrors.business_id ? 'error' : ''}
+              disabled={loadingBusinesses}
+              required
+            >
+              <option value="">Select business...</option>
+              {businesses.map(business => (
+                <option key={business.business_id} value={business.business_id}>
+                  {business.business_name}{business.is_default ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.business_id && (
+              <small className="error-text">{fieldErrors.business_id}</small>
+            )}
+            {loadingBusinesses && (
+              <small style={{ color: '#666' }}>Loading businesses...</small>
             )}
           </div>
 
