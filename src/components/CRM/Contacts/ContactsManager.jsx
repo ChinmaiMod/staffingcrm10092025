@@ -135,6 +135,20 @@ export const buildContactUpsertPayload = ({ tenantId, businessId, profileId, con
   }
 }
 
+export const normalizeBusinessIdValue = (rawBusinessId, relatedBusinessId) => {
+  const resolved =
+    rawBusinessId !== null &&
+    rawBusinessId !== undefined &&
+    (typeof rawBusinessId === 'string' || typeof rawBusinessId === 'number')
+      ? rawBusinessId
+      : rawBusinessId?.business_id ||
+        rawBusinessId?.id ||
+        relatedBusinessId ||
+        null
+
+  return resolved ? String(resolved) : null
+}
+
 export default function ContactsManager() {
   // Lookup maps for contact list rendering
   const [lookupMaps, setLookupMaps] = useState({})
@@ -316,11 +330,10 @@ export default function ContactsManager() {
   const currentLookups = lookupMapsRef.current || {}
 
   const normalizedContacts = (data || []).map((contact) => {
-        const rawBusinessId = contact.business_id
-        const resolvedBusinessId = typeof rawBusinessId === 'string'
-          ? rawBusinessId
-          : rawBusinessId?.business_id || rawBusinessId?.id || contact.businesses?.business_id || null
-        const normalizedBusinessId = resolvedBusinessId ? String(resolvedBusinessId) : null
+        const normalizedBusinessId = normalizeBusinessIdValue(
+          contact.business_id,
+          contact.businesses?.business_id
+        )
 
         const contactTypeKey = mapContactTypeToKey(contact.contact_type)
         const contactTypeLabel = CONTACT_TYPE_LABELS[contactTypeKey] || contact.contact_type || null
@@ -625,7 +638,11 @@ export default function ContactsManager() {
       return
     }
 
-    const businessId = selectedContact?.business_id ?? defaultBusinessId ?? null
+    const businessId =
+      contactData?.business_id ??
+      selectedContact?.business_id ??
+      defaultBusinessId ??
+      null
 
     const { payload, updatePayload, insertPayload } = buildContactUpsertPayload({
       tenantId: tenant.tenant_id,
